@@ -53,19 +53,15 @@ sbt coverageReport
 
 <p>Below is a rough sketch of an article to introduce the demo app. </p>
 
-<h2>
-<a id="attribution" class="anchor" href="#attribution" aria-hidden="true"><span class="octicon octicon-link"></span></a>Attribution</h2>
-
-<p>The TRex icon is Tyrannosaurus Rex by Raf Verbraeken from the Noun Project licensed under <a href="http://creativecommons.org/licenses/by/3.0/us/">CC3.0</a></p>
 
 <h3>
 <a id="trex-the-paxos-engine" class="anchor" href="#trex-the-paxos-engine" aria-hidden="true"><span class="octicon octicon-link"></span></a>TRex The Paxos Engine</h3>
 
-<p>Previous <a href="https://simbo1905.wordpress.com/2014/10/28/transaction-log-replication-with-paxos/">posts</a> described how the Paxos algorithm can be applied to binary log replication. This post introduces a Paxos state machine replication engine called TRex. TRex is implemented in Scala using Akka FSM. It can be used to reliably replicate messages, commands or method invocations to create a strongly consistent and fault tolerate cluster with automatic leader failover. The demo code for TRex shows how to wrap an object so that it is replicated across a Paxos cluster. You can fork the code over at TBD.</p>
+<p>Previous <a href="https://simbo1905.wordpress.com/2014/10/28/transaction-log-replication-with-paxos/">posts</a> described how the Paxos algorithm can be applied to binary log replication. This post introduces a Paxos state machine replication engine called TRex. TRex is implemented in Scala using Akka FSM. It can be used to reliably replicate messages, commands or method invocations to create a strongly consistent and fault tolerate cluster with automatic leader failover. The demo code for TRex shows how to wrap an object so that it is replicated across a Paxos cluster. You can fork the code over at <a href="https://github.com/simbo1905/trex">GitHub</a>.</p>
 
 <p>This post will provide a walk-through of the demo application. A detailed description of how multi-Paxos is implemented in TRex is given in a previous post. TRex also comes with extensive unit tests that are an executable specification of its implementation of the multi-Paxos consensus algorithm. </p>
 
-<p>Before we begin I should make a statement about the status of the codebase. Currently this post describes version 0.5.0 of the code. Some features that a production replication service would need to provide (e.g. metrics, dynamic cluster membership) are not yet implemented. This blog post will be updated as new features are added to TRex. </p>
+<p>Before we begin I should make a statement about the status of the codebase. Currently this post describes version x.y.z of the code. Some features that a production replication service would need to provide (e.g. metrics, dynamic cluster membership) are not yet implemented. This blog post will be updated as new features are added to TRex. </p>
 
 <p>The demo application implements a key-value store that has the following interface:</p>
 
@@ -188,8 +184,14 @@ trex {
 <p>Now we have both client and server its worth describing the full data flow created by the demo code. The client code invokes the interface methods on the <code>TypedActor</code>. The <code>TypedActor</code> forwards a <code>MethodCall</code> message to the TRex driver. The driver has Akka serialise the message and forwards it to the distinguished leader over TCP. At the other end the distinguished leader runs the multi-Paxos consensus algorithm over UDP. The chosen messages are invoked on all the replicated objects in consensus order. The method return value at the distinguished leader is sent back to the client TRex driver. It responds to the TypedActor which competes the method call for the client code. </p>
 
 <p>We can now start up the three server process and multiple clients. We can run commands though the clients and kill the leader node to see a failover. If we restart the failed node it will automatically sync up with the new leader. Not bad for a few lines of custom code and a bit of configuration. </p>
+
+
+<h2>
+<a id="attribution" class="anchor" href="#attribution" aria-hidden="true"><span class="octicon octicon-link"></span></a>Attribution</h2>
+<p>The TRex icon is Tyrannosaurus Rex by Raf Verbraeken from the Noun Project licensed under <a href="http://creativecommons.org/licenses/by/3.0/us/">CC3.0</a></p>
       </section>
     </div>
+
 
     <!-- FOOTER  -->
     <div id="footer_wrap" class="outer">
