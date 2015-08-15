@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="description" content="Trex : A multi-Paxos transaction log replication engine">
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Trex</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/simbo1905/trex">View on GitHub</a>
+
+          <h1 id="project_title">Trex</h1>
+          <h2 id="project_tagline">A multi-Paxos transaction log replication engine</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/simbo1905/trex/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/simbo1905/trex/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <h2>
+<a id="building" class="anchor" href="#building" aria-hidden="true"><span class="octicon octicon-link"></span></a>Building</h2>
+
+<pre><code># kick the tires
+sbt clean coverage test it:test
+sbt coverageReport
+</code></pre>
+
+<p><a href="https://travis-ci.org/simbo1905/trex"><img src="https://travis-ci.org/simbo1905/trex.svg?branch=master" alt="Build Status"></a></p>
+
+<h2>
+<a id="what-is-this" class="anchor" href="#what-is-this" aria-hidden="true"><span class="octicon octicon-link"></span></a>What is this?</h2>
+
+<p>This is TRex which has a <a href="https://simbo1905.wordpress.com/2014/10/28/transaction-log-replication-with-paxos/">write up here</a>. </p>
+
+<p>More to come...</p>
+
+<h2>
+<a id="how-do-i-use-this" class="anchor" href="#how-do-i-use-this" aria-hidden="true"><span class="octicon octicon-link"></span></a>How do I use this?</h2>
+
+<p>Below is a rough sketch of an article to introduce the demo app. </p>
+
+<h2>
+<a id="attribution" class="anchor" href="#attribution" aria-hidden="true"><span class="octicon octicon-link"></span></a>Attribution</h2>
+
+<p>The TRex icon is Tyrannosaurus Rex by Raf Verbraeken from the Noun Project licensed under <a href="http://creativecommons.org/licenses/by/3.0/us/">CC3.0</a></p>
+
+<h3>
+<a id="trex-the-paxos-engine" class="anchor" href="#trex-the-paxos-engine" aria-hidden="true"><span class="octicon octicon-link"></span></a>TRex The Paxos Engine</h3>
+
+<p>Previous <a href="https://simbo1905.wordpress.com/2014/10/28/transaction-log-replication-with-paxos/">posts</a> described how the Paxos algorithm can be applied to binary log replication. This post introduces a Paxos state machine replication engine called TRex. TRex is implemented in Scala using Akka FSM. It can be used to reliably replicate messages, commands or method invocations to create a strongly consistent and fault tolerate cluster with automatic leader failover. The demo code for TRex shows how to wrap an object so that it is replicated across a Paxos cluster. You can fork the code over at TBD.</p>
+
+<p>This post will provide a walk-through of the demo application. A detailed description of how multi-Paxos is implemented in TRex is given in a previous post. TRex also comes with extensive unit tests that are an executable specification of its implementation of the multi-Paxos consensus algorithm. </p>
+
+<p>Before we begin I should make a statement about the status of the codebase. Currently this post describes version 0.5.0 of the code. Some features that a production replication service would need to provide (e.g. metrics, dynamic cluster membership) are not yet implemented. This blog post will be updated as new features are added to TRex. </p>
+
+<p>The demo application implements a key-value store that has the following interface:</p>
+
+<div class="highlight highlight-Scala"><pre><span class="pl-k">trait</span> <span class="pl-en">ConsistentKVStore</span> {
+<span class="pl-c">  /**</span>
+<span class="pl-c">   * Add a value into the KV store</span>
+<span class="pl-c">   */</span>
+  <span class="pl-k">def</span> <span class="pl-en">put</span>(<span class="pl-v">key</span>: <span class="pl-k">String</span>, <span class="pl-v">value</span>: <span class="pl-k">String</span>)<span class="pl-k">:</span> <span class="pl-k">Unit</span>
+
+<span class="pl-c">  /**</span>
+<span class="pl-c">   * Add a value into the KV store only if the current version number is 'version'</span>
+<span class="pl-c">   * <span class="pl-k">@return</span> True if the operation succeeded else False</span>
+<span class="pl-c">   */</span>
+  <span class="pl-k">def</span> <span class="pl-en">put</span>(<span class="pl-v">key</span>: <span class="pl-k">String</span>, <span class="pl-v">value</span>: <span class="pl-k">String</span>, <span class="pl-v">version</span>: <span class="pl-k">Long</span>)<span class="pl-k">:</span> <span class="pl-k">Boolean</span>
+
+<span class="pl-c">  /**</span>
+<span class="pl-c">   * Remove a value form the store.</span>
+<span class="pl-c">   */</span>
+  <span class="pl-k">def</span> <span class="pl-en">remove</span>(<span class="pl-v">key</span>: <span class="pl-k">String</span>)<span class="pl-k">:</span> <span class="pl-k">Unit</span>
+
+<span class="pl-c">  /**</span>
+<span class="pl-c">   * Remove a value from the KV store only if the current version number is 'version'</span>
+<span class="pl-c">   * <span class="pl-k">@return</span></span>
+<span class="pl-c">   */</span>
+  <span class="pl-k">def</span> <span class="pl-en">remove</span>(<span class="pl-v">key</span>: <span class="pl-k">String</span>, <span class="pl-v">version</span>: <span class="pl-k">Long</span>)<span class="pl-k">:</span> <span class="pl-k">Boolean</span>
+
+<span class="pl-c">  /**</span>
+<span class="pl-c">   * Read a value and its version number from the KV store.</span>
+<span class="pl-c">   * The setting of the ‘consistent’ flag is used</span>
+<span class="pl-c">   * to choose the consistency level. Setting it to ‘true’</span>
+<span class="pl-c">   * chooses strong consistency, and the latest value is always</span>
+<span class="pl-c">   * returned. Setting it to ‘false’ chooses timeline</span>
+<span class="pl-c">   * consistency, and a possibly stale value is returned in</span>
+<span class="pl-c">   * exchange for better performance.</span>
+<span class="pl-c">   * <span class="pl-k">@param</span> <span class="pl-v">key</span> The key of the value to get</span>
+<span class="pl-c">   * <span class="pl-k">@return</span> A tuple of the value and the version number of the value of the key</span>
+<span class="pl-c">   */</span>
+  <span class="pl-k">def</span> <span class="pl-en">get</span>(<span class="pl-v">key</span>: <span class="pl-k">String</span>)<span class="pl-k">:</span> <span class="pl-en">Option</span>[(<span class="pl-k">String</span>,<span class="pl-k">Long</span>)]
+}</pre></div>
+
+<p>The actual implementation isn't important for the purposes of the demo. It simply represents an application service that we will replicate to achieve fault tolerance. We should note that the write methods are safe to repeat during crash recovery. TRex journals that it has completed chosen commands immediately after they have been run. If a crash happens before the journal is flushed then a command will be rerun after the node is restarted. If your application API is not "recovery replay safe" you should code a custom journal class which participates in your application transactions. You would also need to override the TRex Paxos message sending methods to buffer outbound messages. Either send the buffered massages post-commit else drop them post-rollback. </p>
+
+<p>Now that we understand the object we wish to replicate we can go step-by-step through [the demo code]. It starts with a static TRex cluster configuration:</p>
+
+<pre><code># trex simple cluster configuration
+trex {
+  # folder to use to persist data at each node
+  data-folder="/tmp"
+  # number of slots entries to retain in the log to support retransmission
+  data-retained=1048576
+  # static cluster definintion
+  cluster {
+    name = "PaxosKVStore"
+    nodes = "2552,2562,2572"
+    node-2552 {
+      host = "127.0.0.1"
+      client-port = 2552
+      node-port = 2553
+    }
+    node-2562 {
+      host = "127.0.0.1"
+      client-port = 2562
+      node-port = 2563
+    }
+    node-2572 {
+      host = "127.0.0.1"
+      client-port = 2572
+      node-port = 2573
+    }
+  }
+  # timeouts
+  leader-timeout-max=4000
+  leader-timeout-min=2000
+}
+</code></pre>
+
+<p>That defines a TRex cluster with three server nodes on localhost exposing a TCP port to clients and a UDP port to the other cluster nodes. A more typical deployment would use three separate hosts and the same ports on each. The client application loads the configuration then creates a dynamic proxy backed by the Paxos cluster:</p>
+
+<div class="highlight highlight-Scala"><pre>    <span class="pl-k">val</span> <span class="pl-en">cluster</span> <span class="pl-k">=</span> <span class="pl-en">Cluster</span>.parseConfig(config)
+
+    <span class="pl-k">val</span> <span class="pl-en">system</span> <span class="pl-k">=</span>
+      <span class="pl-en">ActorSystem</span>(cluster.name, <span class="pl-en">ConfigFactory</span>.load(<span class="pl-s"><span class="pl-pds">"</span>client.conf<span class="pl-pds">"</span></span>))
+
+    <span class="pl-k">val</span> <span class="pl-en">timeout</span> <span class="pl-k">=</span> <span class="pl-en">Timeout</span>(<span class="pl-c1">100</span> millisecond)
+
+    <span class="pl-k">val</span> <span class="pl-en">driver</span> <span class="pl-k">=</span> system.actorOf(<span class="pl-en">Props</span>(<span class="pl-c1">classOf</span>[<span class="pl-en">StaticClusterDriver</span>], timeout, cluster, <span class="pl-c1">20</span>), <span class="pl-s"><span class="pl-pds">"</span>TrexDriver<span class="pl-pds">"</span></span>)
+
+    <span class="pl-k">val</span> <span class="pl-en">typedActor</span><span class="pl-k">:</span> <span class="pl-en">ConsistentKVStore</span> <span class="pl-k">=</span>
+      <span class="pl-en">TypedActor</span>(system).
+        typedActorOf(
+          <span class="pl-en">TypedProps</span>[<span class="pl-en">ConsistentKVStore</span>],
+          driver)</pre></div>
+
+<p>That code creates a TRex client driver passing in the cluster configuration. It then creates a TypedActor proxy which forwards onto the TRex driver. The TypedActor proxy pattern is an out-of-the-box Akka feature. It gives us an implementation of the application interface which serialises every method invocation as a MethodCall message. This is sent to the TRex driver which dispatches the message to the current Paxos distinguished leader. We should note that the TRex driver it is agnostic to the client-to-server application protocol. If your application is already using Akka you could just send your existing messages to the driver. You can even configure Akka with a custom serialiser to control the wire format. </p>
+
+<p>That's it. The remainder of the client application is a trivial loop reading input commands to invoke methods on the interface. The same loop would work invoking methods directly on a local object. We can think of the few lines of Akka code shown above as a drop-in replacement for a local object. The drop-in code creates a stub of the application which is a dynamic proxy backed by a cluster of replicated objects with automatic failover. Next we need to setup the server cluster. </p>
+
+<p>The server code is as follows:  </p>
+
+<div class="highlight highlight-Scala"><pre>      <span class="pl-c">// the client app K-V store</span>
+      <span class="pl-k">val</span> <span class="pl-en">dataFile</span> <span class="pl-k">=</span> <span class="pl-k">new</span> <span class="pl-en">java.io.File</span>(folder.getCanonicalPath <span class="pl-k">+</span> <span class="pl-s"><span class="pl-pds">"</span>/kvstore<span class="pl-pds">"</span></span>)
+      println(s<span class="pl-s"><span class="pl-pds">"</span>node kv data store is ${dataFile.getCanonicalPath}<span class="pl-pds">"</span></span>)
+      <span class="pl-k">val</span> <span class="pl-en">db</span><span class="pl-k">:</span> <span class="pl-en">DB</span> <span class="pl-k">=</span> <span class="pl-en">DBMaker</span>.newFileDB(dataFile).make
+      <span class="pl-k">val</span> <span class="pl-en">clientApp</span> <span class="pl-k">=</span> <span class="pl-k">new</span> <span class="pl-en">MapDBConsistentKVStore</span>(db)
+      <span class="pl-k">val</span> <span class="pl-en">logFile</span> <span class="pl-k">=</span> <span class="pl-k">new</span> <span class="pl-en">java.io.File</span>(folder.getCanonicalPath <span class="pl-k">+</span> <span class="pl-s"><span class="pl-pds">"</span>/paxos<span class="pl-pds">"</span></span>)
+      println(s<span class="pl-s"><span class="pl-pds">"</span>paxos data log is ${logFile.getCanonicalPath}<span class="pl-pds">"</span></span>)
+      <span class="pl-k">val</span> <span class="pl-en">journal</span> <span class="pl-k">=</span> <span class="pl-k">new</span> <span class="pl-en">FileJournal</span>(logFile, cluster.retained)
+      <span class="pl-c">// the node unique id in the paxos closter which is passed into main</span>
+      <span class="pl-k">val</span> <span class="pl-en">node</span> <span class="pl-k">=</span> nodeMap.get(nodeId).get
+      <span class="pl-c">// actor system with the node config</span>
+      <span class="pl-k">val</span> <span class="pl-en">system</span> <span class="pl-k">=</span>
+        <span class="pl-en">ActorSystem</span>(cluster.name, <span class="pl-en">ConfigFactory</span>.load(<span class="pl-s"><span class="pl-pds">"</span>server.conf<span class="pl-pds">"</span></span>).withValue(<span class="pl-s"><span class="pl-pds">"</span>akka.remote.netty.tcp.port<span class="pl-pds">"</span></span>,<span class="pl-en">ConfigValueFactory</span>.fromAnyRef(node.clientPort) ))
+      <span class="pl-c">// generic entry point accepts TypedActor MethodCall messages and reflectively invokes them on our client app</span>
+      system.actorOf(<span class="pl-en">Props</span>(<span class="pl-c1">classOf</span>[<span class="pl-en">TypedActorPaxosEndpoint</span>], cluster, <span class="pl-en">PaxosActor</span>.<span class="pl-en">Configuration</span>(config, cluster.nodes.size), node.id, journal, clientApp, <span class="pl-s"><span class="pl-pds">"</span>TrexServer<span class="pl-pds">"</span></span>))</pre></div>
+
+<p>There is quite a bit going on there due to the separation of concerns in the code. The application object <code>val clientApp = new MapDBConsistentKVStore(db))</code> has its own concerns and has no dependencies on TRex. The journal object encapsulates the concern of journaling the progress of the consensus algorithm. As noted above an application which is not crash recovery replay safe would need to provide a custom journal that participates in application transactions. The <code>TypedActorPaxosEndpoint</code> is our Trex Server which runs the consensus algorithm.</p>
+
+<p>The most interesting actor for the purpose of a demo of integrating TRex into an existing application is the <code>TypedActorPaxosEndpoint</code>. This runs the consensus algorithm over values sent from the TRex driver by clients. In this case the values are <code>MethodCall</code> messages sent from the <code>TypedActor</code> at the client. This endpoint reflectively invokes the select commands on its local copy of the replicated application object. The consensus logic is in a superclass so you can write a custom endpoint actor by overriding the <code>deliver</code> method. You can then compile the deliver logic directly against your own application code and message formats. </p>
+
+<p>Now we have both client and server its worth describing the full data flow created by the demo code. The client code invokes the interface methods on the <code>TypedActor</code>. The <code>TypedActor</code> forwards a <code>MethodCall</code> message to the TRex driver. The driver has Akka serialise the message and forwards it to the distinguished leader over TCP. At the other end the distinguished leader runs the multi-Paxos consensus algorithm over UDP. The chosen messages are invoked on all the replicated objects in consensus order. The method return value at the distinguished leader is sent back to the client TRex driver. It responds to the TypedActor which competes the method call for the client code. </p>
+
+<p>We can now start up the three server process and multiple clients. We can run commands though the clients and kill the leader node to see a failover. If we restart the failed node it will automatically sync up with the new leader. Not bad for a few lines of custom code and a bit of configuration. </p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Trex maintained by <a href="https://github.com/simbo1905">simbo1905</a></p>
+        <p>Published with <a href="https://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
