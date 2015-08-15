@@ -1,4 +1,3 @@
-[![Build Status](https://travis-ci.org/simbo1905/trex.svg?branch=master)](https://travis-ci.org/simbo1905/trex)
 ## Building
 
 ```
@@ -6,6 +5,7 @@
 sbt clean coverage test it:test
 sbt coverageReport
 ```
+[![Build Status](https://travis-ci.org/simbo1905/trex.svg?branch=master)](https://travis-ci.org/simbo1905/trex)
 
 ## What is this? 
 
