@@ -5,4 +5,4 @@ scala:
    - 2.11.7
 
 script:
-  - sbt compile test it:test
+  - sbt compile test

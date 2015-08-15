@@ -1,4 +1,4 @@
-
+[![Build Status](https://travis-ci.org/simbo1905/trex.svg?branch=master)](https://travis-ci.org/simbo1905/trex)
 ## Building
 
 ```
