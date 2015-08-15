@@ -1,0 +1,14 @@
+/target
+/.classpath
+/.project
+/.cache
+/bin/
+/project/config-classes
+/.idea
+trex.iml
+compile
+core/target/
+demo/target/
+run
+store.trex
+store.trex.*
