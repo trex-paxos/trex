@@ -9,7 +9,7 @@ import com.github.simbo1905.trex._
 import com.github.simbo1905.trex.internals.PaxosActor._
 import com.typesafe.config.ConfigFactory
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers
+import org.scalatest.{OptionValues, Matchers}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
@@ -82,7 +82,7 @@ object AllStateSpec {
 }
 
 trait AllStateSpec {
-  self: TestKit with MockFactory with Matchers =>
+  self: TestKit with MockFactory with Matchers with OptionValues =>
 
   import AllStateSpec._
   import PaxosActor.Configuration
@@ -96,24 +96,24 @@ trait AllStateSpec {
 
   def retransmitRequestInvokesHandler(state: PaxosRole)(implicit sender: ActorRef): Unit = {
     var handledMessage = false
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, AllStateSpec.tempFileJournal, ArrayBuffer.empty, None){
+    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, AllStateSpec.tempFileJournal, ArrayBuffer.empty, None) {
       override def handleRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData): Progress = {
         handledMessage = true
         super.handleRetransmitResponse(response, nodeData)
       }
-    } )
+    })
     fsm ! RetransmitResponse(1, 0, Seq.empty, Seq.empty)
     handledMessage shouldBe true
   }
 
   def retransmitResponseInvokesHandler(state: PaxosRole)(implicit sender: ActorRef): Unit = {
     var handledMessage = false
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, AllStateSpec.tempFileJournal, ArrayBuffer.empty, None){
+    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, AllStateSpec.tempFileJournal, ArrayBuffer.empty, None) {
       override def handleRetransmitRequest(request: RetransmitRequest, nodeData: PaxosData): Option[RetransmitResponse] = {
         handledMessage = true
         super.handleRetransmitRequest(request, nodeData)
       }
-    } )
+    })
     fsm ! RetransmitRequest(1, 33, 100L)
     handledMessage shouldBe true
   }
@@ -295,9 +295,9 @@ trait AllStateSpec {
     // does not delivered any committed values
     delivered.size should be(0)
     // does journal the values
-    fileJournal.accepted(98L).get.id should be(a1.id)
-    fileJournal.accepted(99L).get.id should be(a2.id)
-    fileJournal.accepted(100L).get.id should be(a3.id)
+    fileJournal.accepted(98L).value.id should be(a1.id)
+    fileJournal.accepted(99L).value.id should be(a2.id)
+    fileJournal.accepted(100L).value.id should be(a3.id)
     // does journal the new promise
     fileJournal.load() match {
       case Progress(a3.id.number, lastCommitted) => // good
@@ -345,9 +345,9 @@ trait AllStateSpec {
     // does not delivered any committed values
     delivered.size should be(0)
     // does journal the values
-    fileJournal.accepted(98L).get.id should be(a1.id)
-    fileJournal.accepted(99L).get.id should be(a2.id)
-    fileJournal.accepted(100L).get.id should be(a3.id)
+    fileJournal.accepted(98L).value.id should be(a1.id)
+    fileJournal.accepted(99L).value.id should be(a2.id)
+    fileJournal.accepted(100L).value.id should be(a3.id)
     // does journal the new promise
     fileJournal.load() match {
       case Progress(a3.id.number, lastCommitted) => // good
