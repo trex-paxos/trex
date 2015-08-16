@@ -41,7 +41,7 @@ object TrexKVClient {
 
     println("commands:\n\n\tget key\n\tput key value\n\tput key value version\n\tremove key\n\tremove key version\n\nlooping on stdin for your commands...")
 
-    for (ln <- io.Source.stdin.getLines) {
+    for (ln <- io.Source.stdin.getLines()) {
       val args = ln.split("\\s+")
 
       args(0) match {
@@ -58,7 +58,7 @@ object TrexKVClient {
           }
         case "get" =>
           val response = typedActor.get(args(1))
-          println(s"${args(1)}->${response}")
+          println(s"${args(1)}->$response")
         case "remove" =>
           (args.length match {
             case 2 =>
@@ -100,31 +100,28 @@ object TrexKVStore {
     println(cluster)
     val nodeMap = cluster.nodes.map(node => (node.id, node)).toMap
 
-    if (nodeMap.get(nodeId).isDefined) {
+    nodeMap.get(nodeId) match {
+      case Some(node) =>
+        val folder = new java.io.File(cluster.folder + "/" + nodeId)
+        if (!folder.exists() || !folder.canRead || !folder.canWrite) {
+          err.println(s"${folder.getCanonicalPath} does not exist or do not have permission to read and write. Exiting.")
+          System.exit(-1)
+        }
+        // the client app K-V store
+        val dataFile = new java.io.File(folder.getCanonicalPath + "/kvstore")
+        println(s"node kv data store is ${dataFile.getCanonicalPath}")
+        val db: DB = DBMaker.newFileDB(dataFile).make
+        val clientApp = new MapDBConsistentKVStore(db)
+        val logFile = new java.io.File(folder.getCanonicalPath + "/paxos")
+        println(s"paxos data log is ${logFile.getCanonicalPath}")
+        val journal = new FileJournal(logFile, cluster.retained)
+        // actor system with the node config
+        val system =
+          ActorSystem(cluster.name, ConfigFactory.load("server.conf").withValue("akka.remote.netty.tcp.port", ConfigValueFactory.fromAnyRef(node.clientPort)))
+        // generic entry point accepts TypedActor MethodCall messages and reflectively invokes them on our client app
+        system.actorOf(Props(classOf[TypedActorPaxosEndpoint], cluster, PaxosActor.Configuration(config, cluster.nodes.size), node.id, journal, clientApp, "TrexServer"))
 
-      val folder = new java.io.File(cluster.folder + "/" + nodeId)
-      if (!folder.exists() || !folder.canRead || !folder.canWrite) {
-        err.println(s"${folder.getCanonicalPath} does not exist or do not have permission to read and write. Exiting.")
-        System.exit(-1)
-      }
-      // the client app K-V store
-      val dataFile = new java.io.File(folder.getCanonicalPath + "/kvstore")
-      println(s"node kv data store is ${dataFile.getCanonicalPath}")
-      val db: DB = DBMaker.newFileDB(dataFile).make
-      val clientApp = new MapDBConsistentKVStore(db)
-      val logFile = new java.io.File(folder.getCanonicalPath + "/paxos")
-      println(s"paxos data log is ${logFile.getCanonicalPath}")
-      val journal = new FileJournal(logFile, cluster.retained)
-      // the node unique id in the paxos closter which is passed into main
-      val node = nodeMap.get(nodeId).get
-      // actor system with the node config
-      val system =
-        ActorSystem(cluster.name, ConfigFactory.load("server.conf").withValue("akka.remote.netty.tcp.port",ConfigValueFactory.fromAnyRef(node.clientPort) ))
-      // generic entry point accepts TypedActor MethodCall messages and reflectively invokes them on our client app
-      system.actorOf(Props(classOf[TypedActorPaxosEndpoint], cluster, PaxosActor.Configuration(config, cluster.nodes.size), node.id, journal, clientApp, "TrexServer"))
-
-    } else {
-      err.println(s"$nodeId is not a valid node number in cluster $cluster")
+      case None => err.println(s"$nodeId is not a valid node number in cluster $cluster")
     }
   }
 }
@@ -133,9 +130,9 @@ object TrexKVStore {
 class TypedActorPaxosEndpoint(cluster: Cluster, config: PaxosActor.Configuration, nodeUniqueId: Int, journal: Journal, client: AnyRef) extends Actor with ActorLogging {
   val selfNode = cluster.nodeMap(nodeUniqueId)
 
-  val peerNodes = cluster.nodes.filterNot(_.id==nodeUniqueId)
+  val peerNodes = cluster.nodes.filterNot(_.id == nodeUniqueId)
 
-  val peers: Map[Int,ActorRef] = Cluster.senders(context.system, peerNodes)
+  val peers: Map[Int, ActorRef] = Cluster.senders(context.system, peerNodes)
 
   val broadcast = context.system.actorOf(Props(classOf[Broadcast], peers.values.toSeq), "broadcast")
 
@@ -152,7 +149,7 @@ class TypedActorPaxosEndpoint(cluster: Cluster, config: PaxosActor.Configuration
       // TODO handle this
       log.warning(s"Termination notice $t")
     case unknown =>
-      log.warning("{} unknown message {} from {}", this.getClass.getCanonicalName, unknown, sender)
+      log.warning("{} unknown message {} from {}", this.getClass.getCanonicalName, unknown, sender())
   }
 
   def route(msg: AnyRef): ActorRef = {
