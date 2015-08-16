@@ -18,11 +18,10 @@ class MethodCallInvoker(target: Any) extends Actor with ActorLogging {
       val method = methodCall.method
       val parameters = methodCall.parameters
       try {
-        val response = method.invoke(target, parameters: _*)
-        if (response != null) sender ! response
+        Option(method.invoke(target, parameters: _*)).foreach { response => sender() ! response }
       } catch {
         case NonFatal(ex) =>
-          log.error(ex, s"call to $method with ${parameters} got exception $ex")
+          log.error(ex, s"call to $method with $parameters got exception $ex")
           sender ! ex
       }
   }
@@ -71,7 +70,7 @@ object KVStoreClient {
       ActorSystem("LookupSystem", ConfigFactory.load("client"))
 
     val remotePath =
-      s"akka.tcp://ConsistentStore@${host}:${port}/user/store"
+      s"akka.tcp://ConsistentStore@$host:$port/user/store"
 
     implicit val timeout = akka.util.Timeout(5 seconds)
 
@@ -83,7 +82,7 @@ object KVStoreClient {
               TypedProps[ConsistentKVStore],
               actorRefToRemoteActor)
 
-        for (ln <- io.Source.stdin.getLines) {
+        for (ln <- io.Source.stdin.getLines()) {
           val args = ln.split("\\s+")
 
           args(0) match {
@@ -100,7 +99,7 @@ object KVStoreClient {
               }
             case "get" =>
               val response = typedActor.get(args(1))
-              println(s"${args(1)}->${response}")
+              println(s"${args(1)}->$response")
             case "remove" =>
               (args.length match {
                 case 2 =>
