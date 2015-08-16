@@ -68,9 +68,8 @@ class CommitHandlerSpec extends WordSpecLike with Matchers {
     }
     "should not deliver noop values" in {
       // given we have a11 thru a14 in the journal
-      var saved: Progress = null
       val stubJournal: Journal = new UndefinedJournal {
-        override def save(progress: Progress): Unit = saved = progress
+        override def save(progress: Progress): Unit = ()
         override def accepted(logIndex: Long): Option[Accept] = journaled11thru14(logIndex)
       }
       val handler = new TestableCommitHandler {
