@@ -69,40 +69,26 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       expectMsg(50 millisecond, minPrepare)
       // and node one will nack the load prepare
       actor1 ! minPrepare
-      var nack: PrepareNack = null
-      expectMsgPF(50 millisecond) {
-        case p: PrepareNack =>
-          nack = p
-      }
+      val nack: PrepareNack = expectMsgPF(50 millisecond) { case p: PrepareNack => p }
       // which will cause node zero to issue a higher prepare
       nack.requestId.from should be(0)
       // when we send it back to node zero
       actor0 ! nack
       // it issues a higher prepare
-      var phigh: Prepare = null
-      expectMsgPF(50 milliseconds) {
-        case hprepare: Prepare =>
-          phigh = hprepare
-      }
+      val phigh: Prepare = expectMsgPF(50 milliseconds) { case hprepare: Prepare => hprepare }
       phigh.id.logIndex should be(1)
       phigh.id.number.nodeIdentifier should be(0)
       // when we send that high prepare to node one
       actor1 ! phigh
-      var pack: PrepareAck = null
       // it should ack
-      expectMsgPF(50 millisecond) {
-        case p: PrepareAck =>
-          pack = p
-      }
+      val pack = expectMsgPF(50 millisecond) { case p: PrepareAck => p }
       pack.requestId should be(phigh.id)
       // when we send that back to node zero
       actor0 ! pack
+
       // it will issue a noop accept
-      var accept: Accept = null
-      expectMsgPF(50 millisecond) {
-        case a: Accept =>
-          accept = a
-      }
+      val accept: Accept = expectMsgPF(50 millisecond) { case a: Accept => a }
+
       accept.id.logIndex should be(1)
       accept.value shouldBe NoOperationCommandValue
       accept.id.number should be(phigh.id.number)
@@ -110,23 +96,21 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       actor0.stateData.acceptResponses match {
         case map if map.nonEmpty =>
           map.get(accept.id) match {
-            case None => fail
+            case None => fail()
             case Some(m) =>
               m.get.values.head match {
                 case a: AcceptAck => //good
-                case b: AcceptNack => fail
+                case b: AcceptNack => fail()
               }
           }
-        case _ => fail
+        case _ => fail()
       }
       // when we send that to node one
       actor1 ! accept
+
+
       // it will ack
-      var aack: AcceptAck = null
-      expectMsgPF(50 millisecond) {
-        case a: AcceptAck =>
-          aack = a
-      }
+      val aack: AcceptAck = expectMsgPF(50 millisecond) { case a: AcceptAck => a }
       aack.requestId should be(accept.id)
       // when we send that to node zero
       actor0 ! aack
@@ -138,29 +122,19 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       val hw = ClientRequestCommandValue(0, Array[Byte](1))
       actor0 ! hw
       // it will send out an accept
-      expectMsgPF(50 millisecond) {
-        case a: Accept =>
-          accept = a
-      }
-      accept.id.logIndex should be(2)
-      accept.value.asInstanceOf[ClientRequestCommandValue].bytes.length should be(1)
-      accept.id.number should be(phigh.id.number)
+      val accept2 = expectMsgPF(50 millisecond) { case a: Accept => a }
+      accept2.id.logIndex should be(2)
+      accept2.value.asInstanceOf[ClientRequestCommandValue].bytes.length should be(1)
+      accept2.id.number should be(phigh.id.number)
       // when we send that to node one
-      actor1 ! accept
+      actor1 ! accept2
       // it will ack
-      expectMsgPF(50 millisecond) {
-        case a: AcceptAck =>
-          aack = a
-      }
-      aack.requestId should be(accept.id)
+      val aack2 = expectMsgPF(50 millisecond) { case a: AcceptAck => a }
+      aack2.requestId should be(accept2.id)
       // when we send that back to node zero
-      actor0 ! aack
+      actor0 ! aack2
       // it will commit
-      var commit: Commit = null
-      expectMsgPF(50 millisecond) {
-        case c: Commit =>
-          commit = c
-      }
+      val commit: Commit = expectMsgPF(50 millisecond) { case c: Commit => c }
       // when we send that to node one
       actor1 ! commit
       // then it responds with the committed work
@@ -186,30 +160,17 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       def performConsensus(leader: ActorRef, follower: ActorRef, client: TestProbe, msg: Byte): Unit = {
         client.send(leader, ClientRequestCommandValue(0, Array[Byte](msg)))
         // it will send out an accept
-        var accept: Accept = null
-        expectMsgPF(50 millisecond) {
-          case a: Accept =>
-            accept = a
-        }
+        val accept: Accept = expectMsgPF(50 millisecond) { case a: Accept => a }
         accept.value.asInstanceOf[ClientRequestCommandValue].bytes.length should be(1)
         // when we send that to node one
         follower ! accept
-        var aack: AcceptAck = null
         // it will ack
-        expectMsgPF(50 millisecond) {
-          case a: AcceptAck =>
-            aack = a
-        }
+        val aack: AcceptAck = expectMsgPF(50 millisecond) { case a: AcceptAck => a }
         aack.requestId should be(accept.id)
         // when we send that back to node zero
         leader ! aack
         // it will commit
-        var commit: Commit = null
-        expectMsgPF(50 millisecond) {
-          case c: Commit =>
-            commit = c
-        }
-
+        val commit: Commit = expectMsgPF(50 millisecond) { case c: Commit => c }
         // nothing is set back to us
         expectNoMsg(25 millisecond)
         // and response went back to the probe
@@ -245,23 +206,15 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       client.send(actor0, ClientRequestCommandValue(99, Array[Byte](11)))
 
       // it will broadcast out an accept
-      var accept: Accept = null
-      expectMsgPF(100 millisecond) {
-        case a: Accept =>
-          a.id.number.nodeIdentifier should be(0)
-          accept = a
-      }
+      val accept: Accept = expectMsgPF(100 millisecond) { case a: Accept => a }
+      accept.id.number.nodeIdentifier should be(0)
 
       // when we send that to node1
       actor1 ! accept
 
       // it will nack
-      var nack1: AcceptNack = null
-      expectMsgPF(100 millisecond) {
-        case a: AcceptNack =>
-          a.requestId should be(accept.id)
-          nack1 = a
-      }
+      val nack1: AcceptNack = expectMsgPF(100 millisecond) { case a: AcceptNack => a }
+      nack1.requestId should be(accept.id)
 
       // we send that to the leader
       actor0 ! nack1
@@ -270,12 +223,8 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       actor2 ! accept
 
       // it will nack
-      var nack2: AcceptNack = null
-      expectMsgPF(100 millisecond) {
-        case a: AcceptNack =>
-          a.requestId should be(accept.id)
-          nack2 = a
-      }
+      val nack2: AcceptNack = expectMsgPF(100 millisecond) { case a: AcceptNack => a }
+      nack2.requestId should be(accept.id)
 
       // we send that to the leader
       actor0 ! nack2
