@@ -8,6 +8,7 @@ import org.mapdb.{DB, DBMaker}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 class MethodCallInvoker(target: Any) extends Actor with ActorLogging {
@@ -18,9 +19,9 @@ class MethodCallInvoker(target: Any) extends Actor with ActorLogging {
       val parameters = methodCall.parameters
       try {
         val response = method.invoke(target, parameters: _*)
-        if( response != null ) sender ! response
+        if (response != null) sender ! response
       } catch {
-        case ex: Throwable =>
+        case NonFatal(ex) =>
           log.error(ex, s"call to $method with ${parameters} got exception $ex")
           sender ! ex
       }
@@ -58,7 +59,8 @@ object KVStoreClient {
   def main(args: Array[String]) {
     if (args.length != 2) {
       println("Args: host port")
-      println("Where:\n\t host and port identify the remote actor system")    }
+      println("Where:\n\t host and port identify the remote actor system")
+    }
 
     args.foreach(println(_))
 
