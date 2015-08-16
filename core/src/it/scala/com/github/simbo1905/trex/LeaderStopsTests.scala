@@ -60,7 +60,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
     send
 
     // dig out the values which were committed
-    val delivered: Seq[ArrayBuffer[CommandValue]] = clusterHarness.underlyingActor.delivered.map(_._2).toSeq
+    val delivered: Seq[ArrayBuffer[CommandValue]] = clusterHarness.underlyingActor.delivered.values.toSeq
 
     // verify
     verifier(delivered)

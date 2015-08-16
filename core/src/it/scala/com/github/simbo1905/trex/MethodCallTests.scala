@@ -6,13 +6,15 @@ import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
 
+import scala.util.control.NonFatal
+
 trait MethodCallTestTrait {
   def testMethod(testInput: String): String
 }
 
 class MethodCallTestClass extends MethodCallTestTrait {
   override def testMethod(testInput: String): String = {
-    "out:"+testInput
+    "out:" + testInput
   }
 }
 
@@ -27,9 +29,9 @@ class MethodCallInvokingActor(target: Any) extends Actor with ActorLogging {
       val parameters = methodCall.parameters
       try {
         val response = method.invoke(target, parameters: _*)
-        if( response != null ) sender ! response
+        if (response != null) sender ! response
       } catch {
-        case ex: Throwable =>
+        case NonFatal(ex) =>
           log.error(ex, s"call to $method with ${parameters} got exception $ex")
           sender ! ex
       }
@@ -37,7 +39,7 @@ class MethodCallInvokingActor(target: Any) extends Actor with ActorLogging {
 }
 
 class MethodCallTests extends TestKit(ActorSystem("MethodCallTests", ConfigFactory.parseString("akka.extensions = [\"com.github.simbo1905.trex.TrexExtension\"]")))
-  with SpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
+with SpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
 
   def `method call should serialize`: Unit = {
 

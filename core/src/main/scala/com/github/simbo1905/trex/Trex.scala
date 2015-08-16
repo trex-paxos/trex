@@ -1,23 +1,22 @@
 package com.github.simbo1905.trex
 
-import java.io.{ObjectInputStream, ByteArrayInputStream, ObjectOutputStream, ByteArrayOutputStream}
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
 
 import akka.actor.TypedActor.MethodCall
 import akka.actor._
-import akka.event.{LoggingAdapter, Logging}
+import akka.event.Logging
 import akka.io.Udp.CommandFailed
+import akka.io.{IO, Udp}
 import akka.serialization._
+import akka.util.Timeout
 import com.github.simbo1905.trex.internals._
 import com.typesafe.config.Config
-import scala.collection
+
+import scala.collection.SortedMap
 import scala.compat.Platform
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.collection.SortedMap
-import akka.util.{Timeout}
-import akka.io.{IO, Udp}
 
 // TODO do we really need a custom extension can we not use SerializationExtension directly
 class Trex(system: ExtendedActorSystem) extends Extension {
@@ -62,7 +61,7 @@ class UdpSender(remote: InetSocketAddress) extends Actor with ActorLogging {
     case msg: AnyRef =>
       log.debug("sending to {} msg {}", remote, msg)
       val packed = Pickle.pack(msg)
-      if(packed.size > 65535) log.warning("message size > 65,535 may not fit in UDP package")
+      if (packed.size > 65535) log.warning("message size > 65,535 may not fit in UDP package")
       connection ! Udp.Send(Pickle.pack(msg), remote) // makes defensive copy
     case unknown =>
       log.warning("{} connected got unknown message {}", this.getClass.getCanonicalName, unknown)
@@ -126,8 +125,6 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
    * Returns an ActorSelection mapped to the passed counter.
    * This is abstract so that there can be a subclass which knows about cluster membership changes.
    * Counter can be incremented to round-robin to find the new stable leader.
-   * @param member
-   * @return
    */
   protected def resolve(member: Int): ActorSelection
 
@@ -198,8 +195,8 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
         log.debug("incremented counter to {}", counter)
       }
       val requests: Iterable[Request] = overdue flatMap {
-        case (_, requestById) =>
-          requestById map {
+        case (_, r) =>
+          r map {
             case (_, request) =>
               request
           }
@@ -216,7 +213,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
         replace(out, in)
         val target = resolve(counter)
         target ! in.command
-        log.debug("resent request from {} to {} is {}", sender, target, in.command)
+        log.debug("resent request from {} to {} is {}", sender(), target, in.command)
       }
 
     case NotLeader(node, msgId) =>
@@ -229,7 +226,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
           replace(out, in)
           val target = resolve(counter)
           target ! in.command
-          log.debug("resent request from {} to {} is {}", sender, target, in.command)
+          log.debug("resent request from {} to {} is {}", sender(), target, in.command)
       }
 
     case nlle: NoLongerLeaderException =>
@@ -253,11 +250,11 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
     case msg: Any =>
       val bytes = getSerializer(msg.getClass).toBinary(msg.asInstanceOf[AnyRef])
       val commandValue = ClientRequestCommandValue(incrementAndGetRequestId(), bytes)
-      val request = Request(Platform.currentTime + timeoutMillis, sender, commandValue, 1)
+      val request = Request(Platform.currentTime + timeoutMillis, sender(), commandValue, 1)
       val target = resolve(counter)
       target ! commandValue
       add(request)
-      log.debug("sent request from {} to {} is {} containing {}", sender, target, commandValue, msg)
+      log.debug("sent request from {} to {} is {} containing {}", sender(), target, commandValue, msg)
   }
 }
 
@@ -273,7 +270,7 @@ class StaticClusterDriver(timeout: Timeout, cluster: Cluster, maxAttempts: Int) 
   // FIXME timings looks wrong here, waiting a second to start seems forever and 5ms repeat seems aggressive.
   context.system.scheduler.schedule(Duration(5, MILLISECONDS), Duration(1000, MILLISECONDS), self, PaxosActor.CheckTimeout)
 
-  val selectionUrls: Map[Int, String] = ((0 until cluster.nodes.size) zip Cluster.selectionUrls(cluster).map(_._2)).toMap
+  val selectionUrls: Map[Int, String] = (cluster.nodes.indices zip Cluster.selectionUrls(cluster).map(_._2)).toMap
 
   log.info("selections are: {}", selectionUrls)
 
@@ -291,9 +288,9 @@ object Cluster {
   def senders(system: ActorSystem, nodes: Seq[Node]): Map[Int, ActorRef] = {
     val log = Logging.getLogger(system, this)
     log.info("creating senders for nodes {}", nodes)
-    (nodes.map { n =>
-      (n.id -> system.actorOf(Props(classOf[UdpSender], new java.net.InetSocketAddress(n.host, n.nodePort)), s"Sender${n.id}"))
-    }).toMap
+    nodes.map { n =>
+      n.id -> system.actorOf(Props(classOf[UdpSender], new java.net.InetSocketAddress(n.host, n.nodePort)), s"Sender${n.id}")
+    }.toMap
   }
 
   def parseConfig(config: Config): Cluster = {
@@ -326,12 +323,12 @@ class TypedActorPaxosEndpoint(config: PaxosActor.Configuration, broadcast: Actor
       log.debug("delivering {}", mc)
       try {
         val response = Option(method.invoke(target, parameters: _*))
-        log.debug(s"invoked ${method.getName} returned ${response}")
+        log.debug(s"invoked ${method.getName} returned $response")
         ServerResponse(id, response)
       } catch {
         case ex: Throwable =>
-          log.error(ex, s"call to $method with ${parameters} got exception $ex")
-          (ServerResponse(id, Option(ex)))
+          log.error(ex, s"call to $method with $parameters got exception $ex")
+          ServerResponse(id, Option(ex))
       }
   }
 }

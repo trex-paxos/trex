@@ -903,8 +903,9 @@ object PaxosActor {
 
   import Ordering._
 
-  val CheckTimeout = "CheckTimeout"
-  val HeartBeat = "HeartBeat"
+  case object CheckTimeout
+
+  case object HeartBeat
 
   val leaderTimeoutMinKey = "trex.leader-timeout-min"
   val leaderTimeoutMaxKey = "trex.leader-timeout-max"
