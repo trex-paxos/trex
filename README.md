@@ -14,46 +14,45 @@ This is TRex which has a [write up here](https://simbo1905.wordpress.com/2014/10
 
 Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more information.
 
-## Work Plan
+## Status /  Work Plan
 
-0.5 - PoC
-
-X replace pickling
-X fix driver
-X is retransmission of accepted values actually safe?
-X overrideable send methods
-@ actor refactor to handlers
-@ fix the fixmes
-@ nemesis
+- [x] replace pickling
+- [x] fi- [x] driver
+- [x] is retransmission of accepted values actually safe?
+- [x] overrideable send methods
+- [ ] actor refactor to handlers
+- [ ] fi- [x] the fixmes
+- [ ] nemesis
 
 0.6 - practical
 
-@ java demo
-@ complete the TODOs
-@ dynamic cluster membership  
-@ snapshots and out of band retransmission
-@ metrics/akka-tracing
-@ binary tracing 
-@ jumbo UDP packets
-@ learners
+- [ ] java demo
+- [ ] complete the TODOs
+- [ ] dynamic cluster membership  
+- [ ] snapshots and out of band retransmission
+- [ ] metrics/akka-tracing
+- [ ] binary tracing 
+- [ ] jumbo UDP packets
+- [ ] learners
 
 0.7 - performance
 
-@ batching 
-@ remove remote actor use akka tcp
-@ multicast 
-@ strong read optimisation
-@ noop heartbeats to suppress duels
-@ compression 
-@ journal truncation by size 
+- [ ] batching 
+- [ ] remove remote actor use akka tcp
+- [ ] multicast 
+- [ ] strong read optimisation
+- [ ] noop heartbeats to suppress duels
+- [ ] compression 
+- [ ] journal truncation by size 
 
 0.8 
 
-@ final API 
-@ mapdb compression
-@ weak reads demo
+- [ ] final API 
+- [ ] mapdb compression
+- [ ] weak reads demo
 
 M1
 
-@ transaction demo
-@ ???
+- [ ] transaction demo
+- [ ] ???
+
