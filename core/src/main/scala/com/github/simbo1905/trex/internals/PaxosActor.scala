@@ -7,7 +7,7 @@ import com.github.simbo1905.trex._
 import com.github.simbo1905.trex.internals.PaxosActor._
 import com.typesafe.config.Config
 
-import scala.annotation.{elidable, tailrec}
+import scala.annotation.elidable
 import scala.collection.SortedMap
 import scala.collection.immutable.TreeMap
 import scala.util.Try
@@ -33,10 +33,10 @@ object Ordering {
  * @param journal The durable journal required to store the state of the node in a stable manner between crashes.
  */
 abstract class PaxosActor(config: Configuration, val nodeUniqueId: Int, broadcastRef: ActorRef, val journal: Journal) extends FSM[PaxosRole, PaxosData]
-  with RetransmitHandler
-  with ReturnToFollowerHandler
-  with UnhandledHandler
-  with CommitHandler {
+with RetransmitHandler
+with ReturnToFollowerHandler
+with UnhandledHandler
+with CommitHandler {
 
   import Ordering._
 
@@ -308,7 +308,7 @@ abstract class PaxosActor(config: Configuration, val nodeUniqueId: Int, broadcas
     case e@Event(c@Commit(i@Identifier(from, _, logIndex), _), oldData: PaxosData) if logIndex > oldData.progress.highestCommitted.logIndex =>
       trace(stateName, e.stateData, sender, e.event)
       val newProgress = handleReturnToFollowerOnHigherCommit(c, oldData, stateName, sender)
-      goto(Follower) using PaxosData.timeoutLens.set(PaxosData.progressLens.set(oldData,newProgress), randomTimeout)
+      goto(Follower) using PaxosData.timeoutLens.set(PaxosData.progressLens.set(oldData, newProgress), randomTimeout)
 
     case e@Event(Commit(id@Identifier(_, _, logIndex), _), data) =>
       trace(stateName, e.stateData, sender, e.event)
@@ -795,13 +795,13 @@ abstract class PaxosActorWithTimeout(config: Configuration, nodeUniqueId: Int, b
  * @param clientCommands The client work outstanding with the leader. The map key is the accept identifier and the value is a tuple of the client command and the client ref.
  */
 case class PaxosData(progress: Progress,
-                    leaderHeartbeat: Long,
-                    timeout: Long,
-                    clusterSize: Int,
-                    prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] = SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]](Ordering.IdentifierLogOrdering),
-                    epoch: Option[BallotNumber] = None,
-                    acceptResponses: SortedMap[Identifier, Option[Map[Int, AcceptResponse]]] = SortedMap.empty[Identifier, Option[Map[Int, AcceptResponse]]](Ordering.IdentifierLogOrdering),
-                    clientCommands: Map[Identifier, (CommandValue, ActorRef)] = Map.empty)
+                     leaderHeartbeat: Long,
+                     timeout: Long,
+                     clusterSize: Int,
+                     prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] = SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]](Ordering.IdentifierLogOrdering),
+                     epoch: Option[BallotNumber] = None,
+                     acceptResponses: SortedMap[Identifier, Option[Map[Int, AcceptResponse]]] = SortedMap.empty[Identifier, Option[Map[Int, AcceptResponse]]](Ordering.IdentifierLogOrdering),
+                     clientCommands: Map[Identifier, (CommandValue, ActorRef)] = Map.empty)
 
 object PaxosData {
   val prepareResponsesLens = Lens(
@@ -900,6 +900,7 @@ object PaxosData {
 }
 
 object PaxosActor {
+
   import Ordering._
 
   val CheckTimeout = "CheckTimeout"
@@ -931,7 +932,9 @@ object PaxosActor {
   val random = new SecureRandom
 
   // Log the nodeUniqueID, stateName, stateData, sender and message for tracing purposes
-  type Tracer = (Int, PaxosRole, PaxosData, ActorRef, Any) => Unit
+  case class TraceData(nodeUniqueId: Int, stateName: PaxosRole, statData: PaxosData, sender: Option[ActorRef], message: Any)
+
+  type Tracer = TraceData => Unit
 
   val freshAcceptResponses: SortedMap[Identifier, Option[Map[Int, AcceptResponse]]] = SortedMap.empty
 
