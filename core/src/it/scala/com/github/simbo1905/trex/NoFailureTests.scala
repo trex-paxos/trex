@@ -19,7 +19,7 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
 
   import scala.concurrent.duration._
 
-  override def afterAll {
+  override def afterAll() {
     TestKit.shutdownActorSystem(system)
   }
 
@@ -49,7 +49,7 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
     }
 
     // dig out the values which were committed
-    val delivered: Seq[ArrayBuffer[CommandValue]] = ref.underlyingActor.delivered.map(_._2).toSeq
+    val delivered: Seq[ArrayBuffer[CommandValue]] = ref.underlyingActor.delivered.values.toSeq
 
     // kill off that cluster
     ref ! ClusterHarness.Halt
