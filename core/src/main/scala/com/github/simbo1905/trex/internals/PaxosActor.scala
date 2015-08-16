@@ -180,7 +180,7 @@ with CommitHandler {
       send(broadcastRef, minPrepare)
       // nak our own prepare
       val prepareSelfVotes = SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]] ++
-        Map(minPrepare.id -> Some(Map(nodeUniqueId -> PrepareNack(minPrepare.id, nodeUniqueId, progress, highestAcceptedIndex(), data.leaderHeartbeat))))
+        Map(minPrepare.id -> Some(Map(nodeUniqueId -> PrepareNack(minPrepare.id, nodeUniqueId, progress, highestAcceptedIndex, data.leaderHeartbeat))))
 
       stay using PaxosData.timeoutPrepareResponsesLens.set(data, (freshTimeout(randomInterval), prepareSelfVotes))
 
@@ -195,12 +195,12 @@ with CommitHandler {
 
     // having issued a low prepare track responses and promote to recover only if we see insufficient evidence of a leader in the responses
     case e@Event(vote: PrepareResponse, data@PaxosData(progress, _, heartbeat, _, prepareResponses, _, _, _)) if prepareResponses.nonEmpty =>
-      trace(stateName, e.stateData, sender, e.event)
+      trace(stateName, e.stateData, sender(), e.event)
       val selfHighestSlot = progress.highestCommitted.logIndex
       val otherHighestSlot = vote.progress.highestCommitted.logIndex
       if (otherHighestSlot > selfHighestSlot) {
         log.debug("Node {} node {} committed slot {} requesting retransmission", nodeUniqueId, vote.from, otherHighestSlot)
-        send(sender, RetransmitRequest(nodeUniqueId, vote.from, progress.highestCommitted.logIndex)) // TODO test for this
+        send(sender(), RetransmitRequest(nodeUniqueId, vote.from, progress.highestCommitted.logIndex)) // TODO test for this
         stay using backdownData(data)
       } else {
         data.prepareResponses.get(vote.requestId) match {
@@ -209,7 +209,7 @@ with CommitHandler {
             // do we have a majority response such that we could successfully failover?
             if (votes.size > data.clusterSize / 2) {
 
-              val largerHeartbeats = votes.map(_._2) flatMap {
+              val largerHeartbeats = votes.values flatMap {
                 case PrepareNack(_, _, evidenceProgress, _, evidenceHeartbeat) if evidenceHeartbeat > heartbeat =>
                   Some(evidenceHeartbeat)
                 case _ =>
@@ -249,7 +249,7 @@ with CommitHandler {
                 val prepareSelfVotes: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] =
                   (prepares map { prepare =>
                     val selfVote = Some(Map(nodeUniqueId -> PrepareAck(prepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))))
-                    (prepare.id -> selfVote)
+                    prepare.id -> selfVote
                   })(scala.collection.breakOut)
 
                 // the new leader epoch is the promise it made to itself
@@ -391,7 +391,7 @@ with CommitHandler {
             }
             if (positives.size > data.clusterSize / 2) {
               // success gather any values
-              val accepts = positives.map(_._2.asInstanceOf[PrepareAck]).flatMap(_.highestUncommitted)
+              val accepts = positives.values.map(_.asInstanceOf[PrepareAck]).flatMap(_.highestUncommitted)
               val accept = if (accepts.isEmpty) {
                 val accept = Accept(id, NoOperationCommandValue)
                 log.info("Node {} {} got a majority of positive prepare response with no value sending fresh NO_OPERATION accept message {}", nodeUniqueId, stateName, accept)
@@ -454,7 +454,7 @@ with CommitHandler {
           if (latestVotes.size > oldData.clusterSize / 2) {
             // requestRetransmission if behind FIXME what if it cannot get a majority response will it get stuck not asking for retransmission?
             val highestCommittedIndex = oldData.progress.highestCommitted.logIndex
-            val (target, highestCommittedIndexOther) = latestVotes.values.map(ar => (ar.from -> ar.progress.highestCommitted.logIndex)).maxBy(_._2)
+            val (target, highestCommittedIndexOther) = latestVotes.values.map(ar => ar.from -> ar.progress.highestCommitted.logIndex).maxBy(_._2)
             if (highestCommittedIndexOther > highestCommittedIndex) {
               log.debug("Node {} {} requesting retransmission to target {} with highestCommittedIndex {}", nodeUniqueId, stateName, target, highestCommittedIndex)
               send(sender, RetransmitRequest(nodeUniqueId, target, highestCommittedIndex))
@@ -470,7 +470,7 @@ with CommitHandler {
             val updated = oldData.acceptResponses + (vote.requestId -> None)
 
             // grab all the accepted values from the beginning of the tree map
-            val (committable, uncommittable) = updated.span(_._2 == None)
+            val (committable, uncommittable) = updated.span { case (_, rs) => rs.isEmpty }
             log.debug("Node " + nodeUniqueId + " {} vote {} committable {} uncommittable {}", stateName, vote, committable, uncommittable)
 
             // this will have dropped the committable 
@@ -663,7 +663,7 @@ with CommitHandler {
       stay
   }
 
-  def highestAcceptedIndex() = journal.bounds.max
+  def highestAcceptedIndex = journal.bounds.max
 
   def highestNumberProgressed(data: PaxosData): BallotNumber = Seq(data.epoch, Option(data.progress.highestPromised), Option(data.progress.highestCommitted.number)).flatten.max
 

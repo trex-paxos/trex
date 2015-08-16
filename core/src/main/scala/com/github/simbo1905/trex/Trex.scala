@@ -17,6 +17,7 @@ import scala.collection.SortedMap
 import scala.compat.Platform
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import scala.util.control.NonFatal
 
 // TODO do we really need a custom extension can we not use SerializationExtension directly
 class Trex(system: ExtendedActorSystem) extends Extension {
@@ -326,7 +327,7 @@ class TypedActorPaxosEndpoint(config: PaxosActor.Configuration, broadcast: Actor
         log.debug(s"invoked ${method.getName} returned $response")
         ServerResponse(id, response)
       } catch {
-        case ex: Throwable =>
+        case NonFatal(ex) =>
           log.error(ex, s"call to $method with $parameters got exception $ex")
           ServerResponse(id, Option(ex))
       }
