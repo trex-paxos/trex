@@ -572,6 +572,8 @@ with CommitHandler {
 
             val freshAccepts = indexes map { slot =>
               val oldAccept = journal.accepted(slot)
+
+              // TODO: We're making a naked get on the Option here. What if it is None? Need better handling.
               Accept(Identifier(nodeUniqueId, higherNumber, slot), oldAccept.get.value)
             }
             log.info("Node {} {} time-out on {} accepts", nodeUniqueId, stateName, freshAccepts.size)
@@ -618,9 +620,9 @@ with CommitHandler {
       trace(stateName, e.stateData, sender, e.event)
       log.debug("Node {} {} value {}", nodeUniqueId, stateName, value)
 
-      data.epoch.get match {
+      data.epoch match {
         // the following 'if' check is an invariant of the algorithm we will throw and kill the actor if we have no match
-        case epoch if data.progress.highestPromised <= epoch =>
+        case Some(epoch) if data.progress.highestPromised <= epoch =>
           // compute next slot
           val lastLogIndex: Long = if (data.acceptResponses.isEmpty) {
             data.progress.highestCommitted.logIndex
