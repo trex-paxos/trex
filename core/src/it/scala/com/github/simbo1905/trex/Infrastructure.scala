@@ -3,6 +3,7 @@ package com.github.simbo1905.trex
 import java.io.FileWriter
 
 import akka.actor._
+import com.github.simbo1905.trex.internals.PaxosActor.TraceData
 import com.github.simbo1905.trex.internals._
 import com.typesafe.config.Config
 
@@ -13,8 +14,8 @@ import scala.collection.immutable.Seq
 
 
 class TestJournal extends Journal {
-  var _progress = Journal.minBookwork.copy()
-  var _map: SortedMap[Long, Accept] = SortedMap.empty
+  private var _progress = Journal.minBookwork.copy()
+  private var _map: SortedMap[Long, Accept] = SortedMap.empty
 
   def save(progress: Progress): Unit = _progress = progress
 
@@ -53,17 +54,19 @@ class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, nodeUniqueId: 
   override def heartbeatInterval = 33
 
   override def trace(state: PaxosRole, data: PaxosData, sender: ActorRef, msg: Any): Unit = {
-    if (tracer.isDefined) tracer.get(nodeUniqueId, state, data, sender, msg)
+    tracer.foreach(t => t(TraceData(nodeUniqueId, state, data, Some(sender), msg)))
   }
 
   override def trace(state: PaxosRole, data: PaxosData, payload: CommandValue): Unit = {
-    if (tracer.isDefined) tracer.get(nodeUniqueId, state, data, null, payload)
+    tracer.foreach(t => t(TraceData(nodeUniqueId, state, data, None, payload)))
   }
 }
 
 object ClusterHarness {
   type Trace = (Array[Byte]) => Array[Byte]
-  val Halt = "Halt"
+
+  case object Halt
+
 }
 
 /**
@@ -90,10 +93,10 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
   // nodes that are no longer reachable
   var killedNodes = Set.empty[ActorRef]
   // record what each node saw in which state for debugging a full trace
-  var tracedData = SortedMap.empty[Int, Seq[(PaxosRole, PaxosData, ActorRef, Any)]]
+  var tracedData = SortedMap.empty[Int, Seq[TraceData]]
 
-  def recordTraceData(nodeUniqueId: Int, state: PaxosRole, data: PaxosData, sender: ActorRef, msg: Any): Unit = {
-    tracedData = tracedData + (nodeUniqueId -> (tracedData(nodeUniqueId) :+(state, data, sender, msg)))
+  def recordTraceData(data:TraceData): Unit = {
+    tracedData = tracedData + (data.nodeUniqueId -> (tracedData(data.nodeUniqueId) :+ data))
   }
 
   (0 until size) foreach { i =>
@@ -207,20 +210,20 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       log.info(s"dumping state trace to $path")
       try {
         tracedData.toSeq foreach {
-          case (node, t: Seq[(PaxosRole, PaxosData, ActorRef, Any)]) =>
+          case (node, t: Seq[TraceData]) =>
             fw.write(s"#node $node\n\n")
             t foreach { d =>
-              val (state, data, sender, msg) = d
-              if (sender != null) {
-                // if the test fails to commit all values then the leader will have
-                // a reference to the client who sent the message which does not pickle.
-                // since the test harness sent the message we simply scrub that field so that
-                // we can log the state of the leader when the test fails due to a failed commit.
-
-                val dataNoActors = data.copy(clientCommands = Map.empty)
-                fw.write(s"$state|$dataNoActors|${sender.toString}|$msg\n\n")
-              } else {
-                fw.write(s"delivered: $msg\n\n")
+              val TraceData(nId, state, data, sender, msg) = d
+              sender match {
+                case Some(actorRef) =>
+                  // if the test fails to commit all values then the leader will have
+                  // a reference to the client who sent the message which does not pickle.
+                  // since the test harness sent the message we simply scrub that field so that
+                  // we can log the state of the leader when the test fails due to a failed commit.
+                  val dataNoActors = data.copy(clientCommands = Map.empty)
+                  fw.write(s"$state|$dataNoActors|${actorRef.toString}|$msg\n\n")
+                case None =>
+                  fw.write(s"delivered: $msg\n\n")
               }
             }
         }

@@ -2,6 +2,7 @@ package com.github.simbo1905.trex.internals
 
 import akka.actor.ActorRef
 import com.github.simbo1905.trex._
+import com.github.simbo1905.trex.internals.PaxosActor.TraceData
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -22,10 +23,10 @@ class TestPaxosActor(config: PaxosActor.Configuration, nodeUniqueId: Int, broadc
   }
 
   override def trace(state: PaxosRole, data: PaxosData, sender: ActorRef, msg: Any): Unit = {
-    if (tracer.isDefined) tracer.get(nodeUniqueId, state, data, sender, msg)
+    tracer.foreach(t => t(TraceData(nodeUniqueId, state, data, Some(sender), msg)))
   }
 
   override def trace(state: PaxosRole, data: PaxosData, payload: CommandValue): Unit = {
-    if (tracer.isDefined) tracer.get(nodeUniqueId, state, data, null, payload)
+    tracer.foreach(t => t(TraceData(nodeUniqueId, state, data, None, payload)))
   }
 }
