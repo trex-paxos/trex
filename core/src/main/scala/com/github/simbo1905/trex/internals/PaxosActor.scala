@@ -353,13 +353,13 @@ with CommitHandler {
             // if we have a majority response which show more slots to recover issue new prepare messages
             val dataWithExpandedPrepareResponses = if (votes.size > data.clusterSize / 2) {
               // issue more prepares there are more accepted slots than we so far ran recovery upon
-              val (Identifier(_, _, highestAcceptedIndex), _) = data.prepareResponses.last
-              val highestAcceptedIndexOther = votes.values.map(_.highestAcceptedIndex).max
-              if (highestAcceptedIndexOther > highestAcceptedIndex) {
-                val prepares = (highestAcceptedIndex + 1) to highestAcceptedIndexOther map { id =>
+              val (Identifier(_, _, ourLastHighestAccepted), _) = data.prepareResponses.last
+              val theirHighestAccepted = votes.values.map(_.highestAcceptedIndex).max
+              if (theirHighestAccepted > ourLastHighestAccepted) {
+                val prepares = (ourLastHighestAccepted + 1) to theirHighestAccepted map { id =>
                   Prepare(Identifier(nodeUniqueId, data.epoch.get, id))
                 }
-                log.info("Node {} Recoverer broadcasting {} new prepare messages for expanded slots {} to {}", nodeUniqueId, prepares.size, (highestAcceptedIndex + 1), highestAcceptedIndexOther)
+                log.info("Node {} Recoverer broadcasting {} new prepare messages for expanded slots {} to {}", nodeUniqueId, prepares.size, (ourLastHighestAccepted + 1), theirHighestAccepted)
                 prepares foreach { p =>
                   log.debug("Node {} sending {}", nodeUniqueId, p)
                   send(broadcastRef, p)
@@ -369,10 +369,10 @@ with CommitHandler {
                 val newPrepareSelfVotes: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] =
                   (prepares map { prepare =>
                     val ackOrNack = if (prepare.id.number >= data.progress.highestPromised) {
-                      PrepareAck(prepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))
+                      PrepareAck(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))
                     } else {
                       // FIXME no test for this
-                      PrepareNack(prepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat)
+                      PrepareNack(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat)
                     }
                     val selfVote = Some(Map(nodeUniqueId -> ackOrNack))
                     (prepare.id -> selfVote)
@@ -791,7 +791,8 @@ abstract class PaxosActorWithTimeout(config: Configuration, nodeUniqueId: Int, b
  * @param leaderHeartbeat The last heartbeat value seen from a leader. Note that clocks are not synced so this value is only used as evidence that a stable leader is up whereas the paxos number and committed slot are taken as authoritative that a new leader is making progress.
  * @param timeout The next randomised point in time that this node will timeout. Followers timeout on Commit messages and become a Recoverer. Recoverers timeout on PrepareResponses and AcceptResponses. Leaders timeout on AcceptResponses.
  * @param clusterSize The current size of the cluster.
- * @param prepareResponses The work outstanding uncommitted proposed work of the leader take over phase during the recovery of a leader failover. Each key is an identifier of a prepare for which we are collecting a majority response to determine the highest proposed value of the previous leader if any.
+ * @param prepareResponses The outstanding uncommitted proposed work of the leader take over phase during the recovery of a leader failover.
+ *                         Each key is an identifier of a prepare for which we are collecting a majority response to determine the highest proposed value of the previous leader if any.
  * @param epoch The leaders paxos number when leading.
  * @param acceptResponses Tracking of responses to accept messages when Recoverer or Leader. Each key is an identifier of the command we want to commit. Each value is either the votes of each cluster node else None if the slot is ready to commit.
  * @param clientCommands The client work outstanding with the leader. The map key is the accept identifier and the value is a tuple of the client command and the client ref.
