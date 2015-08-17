@@ -604,7 +604,6 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
       // and it sent out the messages only after having journalled its own promise
       assert(saveTime != 0 && sendTime != 0 && saveTime < sendTime)
 
-      // FIXME should use a test file journal and confirm that saves and sends are called in the correct order
     }
 
     // TODO should check that it ignores commits less than or equal to last committed logIndex (both of them)

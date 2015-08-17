@@ -157,7 +157,6 @@ class CoreSpec extends WordSpecLike with Matchers {
     val bytes2 = Array[Byte](7, 8)
 
     "roundrip NotLeader" in {
-      // FIXME NoOp and membership
       val n = NotLeader(1, 2)
       Pickle.unpack(Pickle.pack(n)) should be(NotLeader(1, 2))
     }
