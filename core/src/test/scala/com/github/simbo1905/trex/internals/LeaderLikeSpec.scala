@@ -1,23 +1,21 @@
 package com.github.simbo1905.trex.internals
 
-import akka.testkit.TestKit
-import com.github.simbo1905.trex.internals.PaxosActor._
-import org.scalamock.scalatest.MockFactory
+import akka.actor.ActorRef
+import akka.testkit.{TestFSMRef, TestKit}
 import com.github.simbo1905.trex._
-import akka.testkit.TestFSMRef
+import org.scalamock.scalatest.MockFactory
 
 import scala.collection.immutable.TreeMap
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
-import akka.actor.ActorRef
 import scala.language.postfixOps
 
 trait LeaderLikeSpec {
   self: TestKit with MockFactory with AllStateSpec =>
 
   import AllStateSpec._
-  import PaxosActor.Configuration
   import Ordering._
+  import PaxosActor.Configuration
 
   def ignoreCommitMessageLessThanLastCommit(state: PaxosRole)(implicit sender: ActorRef) {
     require(state == Leader || state == Recoverer)

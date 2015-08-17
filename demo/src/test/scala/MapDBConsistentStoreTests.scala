@@ -1,15 +1,14 @@
 package com.github.simbo1905.trexdemo
 
 import akka.actor._
-import akka.testkit.{TestFSMRef, ImplicitSender, DefaultTimeout, TestKit}
+import akka.testkit.{DefaultTimeout, ImplicitSender, TestKit}
 import com.github.simbo1905.trex._
-import com.github.simbo1905.trex.internals.{Accept, ClusterMember, Progress, PaxosActor}
+import com.github.simbo1905.trex.internals.{Accept, Progress}
 import com.typesafe.config.ConfigFactory
-import org.scalatest._
 import org.mapdb.{DB, DBMaker}
+import org.scalatest._
 
-import scala.collection.immutable.{TreeMap, SortedMap}
-import scala.collection.immutable.Seq
+import scala.collection.immutable.{SortedMap, TreeMap}
 
 object MapDBConsistentStoreTests {
   val config = ConfigFactory.parseString("trex.leader-timeout-min=50\ntrex.leader-timeout-max=300\nakka.loglevel = \"DEBUG\"\nakka.log-dead-letters-during-shutdown=false")

@@ -1,8 +1,7 @@
 package com.github.simbo1905.trex.internals
 
 import akka.event.LoggingAdapter
-import com.github.simbo1905.trex.Journal
-import com.github.simbo1905.trex.JournalBounds
+import com.github.simbo1905.trex.{Journal, JournalBounds}
 import com.github.simbo1905.trex.internals.PaxosActor.HighestCommittedIndex
 
 case class Retransmission(newProgress: Progress, accepts: Seq[Accept], committed: Seq[CommandValue])

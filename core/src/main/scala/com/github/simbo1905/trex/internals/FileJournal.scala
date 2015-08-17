@@ -1,13 +1,13 @@
 
 package com.github.simbo1905.trex.internals
 
+import java.io.{Closeable, File}
+
 import akka.util.ByteString
 import com.github.simbo1905.trex._
-import java.io.File
-import org.mapdb.DBMaker
-import org.mapdb.DB
+import org.mapdb.{DB, DBMaker}
+
 import scala.collection.JavaConversions
-import java.io.Closeable
 
 /**
  * A file based journal which retains a minimum committed history of values for retransmission. The underlying implementation is a MapDB BTree. 
