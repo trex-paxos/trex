@@ -158,14 +158,24 @@ trait LeaderLikeSpec {
     val responses = PaxosData.acceptResponsesLens.set(initialData, votes)
     val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
     val timenow = 999L
-    // FIXME use a test file journal and ensure that it calls save in the correct order to sending messages
+    var sendTime = 0L
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
       override def clock() = timenow
+      override def send(actor: ActorRef, msg: Any): Unit = {
+        sendTime = System.nanoTime()
+        actor ! msg
+      }
     })
     fsm.setState(state, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))))
     // and the accept in the store
     val accept = Accept(id99, ClientRequestCommandValue(0, expectedBytes))
     (stubJournal.accepted _) when (99L) returns Some(accept)
+    // and a journal which records the save time
+    var saveTime = 0L
+    (stubJournal.save _) when(*) returns {
+      saveTime = System.nanoTime()
+      Unit
+    }
 
     // when it gets a timeout
     fsm ! PaxosActor.CheckTimeout
@@ -181,6 +191,9 @@ trait LeaderLikeSpec {
     assert(fsm.stateData.epoch == Some(newEpoch))
     // and sets a fresh timeout
     assert(fsm.stateData.timeout > 0 && fsm.stateData.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
+
+    // and it sent out the messages only after having journalled its own promise
+    assert(saveTime != 0 && sendTime != 0 && saveTime < sendTime)
   }
 
   def resendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(state: PaxosRole)(implicit sender: ActorRef): Unit = {
