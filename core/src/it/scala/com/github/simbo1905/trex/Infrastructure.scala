@@ -36,6 +36,8 @@ class TestJournal extends Journal {
 class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, nodeUniqueId: Int, broadcast: ActorRef, journal: Journal, delivered: ArrayBuffer[CommandValue], tracer: Option[PaxosActor.Tracer])
   extends PaxosActorWithTimeout(config, nodeUniqueId, broadcast, journal) {
 
+  def broadcastRef: ActorRef = broadcast
+
   // does nothing but makes this class concrete for testing
   val deliverClient: PartialFunction[CommandValue, AnyRef] = {
     case ClientRequestCommandValue(_, bytes) => bytes
