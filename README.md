@@ -10,8 +10,6 @@ sbt coverageReport
 
 ## What is this? 
 
-This is TRex which has a [write up here](https://simbo1905.wordpress.com/2014/10/28/transaction-log-replication-with-paxos/). 
-
 Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more information.
 
 ## Status /  Work Plan
