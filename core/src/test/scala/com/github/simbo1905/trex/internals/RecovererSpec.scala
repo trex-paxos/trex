@@ -89,6 +89,7 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
     expectMsg(100 millisecond, accept)
     // and becomes leader
     assert(fsm.stateName == Leader)
+
     // when a majority accept response with an ack from node1
     fsm ! AcceptAck(prepareId, 1, initialData.progress)
     // it commits the no-op
@@ -101,8 +102,6 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
     assert(fsm.stateData.prepareResponses.isEmpty)
     // and sets a fresh timeout
     fsm.stateData.timeout shouldBe 1234L
-
-    // FIXME test the timings of the save actions and sends in two places
     // and send happens after save
     assert( saveTime > 0L && sendTime > 0L && saveTime < sendTime )
   }
