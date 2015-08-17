@@ -25,7 +25,7 @@ trait ResendAcceptsHandler {
 
   def handleResendAccepts(stateName: PaxosRole, data: PaxosData): PaxosData = {
     import Ordering._
-      // accepts didn't get a majority yes/no and saw no higher commits so we increment the ballot number and broadcast
+    // accepts didn't get a majority yes/no and saw no higher commits so we increment the ballot number and broadcast
     val newData = data.acceptResponses match {
       case acceptResponses if acceptResponses.nonEmpty =>
         // the slots which have not yet committed
@@ -33,13 +33,9 @@ trait ResendAcceptsHandler {
         // highest promised or committed at this node
         val highestLocal: BallotNumber = highestNumberProgressed(data)
         // numbers in any responses including our own possibly stale self response
-        val proposalNumbers = (acceptResponses.values flatMap {
-          _ map {
-            _.values.flatMap { r =>
+        val proposalNumbers = (acceptResponses.values.map(_.responses).flatMap(_.values) flatMap { r =>
               Set(r.progress.highestCommitted.number, r.progress.highestPromised)
-            }
-          }
-        }).flatten // TODO for-comprehension?
+        }) // TODO for-comprehension?
       // the max known
       val maxNumber = (proposalNumbers.toSeq :+ highestLocal).max
         // check whether we were actively rejected

@@ -49,13 +49,13 @@ class CoreSpec extends WordSpecLike with Matchers {
 
     "set accept responses" in {
       {
-        val newData = PaxosData.acceptResponsesLens.set(nodeData, SortedMap.empty[Identifier, Option[Map[Int, AcceptResponse]]])
+        val newData = PaxosData.acceptResponsesLens.set(nodeData, SortedMap.empty[Identifier, AcceptResponsesAndTimeout])
         assert(newData == nodeData)
       }
       {
-        val acceptResponses: SortedMap[Identifier, Option[Map[Int, AcceptResponse]]] = TreeMap(id -> None)
+        val acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(id -> AcceptResponsesAndTimeout(0L, Map.empty))
         val newData = PaxosData.acceptResponsesLens.set(nodeData, acceptResponses)
-        assert(newData.acceptResponses(id) == None)
+        assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, Map.empty))
       }
     }
 
@@ -79,14 +79,14 @@ class CoreSpec extends WordSpecLike with Matchers {
       {
         val newData = PaxosData.leaderLens.set(nodeData, (
           SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]],
-          SortedMap.empty[Identifier, Option[Map[Int, AcceptResponse]]],
+          SortedMap.empty[Identifier, AcceptResponsesAndTimeout],
           Map.empty[Identifier, (CommandValue, ActorRef)])
         )
         assert(newData == nodeData)
       }
       {
         val prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] = TreeMap(id -> None)
-        val acceptResponses: SortedMap[Identifier, Option[Map[Int, AcceptResponse]]] = TreeMap(id -> None)
+        val acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(id -> AcceptResponsesAndTimeout(0L,Map.empty))
         val commandValue = new CommandValue {
           override def msgId: Long = 0L
           override def bytes: Array[Byte] = Array()
@@ -94,7 +94,7 @@ class CoreSpec extends WordSpecLike with Matchers {
         val clientCommands = Map(id ->(commandValue, null))
         val newData = PaxosData.leaderLens.set(nodeData, (prepareResponses, acceptResponses, clientCommands))
         assert(newData.prepareResponses(id) == None)
-        assert(newData.acceptResponses(id) == None)
+        assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, Map.empty))
         assert(newData.clientCommands(id) == (commandValue -> null))
       }
     }

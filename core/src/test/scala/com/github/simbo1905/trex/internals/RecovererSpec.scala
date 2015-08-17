@@ -138,8 +138,8 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
         map.get(accept.id) match {
           case None =>
             fail
-          case Some(m) =>
-            m.get.values.head match {
+          case Some(AcceptResponsesAndTimeout(_, responses)) =>
+            responses.values.head match {
               case a: AcceptAck =>
               // good
               case b: AcceptNack =>
