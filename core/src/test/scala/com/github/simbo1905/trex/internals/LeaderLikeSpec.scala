@@ -142,7 +142,8 @@ trait LeaderLikeSpec {
     // it reboardcasts the accept
     expectMsg(100 millisecond, accept)
 
-    // FIXME and sets a fresh timeout
+    // and sets a fresh timeout
+    assert(fsm.stateData.timeout > 0 && fsm.stateData.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
   }
 
   // TODO these next few tests need to be DRYed
@@ -178,7 +179,8 @@ trait LeaderLikeSpec {
 
     // and sets its
     assert(fsm.stateData.epoch == Some(newEpoch))
-    // FIXME and should increment timeout
+    // and sets a fresh timeout
+    assert(fsm.stateData.timeout > 0 && fsm.stateData.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
   }
 
   def resendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(state: PaxosRole)(implicit sender: ActorRef): Unit = {
@@ -211,7 +213,8 @@ trait LeaderLikeSpec {
 
     // and sets its
     assert(fsm.stateData.epoch == Some(newEpoch))
-    // FIXME and sets a fresh timeout
+    // and sets a fresh timeout
+    assert(fsm.stateData.timeout > 0 && fsm.stateData.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
   }
 
 }
