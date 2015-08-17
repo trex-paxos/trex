@@ -5,7 +5,7 @@
 sbt clean coverage test it:test
 sbt coverageReport
 ```
-[![Build Status](https://travis-ci.org/simbo1905/trex.svg?branch=master)](https://travis-ci.org/simbo1905/trex)
+[![Build Status](https://travis-ci.org/trex-paxos/trex.svg?branch=master)](https://travis-ci.org/trex-paxos/trex)
 [![Codacy Badge](https://www.codacy.com/project/badge/dd8dd20b797a4e288213f45c10fae494)](https://www.codacy.com/app/doug/trex)
 
 ## What is this? 
