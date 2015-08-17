@@ -79,14 +79,14 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
 
   "fix a no-op and promote to Leader then commits if in a three node cluster gets a majority with one ack with no values to fix" in {
     // given a recoverer with self vote
-    val (fsm, prepareId) = recovererNoResponsesInClusterOfSize(3)
+    val timenow = 999L
+    val (fsm, prepareId) = recovererNoResponsesInClusterOfSize(3, timenow)
     val accept = Accept(prepareId, NoOperationCommandValue)
     // when a majority prepare response with an ack from node1
     val ack1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
     fsm ! ack1
     // it boardcasts a no-op
     expectMsg(100 millisecond, accept)
-    // FIXME it must increment its timeout
     // and becomes leader
     assert(fsm.stateName == Leader)
     // when a majority accept response with an ack from node1
@@ -99,6 +99,9 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
     assert(fsm.stateData.epoch == Some(prepareId.number))
     // and it has cleared the recover votes
     assert(fsm.stateData.prepareResponses.isEmpty)
+    // and sets a fresh timeout
+    fsm.stateData.timeout shouldBe 1234L
+
     // FIXME test the timings of the save actions and sends in two places
   }
 
@@ -147,7 +150,8 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
 
   "fix a no-op promote to Leader and commits if in a five node cluster gets a majority with two acks with no values to fix" in {
     // given a recoverer with no responses
-    val (fsm, prepareId) = recovererNoResponsesInClusterOfSize(5)
+    val timenow = 999L
+    val (fsm, prepareId) = recovererNoResponsesInClusterOfSize(5, timenow)
     // when a majority prepare response with an ack from node1 and node2
     val ack1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
     fsm ! ack1
@@ -155,7 +159,6 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
     fsm ! ack2
     // it boardcasts a no-op
     expectMsg(100 millisecond, Accept(prepareId, NoOperationCommandValue))
-    // FIXME it must increment its timeout
     // when a majority accept response with an ack from node1 and node2
     fsm ! AcceptAck(prepareId, 1, initialData.progress)
     fsm ! AcceptAck(prepareId, 2, initialData.progress)
@@ -169,19 +172,21 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
     assert(fsm.stateData.epoch == Some(prepareId.number))
     // and it has cleared the recover votes
     assert(fsm.stateData.prepareResponses.isEmpty)
+    // and sets a fresh timeout
+    fsm.stateData.timeout shouldBe 1234L
     // FIXME test the timings of the save actions and sends in two places
   }
 
   "fix a high value and promote to Leader then commits if in a three node cluster gets a majority with one ack" in {
     // given a recoverer with self vote
-    val (fsm, prepareId) = recovererNoResponsesInClusterOfSize(3)
+    val timenow = 999L
+    val (fsm, prepareId) = recovererNoResponsesInClusterOfSize(3, timenow)
     // and some value returned in the promise from node1 with some lower number
     val lowerId = prepareId.copy(number = prepareId.number.copy(counter = prepareId.number.counter - 1))
     val ack1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, Some(Accept(lowerId, ClientRequestCommandValue(0, expectedBytes))))
     fsm ! ack1
     // it boardcasts the payload from the promise under its higher epoch number
     expectMsg(100 millisecond, Accept(prepareId, ClientRequestCommandValue(0, expectedBytes)))
-    // FIXME it must increment its timeout
     // and becomes leader
     assert(fsm.stateName == Leader)
     // when a majority accept response with an ack from node1
@@ -195,12 +200,14 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
     assert(fsm.stateData.epoch == Some(prepareId.number))
     // and it has cleared the recover votes
     assert(fsm.stateData.prepareResponses.isEmpty)
-    // FIXME test the timings of the save actions and sends in two places
+    // and sets a fresh timeout
+    fsm.stateData.timeout shouldBe 1234L
   }
 
   "fix a high value promote to Leader then commits if in a five node cluster gets a majority with two acks" in {
+    val timenow = 999L
     // given a recoverer with no responses
-    val (fsm, prepareId) = recovererNoResponsesInClusterOfSize(5)
+    val (fsm, prepareId) = recovererNoResponsesInClusterOfSize(5, timenow)
     // when a majority prepare response with an ack from node1 and node2 with some value in the promise from node2
     val ack1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
     fsm ! ack1
@@ -209,7 +216,6 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
     fsm ! ack2
     // it boardcasts the payload from the promise under its higher epoch number
     expectMsg(100 millisecond, Accept(prepareId, ClientRequestCommandValue(0, expectedBytes)))
-    // FIXME it must increment its timeout
     // when a majority accept response with an ack from node1 and node2
     fsm ! AcceptAck(prepareId, 1, initialData.progress)
     fsm ! AcceptAck(prepareId, 2, initialData.progress)
@@ -226,6 +232,8 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
     assert(fsm.stateData.prepareResponses.isEmpty)
     // and it has cleared the accept votes its own accept
     assert(fsm.stateData.acceptResponses.isEmpty)
+    // and sets a fresh timeout
+    fsm.stateData.timeout shouldBe 1234L
     // FIXME test the timings of the save actions and sends in two places
   }
 

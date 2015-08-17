@@ -425,7 +425,7 @@ with CommitHandler {
                 // we have completed recovery of the values in the slots so we now switch to stable Leader state
                 val newData = PaxosData.leaderLens.set(dataWithExpandedPrepareResponses, (SortedMap.empty, selfVoted, Map.empty))
                 log.info("Node {} {} has issued accept messages for all prepare messages to promoting to be Leader.", nodeUniqueId, stateName)
-                goto(Leader) using newData.copy(clientCommands = Map.empty) // TODO lens?
+                goto(Leader) using newData.copy(clientCommands = Map.empty, timeout = randomTimeout) // TODO lens?
               } else {
                 log.info("Node {} {} is still recovering {} slots", nodeUniqueId, stateName, updatedPrepares.size)
                 stay using PaxosData.leaderLens.set(dataWithExpandedPrepareResponses, (updatedPrepares, selfVoted, Map.empty))

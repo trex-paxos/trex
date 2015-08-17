@@ -5,6 +5,7 @@ import com.github.simbo1905.trex.internals.PaxosActor._
 import org.scalamock.scalatest.MockFactory
 import com.github.simbo1905.trex._
 import akka.testkit.TestFSMRef
+import org.scalatest.Matchers
 
 import scala.collection.immutable.TreeMap
 import scala.collection.mutable.ArrayBuffer
@@ -13,7 +14,7 @@ import akka.actor.ActorRef
 import scala.language.postfixOps
 
 trait LeaderLikeSpec {
-  self: TestKit with MockFactory with AllStateSpec =>
+  self: TestKit with MockFactory with AllStateSpec with Matchers =>
 
   import AllStateSpec._
   import PaxosActor.Configuration
@@ -208,6 +209,7 @@ trait LeaderLikeSpec {
     val timenow = 999L
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
       override def clock() = timenow
+      override def freshTimeout(interval: Long): Long = 1234L
     })
     fsm.setState(state, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))))
     // and the accept in the store
@@ -227,7 +229,7 @@ trait LeaderLikeSpec {
     // and sets its
     assert(fsm.stateData.epoch == Some(newEpoch))
     // and sets a fresh timeout
-    assert(fsm.stateData.timeout > 0 && fsm.stateData.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
+    fsm.stateData.timeout shouldBe 1234L
   }
 
 }
