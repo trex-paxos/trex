@@ -4,6 +4,7 @@ import akka.actor.ActorRef
 import akka.testkit.{TestFSMRef, TestKit}
 import com.github.simbo1905.trex._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.Matchers
 
 import scala.collection.immutable.TreeMap
 import scala.collection.mutable.ArrayBuffer
@@ -11,7 +12,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 trait LeaderLikeSpec {
-  self: TestKit with MockFactory with AllStateSpec =>
+  self: TestKit with MockFactory with AllStateSpec with Matchers =>
 
   import AllStateSpec._
   import Ordering._
@@ -122,7 +123,7 @@ trait LeaderLikeSpec {
     val lastCommitted = Identifier(0, BallotNumber(1, 0), 98L)
     // self voted on accept id99
     val id99 = Identifier(0, BallotNumber(1, 0), 99L)
-    val votes = TreeMap(id99 -> Some(Map(0 -> AcceptAck(id99, 0, initialData.progress))))
+    val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
     val responses: PaxosData = PaxosData.acceptResponsesLens.set(initialData, votes)
     val oldProgress = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
     val timenow = 999L
@@ -140,7 +141,8 @@ trait LeaderLikeSpec {
     // it reboardcasts the accept
     expectMsg(100 millisecond, accept)
 
-    // FIXME and sets a fresh timeout
+    // and sets a fresh timeout
+    assert(fsm.stateData.timeout > 0 && fsm.stateData.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
   }
 
   // TODO these next few tests need to be DRYed
@@ -148,21 +150,31 @@ trait LeaderLikeSpec {
     val lastCommitted = Identifier(0, BallotNumber(1, 0), 98L)
     // given a leader who has boardcast slot 99 and seen a nack
     val id99 = Identifier(0, BallotNumber(1, 0), 99L)
-    val votes = TreeMap(id99 -> Some(Map(
+    val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, Map(
       0 -> AcceptAck(id99, 0, initialData.progress),
       1 -> AcceptNack(id99, 1, initialData.progress.copy(highestPromised = BallotNumber(22, 2)))
     )))
     val responses = PaxosData.acceptResponsesLens.set(initialData, votes)
     val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
     val timenow = 999L
-    // FIXME use a test file journal and ensure that it calls save in the correct order to sending messages
+    var sendTime = 0L
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
       override def clock() = timenow
+      override def send(actor: ActorRef, msg: Any): Unit = {
+        sendTime = System.nanoTime()
+        actor ! msg
+      }
     })
     fsm.setState(state, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))))
     // and the accept in the store
     val accept = Accept(id99, ClientRequestCommandValue(0, expectedBytes))
     (stubJournal.accepted _) when (99L) returns Some(accept)
+    // and a journal which records the save time
+    var saveTime = 0L
+    (stubJournal.save _) when(*) returns {
+      saveTime = System.nanoTime()
+      Unit
+    }
 
     // when it gets a timeout
     fsm ! PaxosActor.CheckTimeout
@@ -176,14 +188,18 @@ trait LeaderLikeSpec {
 
     // and sets its
     assert(fsm.stateData.epoch == Some(newEpoch))
-    // FIXME and should increment timeout
+    // and sets a fresh timeout
+    assert(fsm.stateData.timeout > 0 && fsm.stateData.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
+
+    // and it sent out the messages only after having journalled its own promise
+    assert(saveTime != 0 && sendTime != 0 && saveTime < sendTime)
   }
 
   def resendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(state: PaxosRole)(implicit sender: ActorRef): Unit = {
     val lastCommitted = Identifier(0, BallotNumber(1, 0), 98L)
     // given a leader who has boardcast slot 99 and seen a nack
     val id99 = Identifier(0, BallotNumber(1, 0), 99L)
-    val votes = TreeMap(id99 -> Some(Map(
+    val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, Map(
       0 -> AcceptAck(id99, 0, initialData.progress)
     )))
     val responses = PaxosData.acceptResponsesLens.set(initialData, votes)
@@ -191,6 +207,7 @@ trait LeaderLikeSpec {
     val timenow = 999L
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
       override def clock() = timenow
+      override def freshTimeout(interval: Long): Long = 1234L
     })
     fsm.setState(state, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))))
     // and the accept in the store
@@ -209,7 +226,8 @@ trait LeaderLikeSpec {
 
     // and sets its
     assert(fsm.stateData.epoch == Some(newEpoch))
-    // FIXME and sets a fresh timeout
+    // and sets a fresh timeout
+    fsm.stateData.timeout shouldBe 1234L
   }
 
 }

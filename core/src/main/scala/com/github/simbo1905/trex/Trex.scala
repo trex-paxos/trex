@@ -260,7 +260,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
 }
 
 /**
- * A concrete driver which uses akka.tcp to send messages. Note akka documentation says that akka.tcp is not firewall.
+ * A concrete driver which uses akka.tcp to send messages. Note akka documentation says that akka.tcp is not firewall friendly.
  * @param timeout The client timeout. It is recommended that this is significantly longer than the cluster failover timeout.
  * @param cluster The static cluster members.
  */
@@ -268,7 +268,7 @@ class StaticClusterDriver(timeout: Timeout, cluster: Cluster, maxAttempts: Int) 
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  // FIXME timings looks wrong here, waiting a second to start seems forever and 5ms repeat seems aggressive.
+  // TODO inject these timings from config
   context.system.scheduler.schedule(Duration(5, MILLISECONDS), Duration(1000, MILLISECONDS), self, PaxosActor.CheckTimeout)
 
   val selectionUrls: Map[Int, String] = (cluster.nodes.indices zip Cluster.selectionUrls(cluster).map(_._2)).toMap
@@ -315,8 +315,10 @@ object Cluster {
 
 }
 
-class TypedActorPaxosEndpoint(config: PaxosActor.Configuration, broadcast: ActorRef, nodeUniqueId: Int, journal: Journal, target: AnyRef)
-  extends PaxosActorWithTimeout(config, nodeUniqueId, broadcast, journal) {
+class TypedActorPaxosEndpoint(config: PaxosActor.Configuration, broadcastReference: ActorRef, nodeUniqueId: Int, journal: Journal, target: AnyRef)
+  extends PaxosActorWithTimeout(config, nodeUniqueId, broadcastReference, journal) {
+
+  def broadcastRef: ActorRef = broadcastReference
 
   override val deliverClient: PartialFunction[CommandValue, AnyRef] = {
     case ClientRequestCommandValue(id, bytes) =>

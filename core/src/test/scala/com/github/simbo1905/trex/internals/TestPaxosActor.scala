@@ -9,6 +9,8 @@ import scala.collection.mutable.ArrayBuffer
 class TestPaxosActor(config: PaxosActor.Configuration, nodeUniqueId: Int, broadcast: ActorRef, journal: Journal, val delivered: ArrayBuffer[CommandValue], tracer: Option[PaxosActor.Tracer])
   extends PaxosActor(config, nodeUniqueId, broadcast, journal) {
 
+  def broadcastRef: ActorRef = broadcast
+
   // does nothing but makes this class concrete for testing
   val deliverClient: PartialFunction[CommandValue, Array[Byte]] = {
     case m => NoOperationCommandValue.bytes

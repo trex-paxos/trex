@@ -467,5 +467,4 @@ trait AllStateSpec {
     fsm
   }
 
-  // FIXME add tests that nodes ignore leader like messages from nodes which are not in the cluster
 }

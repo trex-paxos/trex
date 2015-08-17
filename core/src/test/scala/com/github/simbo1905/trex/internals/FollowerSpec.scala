@@ -19,7 +19,7 @@ object FollowerSpec {
 class FollowerSpec
   extends TestKit(ActorSystem("FollowerSpec", FollowerSpec.config))
   with DefaultTimeout with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with AllStateSpec with FollowerLikeSpec with OptionValues {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with AllStateSpec with FollowerLikeSpec {
 
   import AllStateSpec._
   import Ordering._
@@ -603,7 +603,6 @@ class FollowerSpec
       // and it sent out the messages only after having journalled its own promise
       assert(saveTime != 0 && sendTime != 0 && saveTime < sendTime)
 
-      // FIXME should use a test file journal and confirm that saves and sends are called in the correct order
     }
 
     // TODO should check that it ignores commits less than or equal to last committed logIndex (both of them)

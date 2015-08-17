@@ -29,15 +29,16 @@ object Ordering {
  *
  * @param config Configuration such as timeout durations and the cluster size.
  * @param nodeUniqueId The unique identifier of this node. This *must* be unique in the cluster which is required as of the Paxos algorithm to work properly and be safe.
- * @param broadcastRef An ActorRef through which the current cluster can be messaged.
+ * @param broadcaseRef An ActorRef through which the current cluster can be messaged.
  * @param journal The durable journal required to store the state of the node in a stable manner between crashes.
  */
-abstract class PaxosActor(config: Configuration, val nodeUniqueId: Int, broadcastRef: ActorRef, val journal: Journal) extends FSM[PaxosRole, PaxosData]
+abstract class PaxosActor(config: Configuration, val nodeUniqueId: Int, broadcaseRef: ActorRef, val journal: Journal) extends FSM[PaxosRole, PaxosData]
 with RetransmitHandler
 with ReturnToFollowerHandler
 with UnhandledHandler
-with CommitHandler {
-
+with CommitHandler
+with ResendAcceptsHandler
+{
   import Ordering._
 
   val minPrepare = Prepare(Identifier(nodeUniqueId, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
@@ -353,13 +354,13 @@ with CommitHandler {
             // if we have a majority response which show more slots to recover issue new prepare messages
             val dataWithExpandedPrepareResponses = if (votes.size > data.clusterSize / 2) {
               // issue more prepares there are more accepted slots than we so far ran recovery upon
-              val (Identifier(_, _, highestAcceptedIndex), _) = data.prepareResponses.last
-              val highestAcceptedIndexOther = votes.values.map(_.highestAcceptedIndex).max
-              if (highestAcceptedIndexOther > highestAcceptedIndex) {
-                val prepares = (highestAcceptedIndex + 1) to highestAcceptedIndexOther map { id =>
+              val (Identifier(_, _, ourLastHighestAccepted), _) = data.prepareResponses.last
+              val theirHighestAccepted = votes.values.map(_.highestAcceptedIndex).max
+              if (theirHighestAccepted > ourLastHighestAccepted) {
+                val prepares = (ourLastHighestAccepted + 1) to theirHighestAccepted map { id =>
                   Prepare(Identifier(nodeUniqueId, data.epoch.get, id))
                 }
-                log.info("Node {} Recoverer broadcasting {} new prepare messages for expanded slots {} to {}", nodeUniqueId, prepares.size, (highestAcceptedIndex + 1), highestAcceptedIndexOther)
+                log.info("Node {} Recoverer broadcasting {} new prepare messages for expanded slots {} to {}", nodeUniqueId, prepares.size, (ourLastHighestAccepted + 1), theirHighestAccepted)
                 prepares foreach { p =>
                   log.debug("Node {} sending {}", nodeUniqueId, p)
                   send(broadcastRef, p)
@@ -369,10 +370,10 @@ with CommitHandler {
                 val newPrepareSelfVotes: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] =
                   (prepares map { prepare =>
                     val ackOrNack = if (prepare.id.number >= data.progress.highestPromised) {
-                      PrepareAck(prepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))
+                      PrepareAck(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))
                     } else {
                       // FIXME no test for this
-                      PrepareNack(prepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat)
+                      PrepareNack(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat)
                     }
                     val selfVote = Some(Map(nodeUniqueId -> ackOrNack))
                     (prepare.id -> selfVote)
@@ -417,7 +418,7 @@ with CommitHandler {
                 AcceptNack(accept.id, nodeUniqueId, dataWithExpandedPrepareResponses.progress)
               }
               // create a fresh vote for your new accept message
-              val selfVoted = dataWithExpandedPrepareResponses.acceptResponses + (accept.id -> Some(Map(nodeUniqueId -> selfResponse)))
+              val selfVoted = dataWithExpandedPrepareResponses.acceptResponses + (accept.id -> AcceptResponsesAndTimeout(randomTimeout, Map(nodeUniqueId -> selfResponse)))
               // we are no longer awaiting responses to the prepare
               val expandedRecover = dataWithExpandedPrepareResponses.prepareResponses
               val updatedPrepares = expandedRecover - vote.requestId
@@ -425,7 +426,7 @@ with CommitHandler {
                 // we have completed recovery of the values in the slots so we now switch to stable Leader state
                 val newData = PaxosData.leaderLens.set(dataWithExpandedPrepareResponses, (SortedMap.empty, selfVoted, Map.empty))
                 log.info("Node {} {} has issued accept messages for all prepare messages to promoting to be Leader.", nodeUniqueId, stateName)
-                goto(Leader) using newData.copy(clientCommands = Map.empty) // TODO lens?
+                goto(Leader) using newData.copy(clientCommands = Map.empty, timeout = randomTimeout) // TODO lens?
               } else {
                 log.info("Node {} {} is still recovering {} slots", nodeUniqueId, stateName, updatedPrepares.size)
                 stay using PaxosData.leaderLens.set(dataWithExpandedPrepareResponses, (updatedPrepares, selfVoted, Map.empty))
@@ -449,8 +450,8 @@ with CommitHandler {
       trace(stateName, e.stateData, sender, e.event)
       log.debug("Node {} {} {}", nodeUniqueId, stateName, vote)
       oldData.acceptResponses.get(vote.requestId) match {
-        case Some(votesOption) =>
-          val latestVotes = votesOption.get + (vote.from -> vote)
+        case Some(AcceptResponsesAndTimeout(_, votes)) =>
+          val latestVotes = votes + (vote.from -> vote)
           if (latestVotes.size > oldData.clusterSize / 2) {
             // requestRetransmission if behind FIXME what if it cannot get a majority response will it get stuck not asking for retransmission?
             val highestCommittedIndex = oldData.progress.highestCommitted.logIndex
@@ -467,10 +468,10 @@ with CommitHandler {
             goto(Follower) using backdownData(oldData)
           } else if (positives.size > oldData.clusterSize / 2) {
             // this slot is fixed record that we are not awaiting any more votes 
-            val updated = oldData.acceptResponses + (vote.requestId -> None)
+            val updated = oldData.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(randomTimeout, Map.empty))
 
             // grab all the accepted values from the beginning of the tree map
-            val (committable, uncommittable) = updated.span { case (_, rs) => rs.isEmpty }
+            val (committable, uncommittable) = updated.span { case (_, AcceptResponsesAndTimeout(_,rs)) => rs.isEmpty }
             log.debug("Node " + nodeUniqueId + " {} vote {} committable {} uncommittable {}", stateName, vote, committable, uncommittable)
 
             // this will have dropped the committable 
@@ -515,7 +516,7 @@ with CommitHandler {
             }
           } else {
             // insufficient votes keep counting
-            val updated = oldData.acceptResponses + (vote.requestId -> Some(latestVotes))
+            val updated = oldData.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(randomTimeout,latestVotes))
             log.debug("Node {} {} insufficent votes for {} have {}", nodeUniqueId, stateName, vote.requestId, updated)
             stay using PaxosData.acceptResponsesLens.set(oldData, updated)
           }
@@ -541,59 +542,9 @@ with CommitHandler {
   }
 
   val resendAcceptsStateFunction: StateFunction = {
-
-    // FIXME set the fresh timeout when send accepts but given leader sends accepts for clients we need to timeout on individual accepts
     case e@Event(PaxosActor.CheckTimeout, data@PaxosData(_, _, timeout, _, _, _, accepts, _)) if accepts.nonEmpty && clock() > timeout =>
       trace(stateName, e.stateData, sender, e.event)
-
-      // accepts didn't get a majority yes/no and saw no higher commits so we increment the ballot number and broadcast
-      val newData = data.acceptResponses match {
-        case acceptResponses if acceptResponses.nonEmpty =>
-          // the slots which have not yet committed
-          val indexes = acceptResponses.keys.map(_.logIndex)
-          // highest promised or committed at this node
-          val highestLocal: BallotNumber = highestNumberProgressed(data)
-          // numbers in any responses including our own possibly stale self response
-          val proposalNumbers = (acceptResponses.values flatMap {
-            _ map {
-              _.values.flatMap { r =>
-                Set(r.progress.highestCommitted.number, r.progress.highestPromised)
-              }
-            }
-          }).flatten // TODO for-comprehension?
-        // the max known
-        val maxNumber = (proposalNumbers.toSeq :+ highestLocal).max
-          // check whether we were actively rejected
-          if (maxNumber > data.epoch.get) {
-            val higherNumber = maxNumber.copy(counter = maxNumber.counter + 1, nodeIdentifier = nodeUniqueId) // TODO lens?
-            log.info(s"Node $nodeUniqueId {} time-out on accept old epoch {} new epoch {}", stateName, maxNumber, data.epoch.get, higherNumber)
-
-            val freshAccepts = indexes map { slot =>
-              val oldAccept = journal.accepted(slot)
-
-              // TODO: We're making a naked get on the Option here. What if it is None? Need better handling.
-              Accept(Identifier(nodeUniqueId, higherNumber, slot), oldAccept.get.value)
-            }
-            log.info("Node {} {} time-out on {} accepts", nodeUniqueId, stateName, freshAccepts.size)
-            freshAccepts foreach { a =>
-              journal.accept(a)
-              send(broadcastRef, a)
-            }
-            PaxosData.acceptResponsesEpochTimeoutLens.set(data, (SortedMap.empty, Some(higherNumber), data.timeout))
-          } else {
-            log.info("Node {} {} time-out on accepts same epoch {} resending {}", nodeUniqueId, stateName, data.epoch.get, indexes)
-            indexes foreach {
-              journal.accepted(_) foreach {
-                send(broadcastRef, _)
-              }
-            }
-            data
-          }
-        case _ =>
-          data
-      }
-
-      stay using PaxosData.timeoutLens.set(newData, freshTimeout(randomInterval))
+      stay using handleResendAccepts(stateName, data)
   }
 
   when(Recoverer)(takeoverStateFunction orElse
@@ -635,7 +586,7 @@ with CommitHandler {
           // self accept
           journal.accept(accept)
           // register self
-          val updated = data.acceptResponses + (aid -> Some(Map(nodeUniqueId -> AcceptAck(aid, nodeUniqueId, data.progress))))
+          val updated = data.acceptResponses + (aid -> AcceptResponsesAndTimeout(randomTimeout,Map(nodeUniqueId -> AcceptAck(aid, nodeUniqueId, data.progress))))
           // broadcast
           send(broadcastRef, accept)
           // add the sender our client map
@@ -780,6 +731,8 @@ abstract class PaxosActorWithTimeout(config: Configuration, nodeUniqueId: Int, b
   }
 }
 
+case class AcceptResponsesAndTimeout(timeout: Long, responses: Map[Int, AcceptResponse])
+
 /**
  * We use a stateless Actor FSM pattern. This immutable case class holds the state of a node in the cluster.
  * Note that for testing this class does not schedule and manage its own timeouts. Use the subclass which
@@ -789,9 +742,10 @@ abstract class PaxosActorWithTimeout(config: Configuration, nodeUniqueId: Int, b
  * @param leaderHeartbeat The last heartbeat value seen from a leader. Note that clocks are not synced so this value is only used as evidence that a stable leader is up whereas the paxos number and committed slot are taken as authoritative that a new leader is making progress.
  * @param timeout The next randomised point in time that this node will timeout. Followers timeout on Commit messages and become a Recoverer. Recoverers timeout on PrepareResponses and AcceptResponses. Leaders timeout on AcceptResponses.
  * @param clusterSize The current size of the cluster.
- * @param prepareResponses The work outstanding uncommitted proposed work of the leader take over phase during the recovery of a leader failover. Each key is an identifier of a prepare for which we are collecting a majority response to determine the highest proposed value of the previous leader if any.
+ * @param prepareResponses The outstanding uncommitted proposed work of the leader take over phase during the recovery of a leader failover.
+ *                         Each key is an identifier of a prepare for which we are collecting a majority response to determine the highest proposed value of the previous leader if any.
  * @param epoch The leaders paxos number when leading.
- * @param acceptResponses Tracking of responses to accept messages when Recoverer or Leader. Each key is an identifier of the command we want to commit. Each value is either the votes of each cluster node else None if the slot is ready to commit.
+ * @param acceptResponses Tracking of responses to accept messages when Recoverer or Leader. Each key is an identifier of the command we want to commit. Each value is a map of the ack/nacks of each cluster node with a timeout. 
  * @param clientCommands The client work outstanding with the leader. The map key is the accept identifier and the value is a tuple of the client command and the client ref.
  */
 case class PaxosData(progress: Progress,
@@ -800,7 +754,7 @@ case class PaxosData(progress: Progress,
                      clusterSize: Int,
                      prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] = SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]](Ordering.IdentifierLogOrdering),
                      epoch: Option[BallotNumber] = None,
-                     acceptResponses: SortedMap[Identifier, Option[Map[Int, AcceptResponse]]] = SortedMap.empty[Identifier, Option[Map[Int, AcceptResponse]]](Ordering.IdentifierLogOrdering),
+                     acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering),
                      clientCommands: Map[Identifier, (CommandValue, ActorRef)] = Map.empty)
 
 object PaxosData {
@@ -810,7 +764,7 @@ object PaxosData {
 
   val acceptResponsesLens = Lens(
     get = (_: PaxosData).acceptResponses,
-    set = (nodeData: PaxosData, acceptResponses: SortedMap[Identifier, Option[Map[Int, AcceptResponse]]]) => nodeData.copy(acceptResponses = acceptResponses)
+    set = (nodeData: PaxosData, acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout]) => nodeData.copy(acceptResponses = acceptResponses)
   )
 
   val clientCommandsLens = Lens(
@@ -820,9 +774,9 @@ object PaxosData {
 
   val acceptResponsesClientCommandsLens = Lens(
     get = (n: PaxosData) => ((acceptResponsesLens(n), clientCommandsLens(n))),
-    set = (n: PaxosData, value: (SortedMap[Identifier, Option[Map[Int, AcceptResponse]]], Map[Identifier, (CommandValue, ActorRef)])) =>
+    set = (n: PaxosData, value: (SortedMap[Identifier, AcceptResponsesAndTimeout], Map[Identifier, (CommandValue, ActorRef)])) =>
       value match {
-        case (acceptResponses: SortedMap[Identifier, Option[Map[Int, AcceptResponse]]], clientCommands: Map[Identifier, (CommandValue, ActorRef)]) =>
+        case (acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout], clientCommands: Map[Identifier, (CommandValue, ActorRef)]) =>
           acceptResponsesLens.set(clientCommandsLens.set(n, clientCommands), acceptResponses)
       }
   )
@@ -840,11 +794,11 @@ object PaxosData {
   val leaderLens = Lens(
     get = (nodeData: PaxosData) => ((prepareResponsesLens(nodeData), acceptResponsesLens(nodeData), clientCommandsLens(nodeData))),
     set = (nodeData: PaxosData, value: (SortedMap[Identifier, Option[Map[Int, PrepareResponse]]],
-      SortedMap[Identifier, Option[Map[Int, AcceptResponse]]],
+      SortedMap[Identifier, AcceptResponsesAndTimeout],
       Map[Identifier, (CommandValue, ActorRef)])) =>
       value match {
         case (prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]],
-        acceptResponses: SortedMap[Identifier, Option[Map[Int, AcceptResponse]]],
+        acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout],
         clientCommands: Map[Identifier, (CommandValue, ActorRef)]) =>
           prepareResponsesLens.set(acceptResponsesLens.set(clientCommandsLens.set(nodeData, clientCommands), acceptResponses), prepareResponses)
       }
@@ -852,11 +806,11 @@ object PaxosData {
 
   val backdownLens = Lens(
     get = (n: PaxosData) => ((prepareResponsesLens(n), acceptResponsesLens(n), clientCommandsLens(n), epochLens(n), timeoutLens(n))),
-    set = (n: PaxosData, value: (SortedMap[Identifier, Option[Map[Int, PrepareResponse]]], SortedMap[Identifier, Option[Map[Int, AcceptResponse]]], Map[Identifier, (CommandValue, ActorRef)], Option[BallotNumber], Long)) =>
+    set = (n: PaxosData, value: (SortedMap[Identifier, Option[Map[Int, PrepareResponse]]], SortedMap[Identifier, AcceptResponsesAndTimeout], Map[Identifier, (CommandValue, ActorRef)], Option[BallotNumber], Long)) =>
       value match {
         case
           (prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]],
-          acceptResponses: SortedMap[Identifier, Option[Map[Int, AcceptResponse]]],
+          acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout],
           clientCommands: Map[Identifier, (CommandValue, ActorRef)],
           epoch: Option[BallotNumber],
           timeout: Long
@@ -882,18 +836,18 @@ object PaxosData {
 
   val acceptResponsesEpochTimeoutLens = Lens(
     get = (nodeData: PaxosData) => ((acceptResponsesLens(nodeData), epochLens(nodeData), timeoutLens(nodeData))),
-    set = (nodeData: PaxosData, value: (SortedMap[Identifier, Option[Map[Int, AcceptResponse]]], Option[BallotNumber], Long)) =>
+    set = (nodeData: PaxosData, value: (SortedMap[Identifier, AcceptResponsesAndTimeout], Option[BallotNumber], Long)) =>
       value match {
-        case (acceptResponses: SortedMap[Identifier, Option[Map[Int, AcceptResponse]]], epoch: Option[BallotNumber], timeout: Long) =>
+        case (acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout], epoch: Option[BallotNumber], timeout: Long) =>
           acceptResponsesLens.set(timeoutLens.set(epochLens.set(nodeData, epoch), timeout), acceptResponses)
       }
   )
 
   val highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens = Lens(
     get = (n: PaxosData) => (highestPromisedLens(n), timeoutLens(n), epochLens(n), prepareResponsesLens(n), acceptResponsesLens(n)),
-    set = (n: PaxosData, value: (BallotNumber, Long, Option[BallotNumber], SortedMap[Identifier, Option[Map[Int, PrepareResponse]]], SortedMap[Identifier, Option[Map[Int, AcceptResponse]]])) =>
+    set = (n: PaxosData, value: (BallotNumber, Long, Option[BallotNumber], SortedMap[Identifier, Option[Map[Int, PrepareResponse]]], SortedMap[Identifier, AcceptResponsesAndTimeout])) =>
       value match {
-        case (promise: BallotNumber, timeout: Long, epoch: Option[BallotNumber], prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]], acceptResponses: SortedMap[Identifier, Option[Map[Int, AcceptResponse]]]) =>
+        case (promise: BallotNumber, timeout: Long, epoch: Option[BallotNumber], prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]], acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout]) =>
           highestPromisedLens.set(timeoutLens.set(epochLens.set(prepareResponsesLens.set(acceptResponsesLens.set(n, acceptResponses), prepareResponses), epoch), timeout), promise)
       }
   )
@@ -937,7 +891,7 @@ object PaxosActor {
 
   type Tracer = TraceData => Unit
 
-  val freshAcceptResponses: SortedMap[Identifier, Option[Map[Int, AcceptResponse]]] = SortedMap.empty
+  val freshAcceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = SortedMap.empty
 
   val minJournalBounds = JournalBounds(Long.MinValue, Long.MinValue)
 
