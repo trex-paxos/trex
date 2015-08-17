@@ -3,7 +3,7 @@ package com.github.simbo1905.trex.internals
 import akka.actor.ActorSystem
 import akka.testkit.{DefaultTimeout, ImplicitSender, TestFSMRef, TestKit}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{BeforeAndAfter, Matchers, WordSpecLike}
+import org.scalatest.{OptionValues, BeforeAndAfter, Matchers, WordSpecLike}
 
 import scala.collection.SortedMap
 import scala.collection.mutable.ArrayBuffer
@@ -11,8 +11,10 @@ import scala.compat.Platform
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.config))
-  with DefaultTimeout with WordSpecLike with Matchers with MockFactory with ImplicitSender with BeforeAndAfter with AllStateSpec with LeaderLikeSpec with FollowerLikeSpec {
+class RecovererSpec
+  extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.config))
+  with DefaultTimeout with WordSpecLike with Matchers with MockFactory with ImplicitSender
+  with BeforeAndAfter with AllStateSpec with LeaderLikeSpec with FollowerLikeSpec with OptionValues {
 
   import AllStateSpec._
   import Ordering._

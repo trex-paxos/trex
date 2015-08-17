@@ -1,31 +1,29 @@
 package com.github.simbo1905.trex.internals
 
-import org.scalatest.{BeforeAndAfterAll, WordSpecLike, Matchers, BeforeAndAfter}
-import org.scalamock.scalatest.MockFactory
-import com.typesafe.config.ConfigFactory
 import akka.actor.{ActorRef, ActorSystem}
-import akka.testkit.{ DefaultTimeout, ImplicitSender, TestKit }
-import akka.testkit.TestFSMRef
+import akka.testkit.{DefaultTimeout, ImplicitSender, TestFSMRef, TestKit}
+import com.github.simbo1905.trex.{Journal, JournalBounds}
+import com.typesafe.config.{Config, ConfigFactory}
+import org.scalamock.scalatest.MockFactory
+import org.scalatest._
+
 import scala.collection.SortedMap
 import scala.collection.mutable.ArrayBuffer
-import com.github.simbo1905.trex.{JournalBounds, Journal}
-import com.typesafe.config.Config
-import scala.compat.Platform
-import scala.language.postfixOps
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 object FollowerSpec {
   val config = ConfigFactory.parseString("trex.leader-timeout-min=10\ntrex.leader-timeout-max=20\nakka.loglevel = \"DEBUG\"")
 }
 
-class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
-  FollowerSpec.config))
+class FollowerSpec
+  extends TestKit(ActorSystem("FollowerSpec", FollowerSpec.config))
   with DefaultTimeout with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with AllStateSpec with FollowerLikeSpec {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with AllStateSpec with FollowerLikeSpec with OptionValues {
 
   import AllStateSpec._
-  import PaxosActor.Configuration
   import Ordering._
+  import PaxosActor.Configuration
 
   override def afterAll() {
     shutdown()
@@ -65,11 +63,11 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
       val v2 = ClientRequestCommandValue(1, Array[Byte]{1})
       val v3 = ClientRequestCommandValue(2, Array[Byte]{2})
       val a1 =
-        Accept(Identifier(1,BallotNumber(1, 1), 1L), v1)
+        Accept(Identifier(1, BallotNumber(1, 1), 1L), v1)
       val a2 =
-        Accept(Identifier(2,BallotNumber(2, 2), 2L), v2)
+        Accept(Identifier(2, BallotNumber(2, 2), 2L), v2)
       val a3 =
-        Accept(Identifier(3,BallotNumber(3, 3), 3L), v3)
+        Accept(Identifier(3, BallotNumber(3, 3), 3L), v3)
       val retransmission = RetransmitResponse(1, 0, Seq(a1, a2, a3), Seq.empty)
 
       // and an empty node
@@ -88,13 +86,13 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
       assert(fsm.stateData.progress.highestCommitted == a3.id)
 
       // delivered the committed values
-      delivered.size should be (3)
-      delivered(0) should be (v1)
-      delivered(1) should be (v2)
-      delivered(2) should be (v3)
+      delivered.size should be(3)
+      delivered(0) should be(v1)
+      delivered(1) should be(v2)
+      delivered(2) should be(v3)
 
       // journaled the values so that it can retransmit itself
-      fileJournal.bounds should be (JournalBounds(1,3))
+      fileJournal.bounds should be(JournalBounds(1, 3))
       fileJournal.accepted(1) match {
         case Some(a) if a.id == a1.id => // good
       }
@@ -140,7 +138,7 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
     val timenow = 999L
     "update its timeout when it sees a commit" in {
       // given an initalized journal
-      (stubJournal.load _) when () returns (Journal.minBookwork)
+      (stubJournal.load _) when() returns (Journal.minBookwork)
       // given we control the clock
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
@@ -167,7 +165,7 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
     }
     "commit next slot if same number as previous commit" in {
       // given an initialized journal
-      (stubJournal.load _) when () returns (Journal.minBookwork)
+      (stubJournal.load _) when() returns (Journal.minBookwork)
 
       // given slot 1 has been accepted under the same number as previously committed slot 0 shown in initialData
       val identifier = Identifier(0, BallotNumber(lowValue, lowValue), 1L)
@@ -191,7 +189,7 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
     }
     "commit next slot on a different number as previous commit" in {
       // given an initialized journal
-      (stubJournal.load _) when () returns (Journal.minBookwork)
+      (stubJournal.load _) when() returns (Journal.minBookwork)
 
       // given slot 1 has been accepted under a different number as previously committed slot 0 shown in initialData
       val identifier = Identifier(0, BallotNumber(0, 0), 1L)
@@ -215,7 +213,7 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
     }
     "request retranmission if commit of next in slot does not match value in slot" in {
       // given an initalized journal
-      (stubJournal.load _) when () returns (Journal.minBookwork)
+      (stubJournal.load _) when() returns (Journal.minBookwork)
 
       // given slot 1 has been accepted under the same number as previously committed slot 0 shown in initialData
       val identifierMin = Identifier(0, BallotNumber(lowValue, lowValue), 1L)
@@ -238,7 +236,7 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
     }
     "commit if three slots if previous accepts are from stable leader" in {
       // given an initalized journal
-      (stubJournal.load _) when () returns (Journal.minBookwork)
+      (stubJournal.load _) when() returns (Journal.minBookwork)
 
       // given slots 1 thru 3 have been accepted under the same number as previously committed slot 0 shown in initialData
 
@@ -270,7 +268,7 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
     }
     "request retransmission if it sees a gap in commit sequence" in {
       // given an initalized journal
-      (stubJournal.load _) when () returns (Journal.minBookwork)
+      (stubJournal.load _) when() returns (Journal.minBookwork)
 
       // given slots 1 thru 3 have been accepted under the same number as previously committed slot 0 shown in initialData
       val otherNodeId = 1
@@ -302,7 +300,7 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
       val node1 = 1
       val node2 = 2
 
-      (stubJournal.load _) when () returns (Progress(BallotNumber(99, node1), Identifier(node2, BallotNumber(98, node2),0L)))
+      (stubJournal.load _) when() returns (Progress(BallotNumber(99, node1), Identifier(node2, BallotNumber(98, node2), 0L)))
 
       // given slots 1 and 3 match the promise but slot 2 has old value from failed leader.
 
@@ -366,7 +364,7 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
       })
       // and no uncommitted values in journal
       val bounds = JournalBounds(0L, 0L)
-      (stubJournal.bounds _) when () returns (bounds)
+      (stubJournal.bounds _) when() returns (bounds)
       // when our node gets a timeout
       fsm ! PaxosActor.CheckTimeout
       // it sends out a single low prepare
@@ -389,7 +387,7 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
       })
       // and no uncommitted values in journal
       val bounds = JournalBounds(0L, 0L)
-      (stubJournal.bounds _) when () returns (bounds)
+      (stubJournal.bounds _) when() returns (bounds)
       // when our node gets a timeout
       fsm ! PaxosActor.CheckTimeout
       // it sends out a single low prepare
@@ -414,7 +412,7 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
     }
     "backdown from a low prepare on receiving a fresh heartbeat commit from the same leader and request a retransmit" in {
       // given an initalized journal
-      (stubJournal.load _) when () returns (Journal.minBookwork)
+      (stubJournal.load _) when() returns (Journal.minBookwork)
 
       // given that we control the clock
       val timenow = 999L
@@ -423,7 +421,7 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
       })
       // and no uncommitted values in journal
       val bounds = JournalBounds(0L, 0L)
-      (stubJournal.bounds _) when () returns (bounds)
+      (stubJournal.bounds _) when() returns (bounds)
       // when our node gets a timeout
       fsm ! PaxosActor.CheckTimeout
       // it sends out a single low prepare
@@ -529,6 +527,7 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
       var sendTime = 0L
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
+
         override def send(actor: ActorRef, msg: Any): Unit = {
           sendTime = System.nanoTime()
           actor ! msg
@@ -538,7 +537,7 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
 
       // and three uncommitted values in journal
       val bounds = JournalBounds(0L, 3L)
-      (stubJournal.bounds _) when () returns (bounds)
+      (stubJournal.bounds _) when() returns (bounds)
 
       val id1 = Identifier(0, BallotNumber(lowValue + 1, 0), 1)
       (stubJournal.accepted _) when (1L) returns Some(Accept(id1, ClientRequestCommandValue(0, expectedBytes)))
@@ -551,7 +550,7 @@ class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
 
       // and a journal which records the save time
       var saveTime = 0L
-      (stubJournal.save _) when(*) returns {
+      (stubJournal.save _) when (*) returns {
         saveTime = System.nanoTime()
         Unit
       }
