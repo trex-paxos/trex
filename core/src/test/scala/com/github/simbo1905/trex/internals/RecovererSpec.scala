@@ -3,7 +3,7 @@ package com.github.simbo1905.trex.internals
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{DefaultTimeout, ImplicitSender, TestFSMRef, TestKit}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{OptionValues, BeforeAndAfter, Matchers, WordSpecLike}
+import org.scalatest.{BeforeAndAfter, Matchers, OptionValues, WordSpecLike}
 
 import scala.collection.SortedMap
 import scala.collection.mutable.ArrayBuffer
@@ -11,8 +11,10 @@ import scala.compat.Platform
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.config))
-  with DefaultTimeout with WordSpecLike with Matchers with MockFactory with ImplicitSender with BeforeAndAfter with OptionValues with AllStateSpec with LeaderLikeSpec with FollowerLikeSpec {
+class RecovererSpec
+  extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.config))
+  with DefaultTimeout with WordSpecLike with Matchers with MockFactory with ImplicitSender
+  with BeforeAndAfter with AllStateSpec with LeaderLikeSpec with FollowerLikeSpec with OptionValues {
 
   import AllStateSpec._
   import Ordering._
@@ -103,7 +105,7 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
     // and sets a fresh timeout
     fsm.stateData.timeout shouldBe 1234L
     // and send happens after save
-    assert( saveTime > 0L && sendTime > 0L && saveTime < sendTime )
+    assert(saveTime > 0L && sendTime > 0L && saveTime < sendTime)
   }
 
   "backs down if it has to make a higher promise" in {
@@ -218,7 +220,7 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
     // it boardcasts the payload from the promise under its higher epoch number
     expectMsg(100 millisecond, Accept(prepareId, ClientRequestCommandValue(0, expectedBytes)))
     // its saves before it sends
-    assert( saveTime > 0L && sendTime > 0L && saveTime < sendTime )
+    assert(saveTime > 0L && sendTime > 0L && saveTime < sendTime)
     saveTime = 0L
     sendTime = 0L
     // when a majority accept response with an ack from node1 and node2
@@ -240,7 +242,7 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
     // and sets a fresh timeout
     fsm.stateData.timeout shouldBe 1234L
     // and send happens after save
-    assert( saveTime > 0L && sendTime > 0L && saveTime < sendTime )
+    assert(saveTime > 0L && sendTime > 0L && saveTime < sendTime)
 
   }
 
@@ -294,7 +296,7 @@ class RecovererSpec extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.co
         assert(keys.contains(prepareId))
     }
     // and send happens after save
-    assert( saveTime > 0L && sendTime > 0L && saveTime < sendTime )
+    assert(saveTime > 0L && sendTime > 0L && saveTime < sendTime)
 
   }
 

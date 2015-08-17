@@ -12,19 +12,20 @@ import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class LeaderSpec extends TestKit(ActorSystem("LeaderSpec", AllStateSpec.config))
+class LeaderSpec
+  extends TestKit(ActorSystem("LeaderSpec", AllStateSpec.config))
   with DefaultTimeout with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with AllStateSpec with LeaderLikeSpec {
 
   import AllStateSpec._
-  import PaxosActor._
   import Ordering._
+  import PaxosActor._
 
   override def afterAll() {
     shutdown()
   }
 
-  val epoch = BallotNumber(1,1)
+  val epoch = BallotNumber(1, 1)
 
   val dataNewEpoch = PaxosData.epochLens.set(initialData, Some(epoch))
   val initailLeaderData = PaxosData.leaderLens.set(dataNewEpoch, (SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]], freshAcceptResponses, Map.empty))
@@ -103,9 +104,9 @@ class LeaderSpec extends TestKit(ActorSystem("LeaderSpec", AllStateSpec.config))
     }
 
     "boardcast client value data" in {
-      
+
       expectNoMsg(10 millisecond)
-      
+
       // given a leader
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
       fsm.setState(Leader, initailLeaderData)
@@ -174,7 +175,7 @@ class LeaderSpec extends TestKit(ActorSystem("LeaderSpec", AllStateSpec.config))
       // and deletes the pending work
       assert(fsm.stateData.acceptResponses.size == 0)
       // and send happens after save
-      assert( saveTime > 0L && sendTime > 0L && saveTime < sendTime )
+      assert(saveTime > 0L && sendTime > 0L && saveTime < sendTime)
     }
 
     // TODO what to do if it recieves nacks?
@@ -182,23 +183,26 @@ class LeaderSpec extends TestKit(ActorSystem("LeaderSpec", AllStateSpec.config))
       // given two clients who have sent a request a leader
       val client1 = TestProbe()
       val client1msg = Identifier(0, epoch, 96L)
-      val client1cmd = new CommandValue(){
+      val client1cmd = new CommandValue() {
         val msgId = 1L
+
         override def bytes: Array[Byte] = Array()
       }
       val client2 = TestProbe()
       val client2msg = Identifier(0, epoch, 97L)
-      val client2cmd = new CommandValue(){
+      val client2cmd = new CommandValue() {
         val msgId = 2L
+
         override def bytes: Array[Byte] = Array()
       }
-      val clientResponses: Map[Identifier, (CommandValue,ActorRef)] = Map(client1msg->(client1cmd,client1.ref), client2msg->(client2cmd,client2.ref))
+      val clientResponses: Map[Identifier, (CommandValue, ActorRef)] = Map(client1msg ->(client1cmd, client1.ref), client2msg ->(client2cmd, client2.ref))
 
       // given a leader who has boardcast slot 99 and self voted on it and committed 98
       val lastCommitted = Identifier(0, epoch, 98L)
       val id99 = Identifier(0, epoch, 99L)
+
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
-      val data = PaxosData.acceptResponsesClientCommandsLens.set(initialData,(votes,clientResponses))
+      val data = PaxosData.acceptResponsesClientCommandsLens.set(initialData, (votes, clientResponses))
       val committed = Progress.highestPromisedHighestCommitted.set(data.progress, (lastCommitted.number, lastCommitted))
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def freshTimeout(interval: Long): Long = 1234L
@@ -252,7 +256,7 @@ class LeaderSpec extends TestKit(ActorSystem("LeaderSpec", AllStateSpec.config))
       // and an actor which records the send time
       var sendTime = 0L
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
-        override def send(actor: ActorRef, msg: Any): Unit ={
+        override def send(actor: ActorRef, msg: Any): Unit = {
           sendTime = System.nanoTime()
           super.send(actor, msg)
         }
@@ -274,7 +278,7 @@ class LeaderSpec extends TestKit(ActorSystem("LeaderSpec", AllStateSpec.config))
       }
 
       // and send happens after save
-      assert( saveTime > 0L && sendTime > 0L && saveTime < sendTime )
+      assert(saveTime > 0L && sendTime > 0L && saveTime < sendTime)
 
       // and delivered both values
       assert(fsm.underlyingActor.delivered.size == 2)
@@ -347,7 +351,7 @@ class LeaderSpec extends TestKit(ActorSystem("LeaderSpec", AllStateSpec.config))
       val hb2 = commit.heartbeat
       assert(hb2 > hb1)
     }
-    
+
     "reissue same accept messages it gets a timeout and no challenge" in {
       resendsNoLeaderChallenges(Leader)
     }
@@ -374,13 +378,13 @@ class LeaderSpec extends TestKit(ActorSystem("LeaderSpec", AllStateSpec.config))
       val highPrepare = Prepare(highIdentifier)
       // given no previous value for that slot
       (stubJournal.accepted _) when (98L) returns None
-      (stubJournal.bounds _) when() returns (JournalBounds(0L,97L))
+      (stubJournal.bounds _) when() returns (JournalBounds(0L, 97L))
       // the leader
       val timenow = 999L
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize5), 0, self, stubJournal, ArrayBuffer.empty, None){
+      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize5), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
       })
-      fsm.setState(Leader, initialData.copy(epoch=Some(epoch), progress=committed))
+      fsm.setState(Leader, initialData.copy(epoch = Some(epoch), progress = committed))
       // when it gets the high prepare
       fsm ! highPrepare
       // then it responds with a ack

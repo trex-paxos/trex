@@ -503,10 +503,8 @@ with ResendAcceptsHandler
                 }
 
                 log.debug("Node {} {} post commit has responds.size={}, remainders.size={}", nodeUniqueId, stateName, responds.size, remainders.size)
-                results foreach { idAndBytes =>
-                  val (id, bytes) = idAndBytes
-                  responds.get(id) foreach {
-                    case (cmd, client) =>
+                results foreach { case (id, bytes) =>
+                  responds.get(id) foreach { case (cmd, client) =>
                       log.debug("sending response from accept {} to {}", id, client)
                       send(client, bytes)
                   }

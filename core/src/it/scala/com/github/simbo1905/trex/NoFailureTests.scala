@@ -1,11 +1,11 @@
 package com.github.simbo1905.trex
 
-import com.github.simbo1905.trex.internals.{NoLongerLeaderException, ClientRequestCommandValue, CommandValue}
-import org.scalatest._
 import akka.actor._
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
+import com.github.simbo1905.trex.internals.{ClientRequestCommandValue, CommandValue, NoLongerLeaderException}
 import com.typesafe.config.{Config, ConfigFactory}
-import akka.testkit.{TestActorRef, TestKit, ImplicitSender}
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.{BeforeAndAfterAll, _}
+
 import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 

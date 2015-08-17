@@ -1,21 +1,16 @@
 package com.github.simbo1905.trex.internals
 
-import akka.testkit.TestKit
-import org.scalatest.SpecLike
+import akka.actor.{ActorRef, ActorSystem}
+import akka.testkit.{ImplicitSender, TestFSMRef, TestKit, TestProbe}
+import com.github.simbo1905.trex.{Journal, _}
+import com.github.simbo1905.trex.internals.PaxosActor._
 import com.typesafe.config.ConfigFactory
-import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.testkit.ImplicitSender
-import org.scalatest.BeforeAndAfterAll
-import com.github.simbo1905.trex.Journal
+import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
+
 import scala.collection.SortedMap
 import scala.collection.immutable.TreeMap
-import akka.testkit.TestFSMRef
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
-import com.github.simbo1905.trex._
-import PaxosActor._
-import org.scalatest.Matchers
-import akka.testkit.TestProbe
 import scala.language.postfixOps
 
 object InteractionSpec {

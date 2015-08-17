@@ -1,11 +1,10 @@
 package com.github.simbo1905.trex.internals
 
-import com.github.simbo1905.trex.JournalBounds
-import org.scalatest.BeforeAndAfter
-import org.scalatest.WordSpecLike
-import org.scalatest.Matchers
-import org.scalamock.scalatest.MockFactory
 import java.io.File
+
+import com.github.simbo1905.trex.JournalBounds
+import org.scalamock.scalatest.MockFactory
+import org.scalatest.{BeforeAndAfter, Matchers, WordSpecLike}
 
 class FileJournalSpec extends WordSpecLike with Matchers with BeforeAndAfter with MockFactory {
 
