@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit._
 import com.github.simbo1905.trex.JournalBounds
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Matchers, WordSpecLike}
+import org.scalatest._
 
 import scala.collection.SortedMap
 import scala.collection.immutable.TreeMap
@@ -14,7 +14,7 @@ import scala.language.postfixOps
 
 class LeaderSpec extends TestKit(ActorSystem("LeaderSpec", AllStateSpec.config))
   with DefaultTimeout with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with AllStateSpec with LeaderLikeSpec {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with AllStateSpec with LeaderLikeSpec {
 
   import AllStateSpec._
   import PaxosActor._

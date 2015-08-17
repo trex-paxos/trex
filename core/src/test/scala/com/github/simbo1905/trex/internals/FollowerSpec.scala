@@ -1,6 +1,6 @@
 package com.github.simbo1905.trex.internals
 
-import org.scalatest.{BeforeAndAfterAll, WordSpecLike, Matchers, BeforeAndAfter}
+import org.scalatest._
 import org.scalamock.scalatest.MockFactory
 import com.typesafe.config.ConfigFactory
 import akka.actor.{ActorRef, ActorSystem}
@@ -21,7 +21,7 @@ object FollowerSpec {
 class FollowerSpec extends TestKit(ActorSystem("FollowerSpec",
   FollowerSpec.config))
   with DefaultTimeout with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with AllStateSpec with FollowerLikeSpec {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with AllStateSpec with FollowerLikeSpec {
 
   import AllStateSpec._
   import PaxosActor.Configuration
