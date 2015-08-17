@@ -176,12 +176,12 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
 
   def getSerializer(clazz: Class[_]) = {
     val serializer = serializers.get(clazz)
-    if (serializer.isEmpty) {
-      val serializer = SerializationExtension(context.system).serializerFor(clazz)
-      serializers = serializers + (clazz -> serializer)
-      serializer
-    } else {
-      serializer.get
+    serializer match {
+      case Some(s) => s
+      case None =>
+        val s = SerializationExtension(context.system).serializerFor(clazz)
+        serializers = serializers + (clazz -> s)
+        s
     }
   }
 
