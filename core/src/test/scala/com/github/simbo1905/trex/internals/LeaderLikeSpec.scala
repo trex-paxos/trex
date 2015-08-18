@@ -132,15 +132,12 @@ trait LeaderLikeSpec {
       override def clock() = timenow
     })
     fsm.setState(state, responses.copy(epoch = Some(BallotNumber(1, 0)), progress = oldProgress))
-    // and the accept in the store
-    val accept = Accept(id99, ClientRequestCommandValue(0, expectedBytes))
-    (stubJournal.accepted _) when (99L) returns Some(accept)
 
     // when it gets a timeout
     fsm ! PaxosActor.CheckTimeout
 
     // it reboardcasts the accept
-    expectMsg(100 millisecond, accept)
+    expectMsg(100 millisecond, a99)
 
     // and sets a fresh timeout
     assert(fsm.stateData.timeout > 0 && fsm.stateData.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
@@ -168,9 +165,6 @@ trait LeaderLikeSpec {
       }
     })
     fsm.setState(state, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))))
-    // and the accept in the store
-    val accept = Accept(id99, ClientRequestCommandValue(0, expectedBytes))
-    (stubJournal.accepted _) when (99L) returns Some(accept)
     // and a journal which records the save time
     var saveTime = 0L
     (stubJournal.save _) when(*) returns {
@@ -185,7 +179,10 @@ trait LeaderLikeSpec {
     val newEpoch = BallotNumber(23, 0)
     val newIdentifier = Identifier(0, newEpoch, 99L)
     expectMsgPF(100 millisecond) {
-      case a: Accept if a.id == newIdentifier && a.value == accept.value =>
+      case a: Accept if a.id == newIdentifier && a.value == a99.value =>
+      case a: Accept =>
+
+        fail(s"${a.id}, ${newIdentifier} => ${a.id == newIdentifier} || ${a.value}, ${a99.value} => ${a.value == a99.value}")
     }
 
     // and sets its
@@ -213,9 +210,6 @@ trait LeaderLikeSpec {
       override def freshTimeout(interval: Long): Long = 1234L
     })
     fsm.setState(state, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))))
-    // and the accept in the store
-    val accept = Accept(id99, ClientRequestCommandValue(0, expectedBytes))
-    (stubJournal.accepted _) when (99L) returns Some(accept)
 
     // when it gets a timeout
     fsm ! PaxosActor.CheckTimeout
@@ -224,7 +218,7 @@ trait LeaderLikeSpec {
     val newEpoch = BallotNumber(23, 0)
     val newIdentifier = Identifier(0, newEpoch, 99L)
     expectMsgPF(100 millisecond) {
-      case a: Accept if a.id == newIdentifier && a.value == accept.value =>
+      case a: Accept if a.id == newIdentifier && a.value == a99.value =>
     }
 
     // and sets its

@@ -351,6 +351,7 @@ with ResendAcceptsHandler
             // register the vote
             val votes = map + (vote.from -> vote)
 
+            // FIXME we send more messages here then have a path below where we ignore the responses by backing down.
             // if we have a majority response which show more slots to recover issue new prepare messages
             val dataWithExpandedPrepareResponses = if (votes.size > data.clusterSize / 2) {
               // issue more prepares there are more accepted slots than we so far ran recovery upon
@@ -467,7 +468,7 @@ with ResendAcceptsHandler
             sendNoLongerLeader(oldData.clientCommands)
             goto(Follower) using backdownData(oldData)
           } else if (positives.size > oldData.clusterSize / 2) {
-            // this slot is fixed record that we are not awaiting any more votes 
+            // this slot is fixed record that we are not awaiting any more votes
             val updated = oldData.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(randomTimeout, accept, Map.empty))
 
             // grab all the accepted values from the beginning of the tree map
@@ -509,6 +510,7 @@ with ResendAcceptsHandler
                       send(client, bytes)
                   }
                 }
+                // FIXME memory leak we have not GCed the stuff we are no longer awaiting responses in votesData.acceptResponses
                 stay using PaxosData.progressLens.set(votesData, newProgress).copy(clientCommands = remainders) // TODO new lens?
               } else {
                 stay using PaxosData.progressLens.set(votesData, newProgress)
@@ -840,12 +842,12 @@ object PaxosData {
       }
   )
 
-  val acceptResponsesEpochTimeoutLens = Lens(
-    get = (nodeData: PaxosData) => ((acceptResponsesLens(nodeData), epochLens(nodeData), timeoutLens(nodeData))),
-    set = (nodeData: PaxosData, value: (SortedMap[Identifier, AcceptResponsesAndTimeout], Option[BallotNumber], Long)) =>
+  val progressAcceptResponsesEpochTimeoutLens = Lens(
+    get = (nodeData: PaxosData) => ((progressLens(nodeData), acceptResponsesLens(nodeData), epochLens(nodeData), timeoutLens(nodeData))),
+    set = (nodeData: PaxosData, value: (Progress, SortedMap[Identifier, AcceptResponsesAndTimeout], Option[BallotNumber], Long)) =>
       value match {
-        case (acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout], epoch: Option[BallotNumber], timeout: Long) =>
-          acceptResponsesLens.set(timeoutLens.set(epochLens.set(nodeData, epoch), timeout), acceptResponses)
+        case (progress: Progress, acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout], epoch: Option[BallotNumber], timeout: Long) =>
+          acceptResponsesLens.set(timeoutLens.set(epochLens.set(progressLens.set(nodeData, progress), epoch), timeout), acceptResponses)
       }
   )
 

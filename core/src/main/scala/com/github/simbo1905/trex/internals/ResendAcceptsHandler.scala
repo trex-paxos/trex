@@ -5,6 +5,7 @@ import akka.event.LoggingAdapter
 import com.github.simbo1905.trex.Journal
 
 import scala.collection.SortedMap
+import Ordering._
 
 trait ResendAcceptsHandler {
   def highestNumberProgressed(data: PaxosData): BallotNumber
@@ -23,64 +24,60 @@ trait ResendAcceptsHandler {
 
   def clock: Long
 
-  // FIXME set the fresh timeout when send accepts but given leader sends accepts for clients we need to timeout on individual accepts
+  def handleResendAccepts(stateName: PaxosRole, oldData: PaxosData, time: Long): PaxosData = {
+    import ResendAcceptsHandler._
 
-  def handleResendAccepts(stateName: PaxosRole, data: PaxosData, timeout: Long): PaxosData = {
-    import Ordering._
+    val data = PaxosData.timeoutLens.set(oldData, randomTimeout)
 
-    // accepts didn't get a majority yes/no and saw no higher commits so we increment the ballot number and broadcast
-    val newData = data.acceptResponses match {
-      case acceptResponses if acceptResponses.nonEmpty =>
-        // the slots which have not yet committed
-        val indexes = acceptResponses.keys.map(_.logIndex)
-        // highest promised or committed at this node
-        val highestLocal: BallotNumber = highestNumberProgressed(data)
-        // numbers in any responses including our own possibly stale self response
-        val proposalNumbers = (acceptResponses.values.map(_.responses).flatMap(_.values) flatMap { r =>
-          Set(r.progress.highestCommitted.number, r.progress.highestPromised)
-        }) // TODO for-comprehension?
-      // the max known
-      val maxNumber = (proposalNumbers.toSeq :+ highestLocal).max
-        // check whether we were actively rejected
-        if (maxNumber > data.epoch.get) {
-          val higherNumber = maxNumber.copy(counter = maxNumber.counter + 1, nodeIdentifier = nodeUniqueId) // TODO lens?
-          log.info(s"Node $nodeUniqueId {} time-out on accept old epoch {} new epoch {}", stateName, maxNumber, data.epoch.get, higherNumber)
+    val late = timedout(time, data.acceptResponses)
 
-          val freshAccepts = indexes map { slot =>
-            val oldAccept = journal.accepted(slot)
+    if (late.isEmpty) {
+      data
+    } else {
+      log.info(s"timed out on ${late.size} accepts")
 
-            // TODO: We're making a naked get on the Option here. What if it is None? Need better handling.
-            Accept(Identifier(nodeUniqueId, higherNumber, slot), oldAccept.get.value)
-          }
-          log.info("Node {} {} time-out on {} accepts", nodeUniqueId, stateName, freshAccepts.size)
-          freshAccepts foreach { a =>
-            journal.accept(a)
-            send(broadcastRef, a)
-          }
-          PaxosData.acceptResponsesEpochTimeoutLens.set(data, (SortedMap.empty, Some(higherNumber), data.timeout))
-        } else {
-          log.info("Node {} {} time-out on accepts same epoch {} resending {}", nodeUniqueId, stateName, data.epoch.get, indexes)
-          indexes foreach {
-            journal.accepted(_) foreach {
-              send(broadcastRef, _)
-            }
-          }
-          data
+      val highPromise = highestPromise(data.progress.highestPromised, late)
+
+      val oldAccepts = late.map {
+        case (id, AcceptResponsesAndTimeout(_, a, _)) => a
+      }
+
+      val (accepts, newData) = if (highPromise > data.epoch.getOrElse(Journal.minBookwork.highestPromised)) {
+        val higherNumber = highPromise.copy(counter = highPromise.counter + 1, nodeIdentifier = nodeUniqueId)
+        val newProgress = data.progress.copy(highestPromised = higherNumber)
+        val removedOld = data.acceptResponses -- oldAccepts.map(_.id)
+        val newAccepts = refreshAccepts(higherNumber, oldAccepts)
+        val newTimeout = randomTimeout
+        val newVotes = newAccepts.foldLeft(removedOld) { (responses, accept) =>
+          responses + (accept.id -> AcceptResponsesAndTimeout(newTimeout, accept, Map(nodeUniqueId -> AcceptAck(accept.id, nodeUniqueId, newProgress))))
         }
-      case _ =>
-        data
+        journal.save(newProgress)
+        (newAccepts, PaxosData.progressAcceptResponsesEpochTimeoutLens.set(data, (newProgress, newVotes, Some(higherNumber), newTimeout)))
+      } else {
+        (oldAccepts, data)
+      }
+
+      accepts.foreach(send(broadcastRef, _))
+
+      newData
     }
-
-    PaxosData.timeoutLens.set(newData, randomTimeout)
   }
-
 }
 
 object ResendAcceptsHandler {
-  def timedout(time: Long, responses: SortedMap[Identifier, AcceptResponsesAndTimeout]): Traversable[Accept] = {
-    responses.values flatMap {
-      case AcceptResponsesAndTimeout(timeout, accept, _) if timeout >= time => Some(accept)
-      case _ => None
+  def timedout(time: Long, responses: SortedMap[Identifier, AcceptResponsesAndTimeout]) = responses.filter {
+    case (_, AcceptResponsesAndTimeout(to, _, _)) if to >= time => true
+    case _ => false
+  }
+
+  def highestPromise(ownPromise: BallotNumber, acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout]): BallotNumber = {
+    val others = acceptResponses.values.map(_.responses).flatMap(_.values) flatMap { r =>
+      Seq(r.progress.highestCommitted.number, r.progress.highestPromised)
     }
+    (Seq(ownPromise) ++ others).max
+  }
+
+  def refreshAccepts(newNumber: BallotNumber, accepts: Traversable[Accept]) = {
+    accepts.map(a => a.copy(a.id.copy(number = newNumber)))
   }
 }
