@@ -21,10 +21,13 @@ trait ResendAcceptsHandler {
 
   def randomTimeout: Long
 
+  def clock: Long
+
   // FIXME set the fresh timeout when send accepts but given leader sends accepts for clients we need to timeout on individual accepts
 
-  def handleResendAccepts(stateName: PaxosRole, data: PaxosData): PaxosData = {
+  def handleResendAccepts(stateName: PaxosRole, data: PaxosData, timeout: Long): PaxosData = {
     import Ordering._
+
     // accepts didn't get a majority yes/no and saw no higher commits so we increment the ballot number and broadcast
     val newData = data.acceptResponses match {
       case acceptResponses if acceptResponses.nonEmpty =>
@@ -34,7 +37,7 @@ trait ResendAcceptsHandler {
         val highestLocal: BallotNumber = highestNumberProgressed(data)
         // numbers in any responses including our own possibly stale self response
         val proposalNumbers = (acceptResponses.values.map(_.responses).flatMap(_.values) flatMap { r =>
-              Set(r.progress.highestCommitted.number, r.progress.highestPromised)
+          Set(r.progress.highestCommitted.number, r.progress.highestPromised)
         }) // TODO for-comprehension?
       // the max known
       val maxNumber = (proposalNumbers.toSeq :+ highestLocal).max
@@ -69,5 +72,15 @@ trait ResendAcceptsHandler {
     }
 
     PaxosData.timeoutLens.set(newData, randomTimeout)
+  }
+
+}
+
+object ResendAcceptsHandler {
+  def timedout(time: Long, responses: SortedMap[Identifier, AcceptResponsesAndTimeout]): Traversable[Accept] = {
+    responses.values flatMap {
+      case AcceptResponsesAndTimeout(timeout, accept, _) if timeout >= time => Some(accept)
+      case _ => None
+    }
   }
 }

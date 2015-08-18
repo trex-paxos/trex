@@ -123,7 +123,8 @@ trait LeaderLikeSpec {
     val lastCommitted = Identifier(0, BallotNumber(1, 0), 98L)
     // self voted on accept id99
     val id99 = Identifier(0, BallotNumber(1, 0), 99L)
-    val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
+    val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
+    val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
     val responses: PaxosData = PaxosData.acceptResponsesLens.set(initialData, votes)
     val oldProgress = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
     val timenow = 999L
@@ -150,7 +151,8 @@ trait LeaderLikeSpec {
     val lastCommitted = Identifier(0, BallotNumber(1, 0), 98L)
     // given a leader who has boardcast slot 99 and seen a nack
     val id99 = Identifier(0, BallotNumber(1, 0), 99L)
-    val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, Map(
+    val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
+    val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(
       0 -> AcceptAck(id99, 0, initialData.progress),
       1 -> AcceptNack(id99, 1, initialData.progress.copy(highestPromised = BallotNumber(22, 2)))
     )))
@@ -199,7 +201,8 @@ trait LeaderLikeSpec {
     val lastCommitted = Identifier(0, BallotNumber(1, 0), 98L)
     // given a leader who has boardcast slot 99 and seen a nack
     val id99 = Identifier(0, BallotNumber(1, 0), 99L)
-    val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, Map(
+    val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
+    val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(
       0 -> AcceptAck(id99, 0, initialData.progress)
     )))
     val responses = PaxosData.acceptResponsesLens.set(initialData, votes)

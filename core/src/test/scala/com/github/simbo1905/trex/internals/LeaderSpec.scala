@@ -139,7 +139,8 @@ class LeaderSpec
       // given a leader who has boardcast slot 99 and self voted on it and committed 98
       val lastCommitted = Identifier(0, epoch, 98L)
       val id99 = Identifier(0, epoch, 99L)
-      val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
+      val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
+      val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
       val responses = PaxosData.acceptResponsesLens.set(initialData, votes)
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
       // and a journal which records when save as invoked
@@ -200,8 +201,9 @@ class LeaderSpec
       // given a leader who has boardcast slot 99 and self voted on it and committed 98
       val lastCommitted = Identifier(0, epoch, 98L)
       val id99 = Identifier(0, epoch, 99L)
+      val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
 
-      val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
+      val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
       val data = PaxosData.acceptResponsesClientCommandsLens.set(initialData, (votes, clientResponses))
       val committed = Progress.highestPromisedHighestCommitted.set(data.progress, (lastCommitted.number, lastCommitted))
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
@@ -240,7 +242,7 @@ class LeaderSpec
       val a100 = Accept(id100, ClientRequestCommandValue(0, expectedBytes))
       (stubJournal.accepted _) when (100L) returns Some(a100)
 
-      val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, Map(0 -> AcceptAck(id99, 0, initialData.progress)))) + (id100 -> AcceptResponsesAndTimeout(0L, Map(0 -> AcceptAck(id100, 0, initialData.progress))))
+      val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress)))) + (id100 -> AcceptResponsesAndTimeout(0L, a100, Map(0 -> AcceptAck(id100, 0, initialData.progress))))
 
       val responses = PaxosData.acceptResponsesLens.set(initialData, votes)
 
@@ -302,7 +304,7 @@ class LeaderSpec
       val a100 = Accept(id100, ClientRequestCommandValue(0, expectedBytes))
       (stubJournal.accepted _) when (100L) returns Some(a100)
 
-      val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, Map(0 -> AcceptAck(id99, 0, initialData.progress)))) + (id100 -> AcceptResponsesAndTimeout(0L, Map(0 -> AcceptAck(id100, 0, initialData.progress))))
+      val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress)))) + (id100 -> AcceptResponsesAndTimeout(0L, a100, Map(0 -> AcceptAck(id100, 0, initialData.progress))))
 
       val responses = PaxosData.acceptResponsesLens.set(initialData, votes)
 

@@ -26,7 +26,7 @@ class VerifiableUnhandledHandler extends LoggingAdapter {
   override protected def notifyDebug(message: String): Unit = {}
 }
 
-class UnhandledHandlerSpec extends TestKit(ActorSystem("UnhandledHandlerSpec")) with WordSpecLike {
+class UnhandledSpec extends TestKit(ActorSystem("UnhandledSpec")) with WordSpecLike {
   "UnhandledHandler" should {
     "trace the event and log an error" in {
       // given

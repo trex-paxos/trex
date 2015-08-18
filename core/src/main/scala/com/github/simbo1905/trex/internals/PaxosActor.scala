@@ -44,7 +44,7 @@ with ResendAcceptsHandler
   val minPrepare = Prepare(Identifier(nodeUniqueId, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
 
   // tests can override this
-  protected def clock() = {
+  def clock() = {
     System.currentTimeMillis()
   }
 
@@ -418,7 +418,7 @@ with ResendAcceptsHandler
                 AcceptNack(accept.id, nodeUniqueId, dataWithExpandedPrepareResponses.progress)
               }
               // create a fresh vote for your new accept message
-              val selfVoted = dataWithExpandedPrepareResponses.acceptResponses + (accept.id -> AcceptResponsesAndTimeout(randomTimeout, Map(nodeUniqueId -> selfResponse)))
+              val selfVoted = dataWithExpandedPrepareResponses.acceptResponses + (accept.id -> AcceptResponsesAndTimeout(randomTimeout, accept, Map(nodeUniqueId -> selfResponse)))
               // we are no longer awaiting responses to the prepare
               val expandedRecover = dataWithExpandedPrepareResponses.prepareResponses
               val updatedPrepares = expandedRecover - vote.requestId
@@ -450,7 +450,7 @@ with ResendAcceptsHandler
       trace(stateName, e.stateData, sender, e.event)
       log.debug("Node {} {} {}", nodeUniqueId, stateName, vote)
       oldData.acceptResponses.get(vote.requestId) match {
-        case Some(AcceptResponsesAndTimeout(_, votes)) =>
+        case Some(AcceptResponsesAndTimeout(_, accept, votes)) =>
           val latestVotes = votes + (vote.from -> vote)
           if (latestVotes.size > oldData.clusterSize / 2) {
             // requestRetransmission if behind FIXME what if it cannot get a majority response will it get stuck not asking for retransmission?
@@ -468,10 +468,10 @@ with ResendAcceptsHandler
             goto(Follower) using backdownData(oldData)
           } else if (positives.size > oldData.clusterSize / 2) {
             // this slot is fixed record that we are not awaiting any more votes 
-            val updated = oldData.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(randomTimeout, Map.empty))
+            val updated = oldData.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(randomTimeout, accept, Map.empty))
 
             // grab all the accepted values from the beginning of the tree map
-            val (committable, uncommittable) = updated.span { case (_, AcceptResponsesAndTimeout(_,rs)) => rs.isEmpty }
+            val (committable, uncommittable) = updated.span { case (_, AcceptResponsesAndTimeout(_,_,rs)) => rs.isEmpty }
             log.debug("Node " + nodeUniqueId + " {} vote {} committable {} uncommittable {}", stateName, vote, committable, uncommittable)
 
             // this will have dropped the committable 
@@ -516,7 +516,7 @@ with ResendAcceptsHandler
             }
           } else {
             // insufficient votes keep counting
-            val updated = oldData.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(randomTimeout,latestVotes))
+            val updated = oldData.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(randomTimeout, accept, latestVotes))
             log.debug("Node {} {} insufficent votes for {} have {}", nodeUniqueId, stateName, vote.requestId, updated)
             stay using PaxosData.acceptResponsesLens.set(oldData, updated)
           }
@@ -542,9 +542,9 @@ with ResendAcceptsHandler
   }
 
   val resendAcceptsStateFunction: StateFunction = {
-    case e@Event(PaxosActor.CheckTimeout, data@PaxosData(_, _, timeout, _, _, _, accepts, _)) if accepts.nonEmpty && clock() > timeout =>
+    case e@Event(PaxosActor.CheckTimeout, data@PaxosData(_, _, timeout, _, _, _, accepts, _)) if accepts.nonEmpty =>
       trace(stateName, e.stateData, sender, e.event)
-      stay using handleResendAccepts(stateName, data)
+      stay using handleResendAccepts(stateName, data, timeout)
   }
 
   when(Recoverer)(takeoverStateFunction orElse
@@ -586,7 +586,7 @@ with ResendAcceptsHandler
           // self accept
           journal.accept(accept)
           // register self
-          val updated = data.acceptResponses + (aid -> AcceptResponsesAndTimeout(randomTimeout,Map(nodeUniqueId -> AcceptAck(aid, nodeUniqueId, data.progress))))
+          val updated = data.acceptResponses + (aid -> AcceptResponsesAndTimeout(randomTimeout,accept,Map(nodeUniqueId -> AcceptAck(aid, nodeUniqueId, data.progress))))
           // broadcast
           send(broadcastRef, accept)
           // add the sender our client map
@@ -731,7 +731,13 @@ abstract class PaxosActorWithTimeout(config: Configuration, nodeUniqueId: Int, b
   }
 }
 
-case class AcceptResponsesAndTimeout(timeout: Long, responses: Map[Int, AcceptResponse])
+/**
+ * Tracks the responses to an accept message and when we timeout on getting a majority response
+ * @param timeout The point in time we timeout.
+ * @param accept The accept that we are awaiting responses.
+ * @param responses The known responses.
+ */
+case class AcceptResponsesAndTimeout(timeout: Long, accept: Accept, responses: Map[Int, AcceptResponse])
 
 /**
  * We use a stateless Actor FSM pattern. This immutable case class holds the state of a node in the cluster.

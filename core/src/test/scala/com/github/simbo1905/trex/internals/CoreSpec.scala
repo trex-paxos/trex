@@ -53,9 +53,10 @@ class CoreSpec extends WordSpecLike with Matchers {
         assert(newData == nodeData)
       }
       {
-        val acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(id -> AcceptResponsesAndTimeout(0L, Map.empty))
+        val a1 = Accept(Identifier(1, BallotNumber(1, 1), 1L), ClientRequestCommandValue(0, Array[Byte](1, 1)))
+        val acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(id -> AcceptResponsesAndTimeout(0L, a1, Map.empty))
         val newData = PaxosData.acceptResponsesLens.set(nodeData, acceptResponses)
-        assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, Map.empty))
+        assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, a1, Map.empty))
       }
     }
 
@@ -86,7 +87,8 @@ class CoreSpec extends WordSpecLike with Matchers {
       }
       {
         val prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] = TreeMap(id -> None)
-        val acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(id -> AcceptResponsesAndTimeout(0L,Map.empty))
+        val a1 = Accept(Identifier(1, BallotNumber(1, 1), 1L), ClientRequestCommandValue(0, Array[Byte](1, 1)))
+        val acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(id -> AcceptResponsesAndTimeout(0L, a1, Map.empty))
         val commandValue = new CommandValue {
           override def msgId: Long = 0L
           override def bytes: Array[Byte] = Array()
@@ -94,7 +96,7 @@ class CoreSpec extends WordSpecLike with Matchers {
         val clientCommands = Map(id ->(commandValue, null))
         val newData = PaxosData.leaderLens.set(nodeData, (prepareResponses, acceptResponses, clientCommands))
         assert(newData.prepareResponses(id) == None)
-        assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, Map.empty))
+        assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, a1, Map.empty))
         assert(newData.clientCommands(id) == (commandValue -> null))
       }
     }
