@@ -542,7 +542,7 @@ with ResendAcceptsHandler
   }
 
   val resendAcceptsStateFunction: StateFunction = {
-    case e@Event(PaxosActor.CheckTimeout, data@PaxosData(_, _, timeout, _, _, _, accepts, _)) if accepts.nonEmpty =>
+    case e@Event(PaxosActor.CheckTimeout, data@PaxosData(_, _, timeout, _, _, _, accepts, _)) if accepts.nonEmpty && clock() >= timeout =>
       trace(stateName, e.stateData, sender, e.event)
       stay using handleResendAccepts(stateName, data, timeout)
   }

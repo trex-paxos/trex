@@ -92,7 +92,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case map if map.nonEmpty =>
           map.get(accept.id) match {
             case None => fail()
-            case Some(AcceptResponsesAndTimeout(_, responses)) =>
+            case Some(AcceptResponsesAndTimeout(_, _, responses)) =>
               responses.values.head match {
                 case a: AcceptAck => //good
                 case b: AcceptNack => fail()
@@ -296,7 +296,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case map if map.nonEmpty =>
           map.get(accept1.id) match {
             case None => fail()
-            case Some(AcceptResponsesAndTimeout(_,responses)) =>
+            case Some(AcceptResponsesAndTimeout(_, _, responses)) =>
               responses.values.head match {
                 case a: AcceptAck => //good
                 case b: AcceptNack => fail()
@@ -325,7 +325,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case map if map.nonEmpty =>
           map.get(accept2.id) match {
             case None => fail()
-            case Some(AcceptResponsesAndTimeout(_, responses)) =>
+            case Some(AcceptResponsesAndTimeout(_, _, responses)) =>
               responses.values.head match {
                 case a: AcceptAck => //good
                 case b: AcceptNack => fail()
@@ -345,7 +345,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case map if map.nonEmpty =>
           map.get(accept3.id) match {
             case None => fail()
-            case Some(AcceptResponsesAndTimeout(_, responses)) =>
+            case Some(AcceptResponsesAndTimeout(_, _, responses)) =>
               responses.values.head match {
                 case a: AcceptAck => //good
                 case b: AcceptNack => fail()

@@ -140,7 +140,7 @@ class RecovererSpec
         map.get(accept.id) match {
           case None =>
             fail
-          case Some(AcceptResponsesAndTimeout(_, responses)) =>
+          case Some(AcceptResponsesAndTimeout(_, _, responses)) =>
             responses.values.head match {
               case a: AcceptAck =>
               // good
