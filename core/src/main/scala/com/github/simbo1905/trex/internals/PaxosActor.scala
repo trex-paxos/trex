@@ -531,9 +531,10 @@ with ResendAcceptsHandler
   /**
    * Here on a timeout we deal with either pending prepares or pending accepts putting a priorty on prepare handling
    * which backs down easily. Only if we have dealt with all timed out prepares do we handle timed out accepts which
-   * is more aggresive as it attemps to go-higher than any other node number. 
+   * is more aggressive as it attempts to go-higher than any other node number.
    */
   val resendStateFunction: StateFunction = {
+    // if we have timed-out on prepare messages
     case e@Event(PaxosActor.CheckTimeout, data@PaxosData(_, _, timeout, _, prepareResponses, _, _, _)) if prepareResponses.nonEmpty && clock() > timeout =>
       trace(stateName, e.stateData, sender, e.event)
       // prepares we only retransmit as we handle all outcomes on the prepare response such as backing down
@@ -547,6 +548,7 @@ with ResendAcceptsHandler
       }
       stay using PaxosData.timeoutLens.set(data, freshTimeout(randomInterval))
 
+    // else if we have timed-out on accept messages
     case e@Event(PaxosActor.CheckTimeout, data@PaxosData(_, _, timeout, _, _, _, accepts, _)) if accepts.nonEmpty && clock() >= timeout =>
       trace(stateName, e.stateData, sender, e.event)
       stay using handleResendAccepts(stateName, data, timeout)
@@ -561,7 +563,7 @@ with ResendAcceptsHandler
 
   val leaderStateFunction: StateFunction = {
 
-    // heatbeats the highest commit message
+    // heartbeats the highest commit message
     case e@Event(PaxosActor.HeartBeat, data) =>
       trace(stateName, e.stateData, sender, e.event)
       val c = Commit(data.progress.highestCommitted)
