@@ -528,7 +528,12 @@ with ResendAcceptsHandler
       }
   }
 
-  val resendPreparesStateFunction: StateFunction = {
+  /**
+   * Here on a timeout we deal with either pending prepares or pending accepts putting a priorty on prepare handling
+   * which backs down easily. Only if we have dealt with all timed out prepares do we handle timed out accepts which
+   * is more aggresive as it attemps to go-higher than any other node number. 
+   */
+  val resendStateFunction: StateFunction = {
     case e@Event(PaxosActor.CheckTimeout, data@PaxosData(_, _, timeout, _, prepareResponses, _, _, _)) if prepareResponses.nonEmpty && clock() > timeout =>
       trace(stateName, e.stateData, sender, e.event)
       // prepares we only retransmit as we handle all outcomes on the prepare response such as backing down
@@ -541,9 +546,7 @@ with ResendAcceptsHandler
           broadcast(Prepare(id))
       }
       stay using PaxosData.timeoutLens.set(data, freshTimeout(randomInterval))
-  }
 
-  val resendAcceptsStateFunction: StateFunction = {
     case e@Event(PaxosActor.CheckTimeout, data@PaxosData(_, _, timeout, _, _, _, accepts, _)) if accepts.nonEmpty && clock() >= timeout =>
       trace(stateName, e.stateData, sender, e.event)
       stay using handleResendAccepts(stateName, data, timeout)
@@ -551,8 +554,7 @@ with ResendAcceptsHandler
 
   when(Recoverer)(takeoverStateFunction orElse
     acceptResponseStateFunction orElse
-    resendPreparesStateFunction orElse
-    resendAcceptsStateFunction orElse
+    resendStateFunction orElse
     returnToFollowerStateFunction orElse
     notLeaderStateFunction orElse
     commonStateFunction)
@@ -605,8 +607,7 @@ with ResendAcceptsHandler
 
   when(Leader)(leaderStateFunction orElse
     acceptResponseStateFunction orElse
-    resendPreparesStateFunction orElse
-    resendAcceptsStateFunction orElse
+    resendStateFunction orElse
     returnToFollowerStateFunction orElse
     commonStateFunction)
 
