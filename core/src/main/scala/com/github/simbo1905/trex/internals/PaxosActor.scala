@@ -178,7 +178,7 @@ with ResendAcceptsHandler
     case e@Event(PaxosActor.CheckTimeout, data@PaxosData(progress, _, to, _, _, _, prepareResponses, _)) if clock() >= to && prepareResponses.isEmpty =>
       trace(stateName, e.stateData, sender, e.event)
       log.info("Node {} {} timed-out progress: {}", nodeUniqueId, stateName, progress)
-      send(broadcastRef, minPrepare)
+      broadcast(minPrepare)
       // nak our own prepare
       val prepareSelfVotes = SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]] ++
         Map(minPrepare.id -> Some(Map(nodeUniqueId -> PrepareNack(minPrepare.id, nodeUniqueId, progress, highestAcceptedIndex, data.leaderHeartbeat))))
@@ -191,7 +191,7 @@ with ResendAcceptsHandler
       trace(stateName, e.stateData, sender, e.event)
       log.debug("Node {} {} timed-out having already issued a low. rebroadcasting", nodeUniqueId, stateName)
       // FIXME test case for this
-      send(broadcastRef, minPrepare)
+      broadcast(minPrepare)
       stay using PaxosData.timeoutPrepareResponsesLens.set(data, (freshTimeout(randomInterval), prepareResponses))
 
     // having issued a low prepare track responses and promote to recover only if we see insufficient evidence of a leader in the responses
@@ -259,7 +259,7 @@ with ResendAcceptsHandler
                 journal.save(Progress.highestPromisedLens.set(data.progress, selfPromise))
                 // broadcast the prepare messages
                 prepares foreach {
-                  send(broadcastRef, _)
+                  broadcast(_)
                 }
                 log.info("Node {} Follower broadcast {} prepare messages with {} transitioning Recoverer max slot index {}.", nodeUniqueId, prepares.size, selfPromise, maxAcceptedSlot)
                 goto(Recoverer) using PaxosData.highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens.set(data, (selfPromise, freshTimeout(randomInterval), epoch, prepareSelfVotes, SortedMap.empty))
@@ -364,7 +364,7 @@ with ResendAcceptsHandler
                 log.info("Node {} Recoverer broadcasting {} new prepare messages for expanded slots {} to {}", nodeUniqueId, prepares.size, (ourLastHighestAccepted + 1), theirHighestAccepted)
                 prepares foreach { p =>
                   log.debug("Node {} sending {}", nodeUniqueId, p)
-                  send(broadcastRef, p)
+                  broadcast(p)
                 }
 
                 // accept our own prepare if we have not made a higher promise
@@ -406,7 +406,7 @@ with ResendAcceptsHandler
               }
               // broadcast accept
               log.debug("Node {} {} sending {}", nodeUniqueId, stateName, accept)
-              send(broadcastRef, accept)
+              broadcast(accept)
               // only accept your own broadcast if we have not made a higher promise whilst awaiting responses from other nodes
               val selfResponse: AcceptResponse = if (accept.id.number >= dataWithExpandedPrepareResponses.progress.highestPromised) {
                 // FIXME had the inequality wrong way around and Recoverer tests didn't catch it. Add a test to cover this.
@@ -490,7 +490,7 @@ with ResendAcceptsHandler
 
               // FIXME test that the send of the commit happens after saving the progress
               // FIXME was no test checking that this was broadcast not just replied to sender
-              send(broadcastRef, Commit(newProgress.highestCommitted))
+              broadcast(Commit(newProgress.highestCommitted))
 
               if (stateName == Leader && oldData.clientCommands.nonEmpty) {
                 // TODO the nonEmpty guard is due to test data not setting this should fix the test data and remove it
@@ -538,7 +538,7 @@ with ResendAcceptsHandler
         // FIXME no test
         case (id, _) =>
           // broadcast is preferred as previous responses may be stale
-          send(broadcastRef, Prepare(id))
+          broadcast(Prepare(id))
       }
       stay using PaxosData.timeoutLens.set(data, freshTimeout(randomInterval))
   }
@@ -563,7 +563,7 @@ with ResendAcceptsHandler
     case e@Event(PaxosActor.HeartBeat, data) =>
       trace(stateName, e.stateData, sender, e.event)
       val c = Commit(data.progress.highestCommitted)
-      send(broadcastRef, c)
+      broadcast(c)
       stay
 
     // broadcasts a new client value
@@ -590,7 +590,7 @@ with ResendAcceptsHandler
           // register self
           val updated = data.acceptResponses + (aid -> AcceptResponsesAndTimeout(randomTimeout,accept,Map(nodeUniqueId -> AcceptAck(aid, nodeUniqueId, data.progress))))
           // broadcast
-          send(broadcastRef, accept)
+          broadcast(accept)
           // add the sender our client map
           val clients = data.clientCommands + (accept.id ->(value, sender))
           stay using PaxosData.leaderLens.set(data, (SortedMap.empty, updated, clients))

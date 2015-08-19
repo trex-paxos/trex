@@ -318,7 +318,7 @@ object Cluster {
 class TypedActorPaxosEndpoint(config: PaxosActor.Configuration, broadcastReference: ActorRef, nodeUniqueId: Int, journal: Journal, target: AnyRef)
   extends PaxosActorWithTimeout(config, nodeUniqueId, broadcastReference, journal) {
 
-  def broadcastRef: ActorRef = broadcastReference
+  def broadcast(msg: Any): Unit = send(broadcastReference, msg)
 
   override val deliverClient: PartialFunction[CommandValue, AnyRef] = {
     case ClientRequestCommandValue(id, bytes) =>

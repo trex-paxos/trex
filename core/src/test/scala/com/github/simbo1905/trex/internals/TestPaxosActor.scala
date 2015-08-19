@@ -6,10 +6,10 @@ import com.github.simbo1905.trex.internals.PaxosActor.TraceData
 
 import scala.collection.mutable.ArrayBuffer
 
-class TestPaxosActor(config: PaxosActor.Configuration, nodeUniqueId: Int, broadcast: ActorRef, journal: Journal, val delivered: ArrayBuffer[CommandValue], tracer: Option[PaxosActor.Tracer])
-  extends PaxosActor(config, nodeUniqueId, broadcast, journal) {
+class TestPaxosActor(config: PaxosActor.Configuration, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, val delivered: ArrayBuffer[CommandValue], tracer: Option[PaxosActor.Tracer])
+  extends PaxosActor(config, nodeUniqueId, broadcastRef, journal) {
 
-  def broadcastRef: ActorRef = broadcast
+  def broadcast(msg: Any): Unit = send(broadcastRef, msg)
 
   // does nothing but makes this class concrete for testing
   val deliverClient: PartialFunction[CommandValue, Array[Byte]] = {

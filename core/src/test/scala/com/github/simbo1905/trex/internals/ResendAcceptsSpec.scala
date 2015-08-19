@@ -1,15 +1,34 @@
 package com.github.simbo1905.trex.internals
 
+import akka.actor.{ActorSystem, ActorRef}
+import akka.event.LoggingAdapter
+import akka.testkit.{TestProbe, TestKit}
+import com.github.simbo1905.trex.Journal
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.collection.SortedMap
 import scala.collection.immutable.TreeMap
 
-class ResendAcceptsSpec extends WordSpecLike with Matchers {
+class TestResendAcceptsHandler extends ResendAcceptsHandler {
+  override def highestNumberProgressed(data: PaxosData): BallotNumber = ???
+
+  override def log: LoggingAdapter = NoopLoggingAdapter
+
+  override def nodeUniqueId: Int = 1
+
+  override def randomTimeout: Long = 0L
+
+  override def journal: Journal = ???
+
+  def broadcast(msg: Any): Unit = ???
+}
+
+class ResendAcceptsSpec extends TestKit(ActorSystem("ResendAcceptsSpec")) with WordSpecLike with Matchers with MockFactory {
   import ResendAcceptsSpec._
   "ResendAcceptsHandler" should {
     "find the timed-out accepts in" in {
-      val timedout = ResendAcceptsHandler.timedout(100L, emptyAcceptResponses)
+      val timedout = ResendAcceptsHandler.timedOutResponse(100L, emptyAcceptResponses)
       timedout shouldBe timedOutAt100AcceptResponses
     }
     "detect highest own promise" in {
@@ -36,11 +55,87 @@ class ResendAcceptsSpec extends WordSpecLike with Matchers {
       val identifier100: Identifier = Identifier(3, newNumber, 100L)
       refreshed shouldBe Seq(a98.copy(id = identifier98), a99.copy(id = identifier99), a100.copy(id = identifier100))
     }
-    "sets a new timeout on resend accept" in {
-      //fail() FIXME
+    "sets a new timeout per accept on resend with same epoch" in {
+      // given
+      val handler = new TestResendAcceptsHandler {
+        override def randomTimeout = 121L
+      }
+      // when
+      val AcceptsAndData(accepts,data) = handler.computeResendAccepts(Leader, AllStateSpec.initialData.copy(acceptResponses = emptyAcceptResponses), 100L)
+      // then
+      data.timeout shouldBe 121L
+      accepts.size shouldBe 2
+      data.acceptResponses.values.map(_.timeout) shouldBe Seq(121L,121L,120L)
     }
-    "sets a new timeout per refreshed accept" in {
-      //fail() FIXME
+    "goes to a one higher epoch on detecting higher promise in responses" in {
+      // given
+      val handler = new TestResendAcceptsHandler
+      val higherPromise = emptyAcceptResponses +
+        (a99.id -> AcceptResponsesAndTimeout(50L, a99, Map(0 -> AcceptNack(a99.id, 0, progressWith(zeroProgress.highestPromised, BallotNumber(99, 99))))))
+      val newEpoch = BallotNumber(100,1)
+      // when
+      val AcceptsAndData(accepts,data) = handler.computeResendAccepts(Leader, AllStateSpec.initialData.copy(acceptResponses = higherPromise), 100L)
+      // then it move to the 1-higher epoch
+      data.epoch match {
+        case Some(newEpoch) => // success
+        case x => fail(s"$x is not expected BallotNumber(100,100)")
+      }
+      // has two messages to resend
+      accepts.size shouldBe 2
+      // then name the new epoch
+      accepts.map(_.id.number).foreach {
+        _ match {
+          case `newEpoch` => // success
+          case x => fail(s"$x is not expected BallotNumber(100,100)")
+        }
+      }
+      // the new epoch accepts are listed as the values we are awaiting
+      data.acceptResponses.values.map(_.accept).filter(_.id.number == newEpoch) shouldBe accepts
+      // we have made to self acks to the two new higher accepts
+      data.acceptResponses.values.flatMap(_.responses.values).filter(_.isInstanceOf[AcceptAck]).size shouldBe 2
+    }
+    "sets a new timeout per accept on resend new epoch" in {
+      // given
+      val handler = new TestResendAcceptsHandler {
+        override def randomTimeout = 121L
+      }
+      val higherPromise = emptyAcceptResponses +
+        (a99.id -> AcceptResponsesAndTimeout(50L, a99, Map(0 -> AcceptNack(a99.id, 0, progressWith(zeroProgress.highestPromised, BallotNumber(99, 99))))))
+      // when
+      val AcceptsAndData(accepts,data) = handler.computeResendAccepts(Leader, AllStateSpec.initialData.copy(acceptResponses = higherPromise), 100L)
+      // then
+      data.timeout shouldBe 121L
+      accepts.size shouldBe 2
+      data.acceptResponses.values.map(_.timeout) shouldBe Seq(121L,121L,120L)
+    }
+    "journalling and sending happens in the correct order" in {
+      // given a journal which records saving and accepting
+      val stubJournal = stub[Journal]
+      var saveJournalTime = 0L
+      var acceptJournalTime = 0L
+      stubJournal.save _ when * returns {
+        saveJournalTime = System.nanoTime()
+        Unit
+      }
+      stubJournal.accept _ when * returns {
+        acceptJournalTime = System.nanoTime()
+        Unit
+      }
+      // and something which can receive broadcast messages
+      val probe = TestProbe()
+      // and a handler that records broadcase time
+      var sendTime = 0L
+      val handler = new TestResendAcceptsHandler {
+        override def randomTimeout = 121L
+        override def journal: Journal = stubJournal
+        override def broadcast(msg: Any): Unit = sendTime = System.nanoTime()
+      }
+      // when we get it to do work
+      handler.handleResendAccepts(Leader, AllStateSpec.initialData.copy(acceptResponses = emptyAcceptResponses), 100L)
+      // then we saved, accepted and sent
+      assert(saveJournalTime > 0 && acceptJournalTime > 0 && sendTime > 0)
+      // in the correct order had we done a full round of paxos which is promise, accept then send last
+      assert(sendTime > acceptJournalTime && acceptJournalTime > saveJournalTime)
     }
   }
 }
@@ -63,7 +158,7 @@ object ResendAcceptsSpec {
 
   val timedOutAt100AcceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(
     a98.id -> AcceptResponsesAndTimeout(100L, a98, Map.empty),
-    a100.id -> AcceptResponsesAndTimeout(120L, a100, Map.empty)
+    a99.id -> AcceptResponsesAndTimeout(50L, a99, Map.empty)
   )
 
   val zeroProgress = Progress(BallotNumber(0,0), Identifier(0, BallotNumber(0,0), 0L))

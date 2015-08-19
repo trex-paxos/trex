@@ -33,10 +33,10 @@ class TestJournal extends Journal {
   }
 }
 
-class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, nodeUniqueId: Int, broadcast: ActorRef, journal: Journal, delivered: ArrayBuffer[CommandValue], tracer: Option[PaxosActor.Tracer])
-  extends PaxosActorWithTimeout(config, nodeUniqueId, broadcast, journal) {
+class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: ArrayBuffer[CommandValue], tracer: Option[PaxosActor.Tracer])
+  extends PaxosActorWithTimeout(config, nodeUniqueId, broadcastRef, journal) {
 
-  def broadcastRef: ActorRef = broadcast
+  def broadcast(msg: Any): Unit = send(broadcastRef, msg)
 
   // does nothing but makes this class concrete for testing
   val deliverClient: PartialFunction[CommandValue, AnyRef] = {
