@@ -2,6 +2,7 @@ package com.github.simbo1905.trex.internals
 
 import akka.actor.ActorRef
 import akka.event.LoggingAdapter
+import com.github.simbo1905.trex.Journal
 
 trait AcceptResponsesHandler {
 
@@ -16,6 +17,8 @@ trait AcceptResponsesHandler {
   def backdownData(data: PaxosData): PaxosData
 
   def commit(state: PaxosRole, data: PaxosData, identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)])
+
+  def journal: Journal
 
   def broadcast(msg: Any): Unit
 
