@@ -76,11 +76,14 @@ class LeaderSpec
     "increments promise with higher accept" in {
       ackHigherAcceptMakingPromise(Leader)
     }
-    "ignore commit message less than last committed" in {
-      ignoreCommitMessageLessThanLastCommit(Leader)
+    "ignore commit message for lower log index" in {
+      ignoreCommitMessageLogIndexLessThanLastCommit(Leader)
     }
-    "ignore commit message equal than last committed" in {
-      ignoreCommitMessageEqualToLast(Leader)
+    "ignore commit message equal than last committed lower nodeIdentifier" in {
+      ignoreCommitMessageSameSlotLowerNodeIdentifier(Leader)
+    }
+    "backdown to follower on a commit of same slot but with higher node number" in {
+      backdownToFollowerOnCommitSameSlotHigherNodeIdentifier(Leader)
     }
     "backdown to follower and request retransmission on commit higher than last committed" in {
       backdownToFollowerAndRequestRetransmissionOnCommitHigherThanLastCommitted(Leader)

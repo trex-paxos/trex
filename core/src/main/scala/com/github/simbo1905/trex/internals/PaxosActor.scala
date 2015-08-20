@@ -306,11 +306,14 @@ with ResendAcceptsHandler {
   when(Follower)(followerStateFunction orElse notLeaderStateFunction orElse commonStateFunction)
 
   val returnToFollowerStateFunction: StateFunction = {
-    // FIXME should also match on same logIndex but higher nodeUniqueNumber
-    case e@Event(c@Commit(i@Identifier(from, _, logIndex), _), oldData: PaxosData) if logIndex > oldData.progress.highestCommitted.logIndex =>
+    /**
+     * If we see a commit at a higher slot we should backdown and request retransmission.
+     * If we see a commit for the same slot but with a higher number from a node with a higher node unique id we should backdown.
+     */
+    case e@Event(c@Commit(i@Identifier(from, number, logIndex), _), oldData@HighestCommittedIndexAndEpoch(committedLogIndex, epoch)) if logIndex > committedLogIndex || number > epoch && logIndex == committedLogIndex =>
       trace(stateName, e.stateData, sender, e.event)
       val newProgress = handleReturnToFollowerOnHigherCommit(c, oldData, stateName, sender)
-      goto(Follower) using PaxosData.timeoutLens.set(PaxosData.progressLens.set(oldData, newProgress), randomTimeout)
+      goto(Follower) using backdownData(PaxosData.progressLens.set(oldData, newProgress))
 
     case e@Event(Commit(id@Identifier(_, _, logIndex), _), data) =>
       trace(stateName, e.stateData, sender, e.event)
@@ -789,6 +792,13 @@ object PaxosActor {
 
   object HighestCommittedIndex {
     def unapply(data: PaxosData) = Some(data.progress.highestCommitted.logIndex)
+  }
+
+  object HighestCommittedIndexAndEpoch {
+    def unapply(data: PaxosData) = data.epoch match {
+      case Some(number) => Some(data.progress.highestCommitted.logIndex, number)
+      case _ => Some(data.progress.highestCommitted.logIndex, Journal.minBookwork.highestPromised)
+    }
   }
 
 }

@@ -19,14 +19,20 @@ trait ReturnToFollowerHandler {
   def handleReturnToFollowerOnHigherCommit(c: Commit, nodeData: PaxosData, stateName: PaxosRole, sender: ActorRef): Progress = {
     log.info("Node {} {} has seen a higher commit {} from node {} so will backdown to be Follower", nodeUniqueId, stateName, c, c.identifier.from)
 
-    val (newProgress, _) = commit(stateName, nodeData, c.identifier, nodeData.progress)
+    val higherSlotCommit = c.identifier.logIndex > nodeData.progress.highestCommitted.logIndex
 
-    if (newProgress == nodeData.progress) {
-      send(sender, RetransmitRequest(nodeUniqueId, c.identifier.from, nodeData.progress.highestCommitted.logIndex))
+    val progress = if( higherSlotCommit ) {
+      val (newProgress, _) = commit(stateName, nodeData, c.identifier, nodeData.progress)
+      if ( newProgress == nodeData.progress) {
+        send(sender, RetransmitRequest(nodeUniqueId, c.identifier.from, nodeData.progress.highestCommitted.logIndex))
+      }
+      newProgress
+    } else {
+      nodeData.progress
     }
 
     sendNoLongerLeader(nodeData.clientCommands)
 
-    newProgress
+    progress
   }
 }

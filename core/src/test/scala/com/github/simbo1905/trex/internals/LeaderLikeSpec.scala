@@ -18,13 +18,11 @@ trait LeaderLikeSpec {
   import Ordering._
   import PaxosActor.Configuration
 
-  def ignoreCommitMessageLessThanLastCommit(state: PaxosRole)(implicit sender: ActorRef) {
+  def ignoreCommitMessageLogIndexLessThanLastCommit(state: PaxosRole)(implicit sender: ActorRef) {
     require(state == Leader || state == Recoverer)
     // given a leaderlike with no responses
     val identifier = Identifier(0, BallotNumber(lowValue + 1, 0), 1L)
     val lessThan = Identifier(0, BallotNumber(lowValue, 0), 0L)
-    val prepare = Prepare(identifier)
-    val initialPrepareResponses = Some((prepare, Map.empty[Int, PrepareResponse]))
     val data = initialData.copy(clusterSize = 3, progress = initialData.progress.copy(highestCommitted = identifier))
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
     fsm.setState(state, data)
@@ -37,29 +35,49 @@ trait LeaderLikeSpec {
     assert(fsm.stateName == state)
   }
 
-  def ignoreCommitMessageEqualToLast(state: PaxosRole)(implicit sender: ActorRef) {
-    // given a recoverer with no responses
-    val identifier = Identifier(0, BallotNumber(lowValue + 1, 0), 1L)
-    val equalTo = Identifier(0, BallotNumber(lowValue + 1, 0), 1L)
-    val prepare = Prepare(identifier)
-    val initialPrepareResponses = Some((prepare, Map.empty[Int, PrepareResponse]))
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
-    fsm.setState(state, initialData.copy(clusterSize = 3, progress = initialData.progress.copy(highestCommitted = identifier)))
-    // when it gets commit
-    val commit = Commit(equalTo)
-    fsm ! commit
+  def ignoreCommitMessageSameSlotLowerNodeIdentifier(state: PaxosRole)(implicit sender: ActorRef) {
+    // given
+    val node2slot1Identifier = Identifier(2, BallotNumber(lowValue + 1, 2), 1L)
+    val node2 = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 2, sender, stubJournal, ArrayBuffer.empty, None))
+    node2.setState(state, initialData.copy(epoch = Some(node2slot1Identifier.number), clusterSize = 3, progress = initialData.progress.copy(highestCommitted = node2slot1Identifier)))
+    // when node2 it gets commit for same slot but lower nodeIdentifier
+    val node0slot1Identifier = Identifier(0, BallotNumber(lowValue + 1, 0), 1L)
+    val commit = Commit(node0slot1Identifier)
+    node2 ! commit
     // it sends no messages
     expectNoMsg(25 millisecond)
     // and stays a recoverer
-    assert(fsm.stateName == state)
+    assert(node2.stateName == state)
+  }
+
+  def backdownToFollowerOnCommitSameSlotHigherNodeIdentifier(state: PaxosRole)(implicit sender: ActorRef) {
+    // given
+    val node2slot1Identifier = Identifier(2, BallotNumber(lowValue + 1, 2), 1L)
+    val timenow = 999L
+    val node2 = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 2, sender, stubJournal, ArrayBuffer.empty, None){
+      override def clock() = timenow
+    })
+    node2.setState(state, initialData.copy(epoch = Some(node2slot1Identifier.number), clusterSize = 3, progress = initialData.progress.copy(highestCommitted = node2slot1Identifier)))
+    // when node2 it gets commit for same slot but lower nodeIdentifier
+    val node3slot1Identifier = Identifier(0, BallotNumber(lowValue + 1, 3), 1L)
+    val commit = Commit(node3slot1Identifier)
+    node2 ! commit
+    // it sends no messages
+    expectNoMsg(25 millisecond)
+    // and returns to be follower
+    assert(node2.stateName == Follower)
+    // and clears data
+    assert(node2.stateData.acceptResponses.isEmpty)
+    assert(node2.stateData.prepareResponses.isEmpty)
+    assert(node2.stateData.epoch == None)
+    // and sets a fresh timeout
+    assert(node2.stateData.timeout > 0 && node2.stateData.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
   }
 
   def backdownToFollowerAndRequestRetransmissionOnCommitHigherThanLastCommitted(state: PaxosRole)(implicit sender: ActorRef) {
     // given a recoverer with no responses
     val identifier = Identifier(1, BallotNumber(lowValue + 1, 0), 1L)
     val greaterThan = Identifier(1, BallotNumber(lowValue + 2, 2), 2L)
-    val prepare = Prepare(identifier)
-    val initialPrepareResponses = Some((prepare, Map.empty[Int, PrepareResponse]))
     val timenow = 999L
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None){
       override def clock() = timenow

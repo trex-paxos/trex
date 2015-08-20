@@ -66,11 +66,14 @@ class RecovererSpec
   "increments promise with higher accept" in {
     ackHigherAcceptMakingPromise(Recoverer)
   }
-  "ignore commit message less than last committed" in {
-    ignoreCommitMessageLessThanLastCommit(Recoverer)
+  "ignore commit message for lower log index" in {
+    ignoreCommitMessageLogIndexLessThanLastCommit(Recoverer)
   }
-  "ignore commit message equal than last committed" in {
-    ignoreCommitMessageEqualToLast(Recoverer)
+  "ignore commit message equal than last committed lower nodeIdentifier" in {
+    ignoreCommitMessageSameSlotLowerNodeIdentifier(Recoverer)
+  }
+  "backdown to follower on a commit of same slot but with higher node number" in {
+    backdownToFollowerOnCommitSameSlotHigherNodeIdentifier(Recoverer)
   }
   "backdown to follower and request retransmission on commit higher than last committed" in {
     backdownToFollowerAndRequestRetransmissionOnCommitHigherThanLastCommitted(Recoverer)
