@@ -1,5 +1,6 @@
 package com.github.simbo1905.trex.internals
 
+
 /**
  * Client request command has an id to correlate to the server response.
  */
@@ -19,7 +20,7 @@ case object NoOperationCommandValue extends CommandValue {
 }
 
 case class MembershipCommandValue(msgId: Long, members: Seq[ClusterMember]) extends CommandValue {
-  override def bytes: Array[Byte] = ???
+  override def bytes: Array[Byte] = emptyArray
 }
 
 case class ClusterMember(nodeUniqueId: Int, location: String, active: Boolean)
