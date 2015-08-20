@@ -1,8 +1,6 @@
 package com.github.simbo1905.trex.internals
 
-import akka.actor.{ActorSystem, ActorRef}
 import akka.event.LoggingAdapter
-import akka.testkit.{TestProbe, TestKit}
 import com.github.simbo1905.trex.Journal
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, WordSpecLike}
@@ -24,7 +22,7 @@ class TestResendAcceptsHandler extends ResendAcceptsHandler {
   def broadcast(msg: Any): Unit = ???
 }
 
-class ResendAcceptsSpec extends TestKit(ActorSystem("ResendAcceptsSpec")) with WordSpecLike with Matchers with MockFactory {
+class ResendAcceptsSpec extends WordSpecLike with Matchers with MockFactory {
   import ResendAcceptsSpec._
   "ResendAcceptsHandler" should {
     "find the timed-out accepts in" in {
@@ -69,7 +67,9 @@ class ResendAcceptsSpec extends TestKit(ActorSystem("ResendAcceptsSpec")) with W
     }
     "goes to a one higher epoch on detecting higher promise in responses" in {
       // given
-      val handler = new TestResendAcceptsHandler
+      val handler = new TestResendAcceptsHandler {
+        override def randomTimeout: Long = 121L
+      }
       val higherPromise = emptyAcceptResponses +
         (a99.id -> AcceptResponsesAndTimeout(50L, a99, Map(0 -> AcceptNack(a99.id, 0, progressWith(zeroProgress.highestPromised, BallotNumber(99, 99))))))
       val newEpoch = BallotNumber(100,1)
@@ -89,6 +89,8 @@ class ResendAcceptsSpec extends TestKit(ActorSystem("ResendAcceptsSpec")) with W
           case x => fail(s"$x is not expected BallotNumber(100,100)")
         }
       }
+      // top level guard timeout is set
+      data.timeout shouldBe 121L
       // the new epoch accepts are listed as the values we are awaiting
       data.acceptResponses.values.map(_.accept).filter(_.id.number == newEpoch) shouldBe accepts
       // we have made to self acks to the two new higher accepts
@@ -121,8 +123,6 @@ class ResendAcceptsSpec extends TestKit(ActorSystem("ResendAcceptsSpec")) with W
         acceptJournalTime = System.nanoTime()
         Unit
       }
-      // and something which can receive broadcast messages
-      val probe = TestProbe()
       // and a handler that records broadcase time
       var sendTime = 0L
       val handler = new TestResendAcceptsHandler {
