@@ -73,6 +73,7 @@ with PrepareResponseHandler {
       trace(stateName, e.stateData, sender, e.event)
       log.debug("Node {} {} RetransmitRequest {} with high watermark {}", nodeUniqueId, stateName, r, committedLogIndex)
       handleRetransmitRequest(r, oldData) foreach { response =>
+        // FIXME no test
         log.info(s"Node $nodeUniqueId retransmission response to node {} at logIndex {} with {} committed and {} proposed entries", r.from, r.logIndex, response.committed.size, response.uncommitted.size)
         send(sender, response)
       }
