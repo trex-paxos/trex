@@ -2,6 +2,7 @@ package com.github.simbo1905.trex.internals
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{DefaultTimeout, ImplicitSender, TestFSMRef, TestKit}
+import com.github.simbo1905.trex.internals.AllStateSpec._
 import com.github.simbo1905.trex.{Journal, JournalBounds}
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalamock.scalatest.MockFactory
@@ -205,7 +206,10 @@ class FollowerSpec
       // then it sends no messages
       expectNoMsg(25 millisecond)
       // and delivered that value
-      assert(fsm.underlyingActor.delivered.head == ClientRequestCommandValue(0, expectedBytes))
+      fsm.underlyingActor.delivered.headOption match {
+        case Some(ClientRequestCommandValue(0, expectedBytes)) => // good
+        case x => fail(s"$x")
+      }
       // and journal bookwork
       (stubJournal.save _).verify(fsm.stateData.progress)
       // and sets a fresh timeout
