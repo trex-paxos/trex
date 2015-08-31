@@ -50,19 +50,19 @@ class CommitHandlerSpec extends WordSpecLike with Matchers {
   "CommitHandler" should {
     "do nothing if have committed up to the specified log index" in {
       CommitHandler.committableValues(accepts98thru100.last.id.number,
-        accepts98thru100.last.id,
-        accepts98thru100.last.id.logIndex,
+        accepts98thru100.lastOption.getOrElse(throw new AssertionError()).id,
+        accepts98thru100.lastOption.getOrElse(throw new AssertionError()).id.logIndex,
         journaled98thru100) shouldBe Seq.empty[Accept]
     }
     "do nothing if have committed way beyond the specified log index" in {
       CommitHandler.committableValues(accepts98thru100.last.id.number,
-        accepts98thru100.last.id,
+        accepts98thru100.lastOption.getOrElse(throw new AssertionError()).id,
         1L,
         journaled98thru100) shouldBe Seq.empty[Accept]
     }
     "do nothing if have a gap in our journal" in {
       CommitHandler.committableValues(accepts98thru100.last.id.number,
-        accepts98thru100.last.id,
+        accepts98thru100.lastOption.getOrElse(throw new AssertionError()).id,
         999L,
         journaled98thru100) shouldBe Seq.empty[Accept]
     }
@@ -81,7 +81,7 @@ class CommitHandlerSpec extends WordSpecLike with Matchers {
       // when we commit to a14
       val (newProgress, results) = handler.commit(Follower,
         AllStateSpec.initialData.copy(progress = oldProgress),
-        accepts11thru14.last.id,
+        accepts11thru14.lastOption.getOrElse(throw new AssertionError()).id,
         oldProgress)
       // then we will have committed
       newProgress.highestCommitted shouldBe accepts11thru14.last.id
