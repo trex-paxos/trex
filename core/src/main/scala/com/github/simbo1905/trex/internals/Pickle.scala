@@ -241,11 +241,13 @@ object Pickle {
     val (highestAcceptedIndex, r4) = r3.splitAt(lengthOfLong)
     val (leaderHeartbeat, r5) = r4.splitAt(lengthOfLong)
     val (bool, accept) = r5.splitAt(lengthOfBool)
-    if (bool.last == 0x0) {
-      PrepareAck(unpickleIdentifier(requestId), unpickleInt(from), unpickleProgress(progress), unpickleLong(highestAcceptedIndex), unpickleLong(leaderHeartbeat), None)
-    } else {
-      val a = unpickleAccept(accept)
-      PrepareAck(unpickleIdentifier(requestId), unpickleInt(from), unpickleProgress(progress), unpickleLong(highestAcceptedIndex), unpickleLong(leaderHeartbeat), Option(a))
+
+    bool.lastOption match {
+      case Some(0x0) =>
+        PrepareAck(unpickleIdentifier(requestId), unpickleInt(from), unpickleProgress(progress), unpickleLong(highestAcceptedIndex), unpickleLong(leaderHeartbeat), None)
+      case _ =>
+        val a = unpickleAccept(accept)
+        PrepareAck(unpickleIdentifier(requestId), unpickleInt(from), unpickleProgress(progress), unpickleLong(highestAcceptedIndex), unpickleLong(leaderHeartbeat), Option(a))
     }
   }
 
