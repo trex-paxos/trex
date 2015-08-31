@@ -137,8 +137,8 @@ object Pickle {
     val (length, r2) = r1.splitAt(lengthOfInt)
     val l = unpickleInt(length)
     val (location, bool) = r2.splitAt(l)
-    val active = bool.take(1).last match {
-      case b if b == 0 => false
+    val active = bool.take(1).lastOption match {
+      case Some(b) if b == 0 => false
       case _ => true
     }
     (ClusterMember(unpickleInt(nodeUniqueId), new String(location.toArray, "UTF8"), active), bool.drop(1))
