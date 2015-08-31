@@ -1,20 +1,27 @@
 package com.github.simbo1905.trex.internals
 
+import akka.actor.{ActorSystem, ActorRef}
 import akka.event.LoggingAdapter
+import akka.testkit.{TestProbe, TestKit}
 import com.github.simbo1905.trex.{JournalBounds, Journal}
 import com.github.simbo1905.trex.internals.RetransmitHandler.{ResponseState, AcceptState, CommitState}
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, WordSpecLike}
 
-class UndefinedRetransmitHandler extends RetransmitHandler {
-  override def log: LoggingAdapter = ???
+import scala.collection.generic.SeqFactory
 
-  override def nodeUniqueId: Int = ???
+class UndefinedRetransmitHandler extends RetransmitHandler {
+  override def log: LoggingAdapter = NoopLoggingAdapter
+
+  override def nodeUniqueId: Int = 0
 
   override def deliver(value: CommandValue): Any = ???
 
   override def journal: Journal = ???
 
   override def processRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData): Retransmission = ???
+
+  def send(actor: ActorRef, msg: Any): Unit = ???
 }
 
 class UndefinedJournal extends Journal {
@@ -65,9 +72,18 @@ object RetransmitSpec {
       case _ => None
     }
   }
+
+  val lowValue = Int.MinValue + 1
+  val initialDataCommittedSlotOne = PaxosData(
+    Progress(
+      BallotNumber(lowValue, lowValue), Identifier(0, BallotNumber(lowValue, lowValue), 1)
+    ), 0, 0, 3)
 }
 
-class RetransmitSpec extends WordSpecLike with Matchers  {
+class RetransmitSpec extends TestKit(ActorSystem("RetransmitSpec", AllStateSpec.config))
+with WordSpecLike
+with Matchers
+with MockFactory {
 
   import RetransmitSpec._
 
@@ -104,7 +120,33 @@ class RetransmitSpec extends WordSpecLike with Matchers  {
           uncommitted.map(_.id.logIndex) shouldBe Seq(100L, 101L)
         case None => fail("Expected Some(ResponseState(committed, uncommitted)) but got None")
       }
+    }
+    "sends a response with both committed and uncommitted values" in {
+      // given a journal with a value
+      val stubJournal = stub[Journal]
+      (stubJournal.bounds _) when() returns (JournalBounds(0, 2))
+      (stubJournal.accepted _) when (1L) returns Option(a98)
+      (stubJournal.accepted _) when (2L) returns Option(a99)
+      // and a retransmit handler which records what it sent
+      val sender: ActorRef = TestProbe().ref
+      var sent: Option[Any] = None
+      val handler = new UndefinedRetransmitHandler {
 
+        override def journal: Journal = stubJournal
+
+        override def send(actor: ActorRef, msg: Any): Unit = {
+          sent = Some(msg)
+          actor shouldBe sender
+        }
+      }
+      // when we send it a request and we have only uncommitted values
+      handler.handleRetransmitRequest(sender, RetransmitRequest(2, 0, 0L), initialDataCommittedSlotOne)
+      // then
+      val expected = Some(RetransmitResponse(0, 2, Seq(a98), Seq(a99)))
+      sent match {
+        case `expected` => // good
+        case x => fail(s"$x != $expected")
+      }
     }
   }
 
@@ -134,6 +176,8 @@ class RetransmitSpec extends WordSpecLike with Matchers  {
         override def deliver(value: CommandValue): Any = {
           deliveredWithTs = deliveredWithTs :+(System.nanoTime(), value)
         }
+
+        override def send(actor: ActorRef, msg: Any): Unit = {}
       }
       // when it is passed a retransmit response
       handler.handleRetransmitResponse(RetransmitResponse(1, 0, accepts98thru100, Seq.empty), AllStateSpec.initialData)

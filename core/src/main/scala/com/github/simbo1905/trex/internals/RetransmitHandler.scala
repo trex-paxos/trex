@@ -1,5 +1,6 @@
 package com.github.simbo1905.trex.internals
 
+import akka.actor.ActorRef
 import akka.event.LoggingAdapter
 import com.github.simbo1905.trex.{Journal, JournalBounds}
 import com.github.simbo1905.trex.internals.PaxosActor.HighestCommittedIndex
@@ -17,6 +18,8 @@ trait RetransmitHandler {
   def deliver(value: CommandValue): Any
 
   def log: LoggingAdapter
+
+  def send(actor: ActorRef, msg: Any): Unit
 
   def handleRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData): Progress = {
     // pure functional computation
@@ -64,15 +67,20 @@ trait RetransmitHandler {
     Retransmission(newProgress, (aboveCommitted ++ acceptState.acceptable).distinct, commitState.committed.map(_.value))
   }
 
-  def handleRetransmitRequest(request: RetransmitRequest, nodeData: PaxosData): Option[RetransmitResponse] = {
-    // extract who to respond to, where they are requesting from and where we are committed upto
+  def handleRetransmitRequest(sender: ActorRef, request: RetransmitRequest, nodeData: PaxosData): Unit = {
+    // extract who to respond to, where they are requesting from and where we are committed up to
     val RetransmitRequest(to, _, requestedLogIndex) = request
     val HighestCommittedIndex(committedLogIndex) = nodeData
 
     // send the response based on what we have in our journal, access to the journal, and where they have committed
-    processRetransmitRequest(journal.bounds, committedLogIndex, journal.accepted _, requestedLogIndex) map {
+    val responseData = processRetransmitRequest(journal.bounds, committedLogIndex, journal.accepted _, requestedLogIndex) map {
       case ResponseState(committed, uncommitted) =>
         RetransmitResponse(nodeUniqueId, to, committed, uncommitted)
+    }
+
+    responseData foreach { r =>
+      log.info(s"Node $nodeUniqueId retransmission response to node {} for logIndex {} with {} committed and {} proposed entries", r.from, request.logIndex, r.committed.size, r.uncommitted.size)
+      send(sender, r)
     }
   }
 }

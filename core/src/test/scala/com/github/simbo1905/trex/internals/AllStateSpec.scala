@@ -109,9 +109,9 @@ trait AllStateSpec {
   def retransmitResponseInvokesHandler(state: PaxosRole)(implicit sender: ActorRef): Unit = {
     var handledMessage = false
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, AllStateSpec.tempFileJournal, ArrayBuffer.empty, None) {
-      override def handleRetransmitRequest(request: RetransmitRequest, nodeData: PaxosData): Option[RetransmitResponse] = {
+      override def handleRetransmitRequest(sender: ActorRef, request: RetransmitRequest, nodeData: PaxosData): Unit = {
         handledMessage = true
-        super.handleRetransmitRequest(request, nodeData)
+        super.handleRetransmitRequest(sender, request, nodeData)
       }
     })
     fsm ! RetransmitRequest(1, 33, 100L)
