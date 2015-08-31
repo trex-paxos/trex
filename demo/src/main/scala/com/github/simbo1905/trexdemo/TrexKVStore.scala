@@ -162,6 +162,9 @@ class TypedActorPaxosEndpoint(cluster: Cluster, config: PaxosActor.Configuration
         retransmitResponse.to
       case retransmitRequest: RetransmitRequest =>
         retransmitRequest.to
+      case x =>
+        log.error("unknown message {}", x)
+        0
     }
     log.debug("routing to {} message {}", nodeId, msg)
     peers(nodeId)
