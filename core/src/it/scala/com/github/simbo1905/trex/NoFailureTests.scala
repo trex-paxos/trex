@@ -27,8 +27,12 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
     0 until clusterSize foreach { i =>
       // NO_OPERATION are not delivered so should only have single value of 1
       delivered(i).size should be(1)
-      delivered(i).head.asInstanceOf[ClientRequestCommandValue].bytes.length should be(1)
-      delivered(i).head.asInstanceOf[ClientRequestCommandValue].bytes(0) should be(1.toByte)
+      delivered(i).headOption match {
+        case Some(c: ClientRequestCommandValue) =>
+          c.bytes.length should be(1)
+          c.bytes(0) should be(1.toByte)
+        case x => fail(s"$x")
+      }
     }
   }
 
