@@ -376,8 +376,10 @@ class FollowerSpec
       // and is tracking reponses to its low prepare
       assert(fsm.stateData.prepareResponses != None)
       // and has responded itself
-      assert(fsm.stateData.prepareResponses.get(minPrepare.id) != None)
-      assert(fsm.stateData.prepareResponses.get(minPrepare.id).get.size == 1)
+      fsm.stateData.prepareResponses.get(minPrepare.id) match {
+        case Some(map) if map.size == 1 => // good
+        case x => fail(s"$x")
+      }
     }
     "re-issues a low prepare on subsequent time-outs when it has not recieved any responses" in {
       // given that we control the clock
