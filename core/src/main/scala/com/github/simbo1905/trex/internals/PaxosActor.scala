@@ -409,10 +409,9 @@ with PrepareResponseHandler {
         // the following 'if' check is an invariant of the algorithm we will throw and kill the actor if we have no match
         case Some(epoch) if data.progress.highestPromised <= epoch =>
           // compute next slot
-          val lastLogIndex: Long = if (data.acceptResponses.isEmpty) {
-            data.progress.highestCommitted.logIndex
-          } else {
-            data.acceptResponses.last._1.logIndex
+          val lastLogIndex: Long = data.acceptResponses.lastOption match {
+            case None =>data.progress.highestCommitted.logIndex
+            case Some((id, _)) => id.logIndex
           }
           // create accept
           val nextLogIndex = lastLogIndex + 1
