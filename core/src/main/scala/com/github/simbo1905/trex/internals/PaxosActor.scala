@@ -410,7 +410,7 @@ with PrepareResponseHandler {
         case Some(epoch) if data.progress.highestPromised <= epoch =>
           // compute next slot
           val lastLogIndex: Long = data.acceptResponses.lastOption match {
-            case None =>data.progress.highestCommitted.logIndex
+            case None => data.progress.highestCommitted.logIndex
             case Some((id, _)) => id.logIndex
           }
           // create accept

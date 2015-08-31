@@ -181,8 +181,11 @@ with MockFactory {
       }
       // when it is passed a retransmit response
       handler.handleRetransmitResponse(RetransmitResponse(1, 0, accepts98thru100, Seq.empty), AllStateSpec.initialData)
-      // then deliver before we save
-      assert(saveTs != 0 && deliveredWithTs.nonEmpty && deliveredWithTs.head._1 != 0 && deliveredWithTs.head._1 < saveTs)
+      // then we deliver before we save
+      deliveredWithTs.headOption.getOrElse(fail("empty delivered list")) match {
+        case (ts, _) =>
+          assert(saveTs != 0 && ts != 0 && ts < saveTs)
+      }
       // and we saved before we accepted
       assert(saveTs != 0 && acceptTs != 0 && saveTs < acceptTs)
       // and we filtered out NoOp values
