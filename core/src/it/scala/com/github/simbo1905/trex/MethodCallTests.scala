@@ -28,8 +28,9 @@ class MethodCallInvokingActor(target: Any) extends Actor with ActorLogging {
       val method = methodCall.method
       val parameters = methodCall.parameters
       try {
-        val response = method.invoke(target, parameters: _*)
-        if (response != null) sender ! response
+        Option(method.invoke(target, parameters: _*)) foreach {
+          sender ! _
+        }
       } catch {
         case NonFatal(ex) =>
           log.error(ex, s"call to $method with ${parameters} got exception $ex")
