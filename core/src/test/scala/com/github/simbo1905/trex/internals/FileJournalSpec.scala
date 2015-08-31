@@ -97,7 +97,7 @@ class FileJournalSpec extends WordSpecLike with Matchers with BeforeAndAfter wit
       }
 
       val j = new FileJournal(storeFile, 10)
-      val readBackAccept = j.accepted(logIndex).get
+      val readBackAccept = j.accepted(logIndex).getOrElse(fail("should be defined"))
       j.close()
       assert(java.util.Arrays.equals(Pickle.pickle(accept).toArray, Pickle.pickle(readBackAccept).toArray))
     }
