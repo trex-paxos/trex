@@ -8,7 +8,7 @@ import org.mapdb.{HTreeMap, DB, Serializer}
  */
 class MapDBConsistentKVStore(db: DB) extends ConsistentKVStore {
 
-  require( db != null)
+  require(db != null)
 
   val valueStore: HTreeMap[String, String] = db.createHashMap("trexdemovalues").
     keySerializer(Serializer.STRING).
@@ -24,8 +24,8 @@ class MapDBConsistentKVStore(db: DB) extends ConsistentKVStore {
    * Add a value into the KV store
    */
   override def put(key: String, value: String): Unit = {
-    val currentVersion = versionStore.getOrDefault(key,0L)
-    versionStore.put(key,currentVersion+1)
+    val currentVersion = versionStore.getOrDefault(key, 0L)
+    versionStore.put(key, currentVersion + 1)
     valueStore.put(key, value)
     db.commit()
   }
@@ -41,7 +41,7 @@ class MapDBConsistentKVStore(db: DB) extends ConsistentKVStore {
    * @param key The key of the value to get
    * @return A tuple of the value and the version number of the value of the key
    */
-  override def get(key: String): Option[(String,Long)] = {
+  override def get(key: String): Option[(String, Long)] = {
     versionStore.getOrDefault(key, -1) match {
       case -1 =>
         None
@@ -57,12 +57,12 @@ class MapDBConsistentKVStore(db: DB) extends ConsistentKVStore {
   override def put(key: String, value: String, version: Long): Boolean = {
     versionStore.getOrDefault(key, Int.MinValue) match {
       case Int.MinValue if version == 0 => // value not in store is implicitly version=0
-        versionStore.put(key,1)
+        versionStore.put(key, 1)
         valueStore.put(key, value)
         db.commit()
         true
       case currentVersion if currentVersion == version =>
-        versionStore.put(key,currentVersion+1)
+        versionStore.put(key, currentVersion + 1)
         valueStore.put(key, value)
         db.commit()
         true
