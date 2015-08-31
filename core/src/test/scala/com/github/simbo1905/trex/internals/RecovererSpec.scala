@@ -144,11 +144,10 @@ class RecovererSpec
           case None =>
             fail
           case Some(AcceptResponsesAndTimeout(_, _, responses)) =>
-            responses.values.head match {
-              case a: AcceptAck =>
-              // good
-              case b: AcceptNack =>
-                fail
+            responses.values.headOption match {
+              case Some(a: AcceptAck) => // good
+              case x =>
+                fail(s"$x")
             }
         }
     }
