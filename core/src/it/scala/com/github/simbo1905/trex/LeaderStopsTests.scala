@@ -114,7 +114,10 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
         delivered foreach { d =>
           if( d.size == 1) {
             // ("killed leader delivered first byte")
-            d.filter(_.isInstanceOf[ClientRequestCommandValue] ).head.asInstanceOf[ClientRequestCommandValue].bytes(0) == 1.toByte
+            d.filter(_.isInstanceOf[ClientRequestCommandValue] ).headOption match {
+              case Some(c: ClientRequestCommandValue) => c.bytes(0) == 1.toByte
+              case x => fail(s"$x")
+            }
           } else {
             // ("follower delivered both bytes")
             val delivered = d.filter(_.isInstanceOf[ClientRequestCommandValue] )
