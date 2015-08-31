@@ -245,24 +245,30 @@ with PrepareResponseHandler {
                 // create prepares for the known uncommitted slots else a refresh prepare for the next higher slot than committed
                 val prepares = recoverPrepares(highestNumber, maxCommittedSlot, maxAcceptedSlot)
                 // make a promise to self not to accept higher numbered messages and journal that
-                val selfPromise = prepares.head.id.number
-                // accept our own promise and load from the journal any values previous accepted in those slots
-                val prepareSelfVotes: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] =
-                  (prepares map { prepare =>
-                    val selfVote = Some(Map(nodeUniqueId -> PrepareAck(prepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))))
-                    prepare.id -> selfVote
-                  })(scala.collection.breakOut)
+                prepares.headOption match {
+                  case Some(p) =>
+                    val selfPromise = p.id.number
+                    // accept our own promise and load from the journal any values previous accepted in those slots
+                    val prepareSelfVotes: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] =
+                      (prepares map { prepare =>
+                        val selfVote = Some(Map(nodeUniqueId -> PrepareAck(prepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))))
+                        prepare.id -> selfVote
+                      })(scala.collection.breakOut)
 
-                // the new leader epoch is the promise it made to itself
-                val epoch: Option[BallotNumber] = Some(selfPromise)
-                // make a promise to self not to accept higher numbered messages and journal that
-                journal.save(Progress.highestPromisedLens.set(data.progress, selfPromise))
-                // broadcast the prepare messages
-                prepares foreach {
-                  broadcast(_)
+                    // the new leader epoch is the promise it made to itself
+                    val epoch: Option[BallotNumber] = Some(selfPromise)
+                    // make a promise to self not to accept higher numbered messages and journal that
+                    journal.save(Progress.highestPromisedLens.set(data.progress, selfPromise))
+                    // broadcast the prepare messages
+                    prepares foreach {
+                      broadcast(_)
+                    }
+                    log.info("Node {} Follower broadcast {} prepare messages with {} transitioning Recoverer max slot index {}.", nodeUniqueId, prepares.size, selfPromise, maxAcceptedSlot)
+                    goto(Recoverer) using PaxosData.highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens.set(data, (selfPromise, freshTimeout(randomInterval), epoch, prepareSelfVotes, SortedMap.empty))
+                  case None =>
+                    log.error("this code should be unreachable")
+                    stay
                 }
-                log.info("Node {} Follower broadcast {} prepare messages with {} transitioning Recoverer max slot index {}.", nodeUniqueId, prepares.size, selfPromise, maxAcceptedSlot)
-                goto(Recoverer) using PaxosData.highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens.set(data, (selfPromise, freshTimeout(randomInterval), epoch, prepareSelfVotes, SortedMap.empty))
               } else {
                 // other nodes are showing a leader behind a partial network partition has a majority so we backdown.
                 // we update the known heartbeat in case that leader dies causing a new scenario were only this node can form a majority.
