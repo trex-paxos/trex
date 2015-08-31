@@ -41,10 +41,17 @@ trait CommitHandler {
         }
         (a.id, bytes)
       }
-      val newHighestCommitted = committable.last.id
-      val newProgress = Progress.highestCommittedLens.set(progress, newHighestCommitted)
-      journal.save(newProgress)
-      (newProgress, results)
+
+      committable.lastOption match {
+        case Some(v) =>
+          val newHighestCommitted = committable.last.id
+          val newProgress = Progress.highestCommittedLens.set(progress, newHighestCommitted)
+          journal.save(newProgress)
+          (newProgress, results)
+        case x =>
+          log.error(s"this code should be unreachable but found $x")
+          (progress, Seq.empty[(Identifier, Any)])
+      }
     }
   }
 }
