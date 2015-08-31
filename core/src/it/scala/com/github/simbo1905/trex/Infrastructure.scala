@@ -7,10 +7,9 @@ import com.github.simbo1905.trex.internals.PaxosActor.TraceData
 import com.github.simbo1905.trex.internals._
 import com.typesafe.config.Config
 
-import scala.collection.immutable.{TreeMap, SortedMap}
-import scala.language.postfixOps
+import scala.collection.immutable.{Seq, SortedMap}
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.immutable.Seq
+import scala.language.postfixOps
 
 
 class TestJournal extends Journal {
@@ -79,8 +78,8 @@ object ClusterHarness {
  */
 class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogging {
 
-  import scala.concurrent.duration._
   import scala.concurrent.ExecutionContext.Implicits.global
+  import scala.concurrent.duration._
 
   // the paxos actor nodes in our cluster
   var children = Map.empty[Int, ActorRef]

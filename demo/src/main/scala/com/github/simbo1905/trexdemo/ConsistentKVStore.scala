@@ -38,5 +38,5 @@ trait ConsistentKVStore {
    * @param key The key of the value to get
    * @return A tuple of the value and the version number of the value of the key
    */
-  def get(key: String): Option[(String,Long)]
+  def get(key: String): Option[(String, Long)]
 }
