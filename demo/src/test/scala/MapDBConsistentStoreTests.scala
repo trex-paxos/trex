@@ -57,9 +57,13 @@ class MapDBConsistentStoreTests extends TestKit(ActorSystem("LeaderSpec", MapDBC
       val store: ConsistentKVStore = new MapDBConsistentKVStore(db)
       store.remove("hello") // noop
       store.put("hello", "world")
-      val (value, version) = store.get("hello").get
-      value should be("world")
-      version should be(1L)
+
+      store.get("hello") match {
+        case Some((value, version)) =>
+          value should be("world")
+          version should be(1L)
+        case x => fail(s"$x")
+      }
       store.remove("hello")
       store.get("hello") match {
         case None => // success
