@@ -52,43 +52,46 @@ trait AcceptResponsesHandler {
           // this will have dropped the committable
           val votesData = PaxosData.acceptResponsesLens.set(oldData, uncommittable)
 
+          val x: Option[(Identifier, AcceptResponsesAndTimeout)] = committable.headOption
+
           // attempt an in-sequence commit
-          if (committable.isEmpty) {
-            (stateName, votesData) // gap in committable sequence
-          } else if (committable.head._1.logIndex != votesData.progress.highestCommitted.logIndex + 1) {
-            log.error(s"Node $nodeUniqueId $stateName invariant violation: $stateName has committable work which is not contiguous with progress implying we have not issued Prepare/Accept messages for the correct range of slots. Returning to follower.")
-            sendNoLongerLeader(oldData.clientCommands)
-            (Follower,backdownData(oldData))
-          } else {
-            val (newProgress, results) = commit(stateName, oldData, committable.last._1, votesData.progress)
+          committable.headOption match {
+            case None =>
+              (stateName, votesData) // gap in committable sequence
+            case Some((id,_)) if id.logIndex != votesData.progress.highestCommitted.logIndex + 1 =>
+              log.error(s"Node $nodeUniqueId $stateName invariant violation: $stateName has committable work which is not contiguous with progress implying we have not issued Prepare/Accept messages for the correct range of slots. Returning to follower.")
+              sendNoLongerLeader(oldData.clientCommands)
+              (Follower,backdownData(oldData))
+            case _ =>
+              val (newProgress, results) = commit(stateName, oldData, committable.last._1, votesData.progress)
 
-            // FIXME test that the send of the commit happens after saving the progress
-            // FIXME was no test checking that this was broadcast not just replied to sender
-            broadcast(Commit(newProgress.highestCommitted))
+              // FIXME test that the send of the commit happens after saving the progress
+              // FIXME was no test checking that this was broadcast not just replied to sender
+              broadcast(Commit(newProgress.highestCommitted))
 
-            if (stateName == Leader && oldData.clientCommands.nonEmpty) {
-              // TODO the nonEmpty guard is due to test data not setting this should fix the test data and remove it
+              if (stateName == Leader && oldData.clientCommands.nonEmpty) {
+                // TODO the nonEmpty guard is due to test data not setting this should fix the test data and remove it
 
-              val (committedIds, _) = results.unzip
+                val (committedIds, _) = results.unzip
 
-              val (responds, remainders) = oldData.clientCommands.partition {
-                idCmdRef: (Identifier, (CommandValue, ActorRef)) =>
-                  val (id, (_, _)) = idCmdRef
-                  committedIds.contains(id)
-              }
-
-              log.debug("Node {} {} post commit has responds.size={}, remainders.size={}", nodeUniqueId, stateName, responds.size, remainders.size)
-              results foreach { case (id, bytes) =>
-                responds.get(id) foreach { case (cmd, client) =>
-                  log.debug("sending response from accept {} to {}", id, client)
-                  send(client, bytes)
+                val (responds, remainders) = oldData.clientCommands.partition {
+                  idCmdRef: (Identifier, (CommandValue, ActorRef)) =>
+                    val (id, (_, _)) = idCmdRef
+                    committedIds.contains(id)
                 }
+
+                log.debug("Node {} {} post commit has responds.size={}, remainders.size={}", nodeUniqueId, stateName, responds.size, remainders.size)
+                results foreach { case (id, bytes) =>
+                  responds.get(id) foreach { case (cmd, client) =>
+                    log.debug("sending response from accept {} to {}", id, client)
+                    send(client, bytes)
+                  }
+                }
+                // FIXME memory leak we have not GCed the stuff we are no longer awaiting responses in votesData.acceptResponses
+                (stateName, PaxosData.progressLens.set(votesData, newProgress).copy(clientCommands = remainders))// TODO new lens?
+              } else {
+                (stateName, PaxosData.progressLens.set(votesData, newProgress))
               }
-              // FIXME memory leak we have not GCed the stuff we are no longer awaiting responses in votesData.acceptResponses
-              (stateName, PaxosData.progressLens.set(votesData, newProgress).copy(clientCommands = remainders))// TODO new lens?
-            } else {
-              (stateName, PaxosData.progressLens.set(votesData, newProgress))
-            }
           }
         } else {
           // insufficient votes keep counting
