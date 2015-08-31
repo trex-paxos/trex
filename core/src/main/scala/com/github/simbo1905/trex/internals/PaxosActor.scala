@@ -427,6 +427,8 @@ with PrepareResponseHandler {
           // add the sender our client map
           val clients = data.clientCommands + (accept.id ->(value, sender))
           stay using PaxosData.leaderLens.set(data, (SortedMap.empty, updated, clients))
+        case x =>
+          throw new AssertionError(s"Invariant violation as '$x' does not match case Some(epoch) if ${data.progress.highestPromised} <= epoch")
       }
 
     // ignore late vote as we would have transitioned on a majority ack
