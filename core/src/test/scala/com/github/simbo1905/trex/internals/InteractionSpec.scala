@@ -134,6 +134,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       // then it responds with the committed work
       expectMsgPF(50 millisecond) {
         case b: Array[Byte] if b(0) == -1 => true
+        case b => fail(s"$b")
       }
       // and both nodes will have delivered the value
       Seq(node0, node1).map(_._map.get(2).get.value) should be(Seq(hw, hw))
@@ -229,6 +230,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       // and it told the client it had lost leadership
       client.expectMsgPF(100 millis) {
         case nlle: NoLongerLeaderException if nlle.msgId == 99 => // good
+        case x => fail(s"unexpected msg $x")
       }
     }
 
@@ -324,12 +326,12 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       actor0.stateData.acceptResponses match {
         case map if map.nonEmpty =>
           map.get(accept2.id) match {
-            case None => fail()
             case Some(AcceptResponsesAndTimeout(_, _, responses)) =>
               responses.values.head match {
                 case a: AcceptAck => //good
                 case b: AcceptNack => fail()
               }
+            case x => fail(s"$x")
           }
         case _ => fail()
       }
