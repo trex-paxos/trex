@@ -187,94 +187,17 @@ with FollowerTimeoutHandler
       stay using handleResendLowPrepares(nodeUniqueId, stateName, data)
 
     // having issued a low prepare track responses and promote to recover only if we see insufficient evidence of a leader in the responses
-    case e@Event(vote: PrepareResponse, data@PaxosData(progress, _, heartbeat, _, prepareResponses, _, _, _)) if prepareResponses.nonEmpty =>
+    case e@Event(vote: PrepareResponse, data@PaxosData(_, _, _, _, prepareResponses, _, _, _)) if prepareResponses.nonEmpty =>
       trace(stateName, e.stateData, sender(), e.event)
-      val selfHighestSlot = progress.highestCommitted.logIndex
-      val otherHighestSlot = vote.progress.highestCommitted.logIndex
-      if (otherHighestSlot > selfHighestSlot) {
-        log.debug("Node {} node {} committed slot {} requesting retransmission", nodeUniqueId, vote.from, otherHighestSlot)
-        send(sender(), RetransmitRequest(nodeUniqueId, vote.from, progress.highestCommitted.logIndex)) // TODO test for this
-        stay using backdownData(data)
-      } else {
-        data.prepareResponses.get(vote.requestId) match {
-          case Some(Some(map)) =>
-            val votes = map + (vote.from -> vote)
-            // do we have a majority response such that we could successfully failover?
-            if (votes.size > data.clusterSize / 2) {
-
-              val largerHeartbeats = votes.values flatMap {
-                case PrepareNack(_, _, evidenceProgress, _, evidenceHeartbeat) if evidenceHeartbeat > heartbeat =>
-                  Some(evidenceHeartbeat)
-                case _ =>
-                  None
-              }
-
-              lazy val largerHeartbeatCount = largerHeartbeats.size
-
-              val failover = if (largerHeartbeats.isEmpty) {
-                // all clear the last leader must be dead take over the leadership
-                log.info("Node {} Follower no heartbeats executing takeover protocol.", nodeUniqueId)
-                true
-              } else if (largerHeartbeatCount + 1 > data.clusterSize / 2) {
-                // no need to failover as there is sufficient evidence to deduce that there is a leader which can contact a working majority
-                log.info("Node {} Follower sees {} fresh heartbeats *not* execute the leader takeover protocol.", nodeUniqueId, largerHeartbeatCount)
-                false
-              } else {
-                // insufficient evidence. this would be due to a complex network partition. if we don't attempt a
-                // leader fail-over the cluster may halt. if we do we risk a leader duel. a duel is the lesser evil as you
-                // can solve it by stopping a node until you heal the network partition(s). in the future the leader
-                // may heartbeat at commit noop values probably when we have implemented the strong read
-                // optimisation which will also prevent a duel.
-                log.info("Node {} Follower sees {} heartbeats executing takeover protocol.",
-                  nodeUniqueId, largerHeartbeatCount)
-                true
-              }
-
-              if (failover) {
-                val highestNumber = Seq(data.progress.highestPromised, data.progress.highestCommitted.number).max
-                val maxCommittedSlot = data.progress.highestCommitted.logIndex
-                val maxAcceptedSlot = highestAcceptedIndex
-                // create prepares for the known uncommitted slots else a refresh prepare for the next higher slot than committed
-                val prepares = recoverPrepares(highestNumber, maxCommittedSlot, maxAcceptedSlot)
-                // make a promise to self not to accept higher numbered messages and journal that
-                prepares.headOption match {
-                  case Some(p) =>
-                    val selfPromise = p.id.number
-                    // accept our own promise and load from the journal any values previous accepted in those slots
-                    val prepareSelfVotes: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] =
-                      (prepares map { prepare =>
-                        val selfVote = Some(Map(nodeUniqueId -> PrepareAck(prepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))))
-                        prepare.id -> selfVote
-                      })(scala.collection.breakOut)
-
-                    // the new leader epoch is the promise it made to itself
-                    val epoch: Option[BallotNumber] = Some(selfPromise)
-                    // make a promise to self not to accept higher numbered messages and journal that
-                    journal.save(Progress.highestPromisedLens.set(data.progress, selfPromise))
-                    // broadcast the prepare messages
-                    prepares foreach {
-                      broadcast(_)
-                    }
-                    log.info("Node {} Follower broadcast {} prepare messages with {} transitioning Recoverer max slot index {}.", nodeUniqueId, prepares.size, selfPromise, maxAcceptedSlot)
-                    goto(Recoverer) using PaxosData.highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens.set(data, (selfPromise, freshTimeout(randomInterval), epoch, prepareSelfVotes, SortedMap.empty))
-                  case None =>
-                    log.error("this code should be unreachable")
-                    stay
-                }
-              } else {
-                // other nodes are showing a leader behind a partial network partition has a majority so we backdown.
-                // we update the known heartbeat in case that leader dies causing a new scenario were only this node can form a majority.
-                stay using data.copy(prepareResponses = SortedMap.empty, leaderHeartbeat = largerHeartbeats.max) // TODO lens
-              }
-            } else {
-              // need to await to hear from a majority
-              stay using data.copy(prepareResponses = TreeMap(Map(minPrepare.id -> Option(votes)).toArray: _*)) // TODO lens
-            }
-          case _ =>
-            // FIXME no test for this
-            log.debug("Node {} {} is no longer awaiting responses to {} so ignoring", nodeUniqueId, stateName, vote.requestId)
-            stay using backdownData(data)
-        }
+      handLowPrepareResponse(nodeUniqueId, stateName, data, sender(), vote) match {
+        case LowPrepareResponseResult(Recoverer, data, highPrepares) =>
+          // journal new progress with our self promise then broadcast the high prepares
+          journalProgress(data.progress)
+          highPrepares foreach {
+            broadcast(_)
+          }
+          goto(Recoverer) using data
+        case LowPrepareResponseResult(_, data, _) => stay using data
       }
 
     // if we backdown to follower on a majority AcceptNack we may see a late accept response that we will ignore
@@ -318,7 +241,8 @@ with FollowerTimeoutHandler
       stay
   }
 
-  def backdownData(data: PaxosData) = PaxosData.backdownLens.set(data, (SortedMap.empty, SortedMap.empty, Map.empty, None, freshTimeout(randomInterval)))
+  // FIXME add explicit test for this
+  def backdownData(data: PaxosData) = PaxosActor.backdownData(data, randomTimeout)
 
   def requestRetransmissionIfBehind(data: PaxosData, sender: ActorRef, from: Int, highestCommitted: Identifier): Unit = {
     val highestCommittedIndex = data.progress.highestCommitted.logIndex
@@ -460,21 +384,6 @@ with FollowerTimeoutHandler
 
   def randomTimeout = freshTimeout(randomInterval)
 
-  /**
-   * Generates fresh prepare messages targeting the range of slots from the highest committed to one higher than the highest accepted slot positions.
-   * @param highest Highest number known to this node.
-   * @param highestCommittedIndex Highest slot committed at this node.
-   * @param highestAcceptedIndex Highest slot where a value has been accepted by this node.
-   */
-  def recoverPrepares(highest: BallotNumber, highestCommittedIndex: Long, highestAcceptedIndex: Long) = {
-    val BallotNumber(counter, _) = highest
-    val higherNumber = BallotNumber(counter + 1, nodeUniqueId)
-    val prepares = (highestCommittedIndex + 1) to (highestAcceptedIndex + 1) map {
-      slot => Prepare(Identifier(nodeUniqueId, higherNumber, slot))
-    }
-    if (prepares.nonEmpty) prepares else Seq(Prepare(Identifier(nodeUniqueId, higherNumber, highestCommittedIndex + 1))) // FIXME empty was not picked up in unit test only when first booting a cluster
-  }
-
   type Epoch = Option[BallotNumber]
   type PrepareSelfVotes = SortedMap[Identifier, Option[Map[Int, PrepareResponse]]]
 
@@ -608,6 +517,8 @@ object PaxosActor {
   val freshAcceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = SortedMap.empty
 
   val minJournalBounds = JournalBounds(Long.MinValue, Long.MinValue)
+
+  def backdownData(data: PaxosData, timeout: Long) = PaxosData.backdownLens.set(data, (SortedMap.empty, SortedMap.empty, Map.empty, None, timeout))
 
   object HighestCommittedIndex {
     def unapply(data: PaxosData) = Some(data.progress.highestCommitted.logIndex)

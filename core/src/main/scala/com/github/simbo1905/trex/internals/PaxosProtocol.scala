@@ -110,6 +110,7 @@ sealed trait PrepareResponse {
 
 /**
  * Positively acknowledge a [[Prepare]] message. See [[PrepareResponse]]
+ *
  * @param highestAcceptedIndex The highest uncommitted log index accepted by the responding node.
  */
 case class PrepareAck(requestId: Identifier, from: Int, progress: Progress, highestAcceptedIndex: Long, leaderHeartbeat: Long, highestUncommitted: Option[Accept]) extends PrepareResponse
