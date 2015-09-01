@@ -179,13 +179,7 @@ with FollowerTimeoutHandler
     // upon timeout having not issued low prepares start the leader takeover protocol by issuing a min prepare
     case e@Event(PaxosActor.CheckTimeout, data@PaxosData(progress, _, to, _, prepareResponses, _, _, _)) if clock() >= to && prepareResponses.isEmpty =>
       trace(stateName, e.stateData, sender, e.event)
-      log.info("Node {} {} timed-out progress: {}", nodeUniqueId, stateName, progress)
-      broadcast(minPrepare)
-      // nak our own prepare
-      val prepareSelfVotes = SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]] ++
-        Map(minPrepare.id -> Some(Map(nodeUniqueId -> PrepareNack(minPrepare.id, nodeUniqueId, progress, highestAcceptedIndex, data.leaderHeartbeat))))
-
-      stay using PaxosData.timeoutPrepareResponsesLens.set(data, (freshTimeout(randomInterval), prepareSelfVotes))
+      stay using handleFollowerTimeout(nodeUniqueId, stateName, data)
 
     // on a timeout where we have issued a low prepare but not yet received a majority response we should rebroadcast the low prepare
     case e@Event(PaxosActor.CheckTimeout, data@PaxosData(_, _, to, _, prepareResponses, _, _, _)) if clock() >= to && prepareResponses.nonEmpty =>
@@ -448,7 +442,7 @@ with FollowerTimeoutHandler
       stay
   }
 
-  def highestAcceptedIndex = journal.bounds.max
+  def highestAcceptedIndex: Long = journal.bounds.max
 
   def highestNumberProgressed(data: PaxosData): BallotNumber = Seq(data.epoch, Option(data.progress.highestPromised), Option(data.progress.highestCommitted.number)).flatten.max
 
