@@ -40,7 +40,9 @@ with UnhandledHandler
 with CommitHandler
 with ResendAcceptsHandler
 with AcceptResponsesHandler
-with PrepareResponseHandler {
+with PrepareResponseHandler
+with FollowerTimeoutHandler
+{
 
   import Ordering._
 
@@ -175,7 +177,7 @@ with PrepareResponseHandler {
       }
 
     // upon timeout having not issued low prepares start the leader takeover protocol by issuing a min prepare
-    case e@Event(PaxosActor.CheckTimeout, data@PaxosData(progress, _, to, _, _, _, prepareResponses, _)) if clock() >= to && prepareResponses.isEmpty =>
+    case e@Event(PaxosActor.CheckTimeout, data@PaxosData(progress, _, to, _, prepareResponses, _, _, _)) if clock() >= to && prepareResponses.isEmpty =>
       trace(stateName, e.stateData, sender, e.event)
       log.info("Node {} {} timed-out progress: {}", nodeUniqueId, stateName, progress)
       broadcast(minPrepare)
@@ -186,13 +188,9 @@ with PrepareResponseHandler {
       stay using PaxosData.timeoutPrepareResponsesLens.set(data, (freshTimeout(randomInterval), prepareSelfVotes))
 
     // on a timeout where we have issued a low prepare but not yet received a majority response we should rebroadcast the low prepare
-    // FIXME no test for this
     case e@Event(PaxosActor.CheckTimeout, data@PaxosData(_, _, to, _, prepareResponses, _, _, _)) if clock() >= to && prepareResponses.nonEmpty =>
       trace(stateName, e.stateData, sender, e.event)
-      log.debug("Node {} {} timed-out having already issued a low. rebroadcasting", nodeUniqueId, stateName)
-      // FIXME no test for this
-      broadcast(minPrepare)
-      stay using PaxosData.timeoutPrepareResponsesLens.set(data, (freshTimeout(randomInterval), prepareResponses))
+      stay using handleResendLowPrepares(nodeUniqueId, stateName, data)
 
     // having issued a low prepare track responses and promote to recover only if we see insufficient evidence of a leader in the responses
     case e@Event(vote: PrepareResponse, data@PaxosData(progress, _, heartbeat, _, prepareResponses, _, _, _)) if prepareResponses.nonEmpty =>
