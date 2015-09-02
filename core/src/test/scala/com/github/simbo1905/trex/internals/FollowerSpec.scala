@@ -96,12 +96,15 @@ class FollowerSpec
       fileJournal.bounds should be(JournalBounds(1, 3))
       fileJournal.accepted(1) match {
         case Some(a) if a.id == a1.id => // good
+        case x => fail(s"$x")
       }
       fileJournal.accepted(2) match {
         case Some(a) if a.id == a2.id => // good
+        case x => fail(s"$x")
       }
       fileJournal.accepted(3) match {
         case Some(a) if a.id == a3.id => // good
+        case x => fail(s"$x")
       }
 
       // and journal the new progress
@@ -182,7 +185,7 @@ class FollowerSpec
       // then it sends no messages
       expectNoMsg(25 millisecond)
       // and delivered that value
-      assert(fsm.underlyingActor.delivered.head == ClientRequestCommandValue(0, expectedBytes))
+      assert(fsm.underlyingActor.delivered.headOption == Some(ClientRequestCommandValue(0, expectedBytes)))
       // and journal bookwork
       (stubJournal.save _).verify(fsm.stateData.progress)
       // and sets a fresh timeout
@@ -414,7 +417,7 @@ class FollowerSpec
       assert(fsm.stateData.prepareResponses != None)
       // and has responded itself
       assert(fsm.stateData.prepareResponses.get(minPrepare.id) != None)
-      assert(fsm.stateData.prepareResponses.get(minPrepare.id).get.size == 1)
+      assert(fsm.stateData.prepareResponses.get(minPrepare.id).getOrElse(fail).size == 1)
     }
     "backdown from a low prepare on receiving a fresh heartbeat commit from the same leader and request a retransmit" in {
       // given an initalized journal
@@ -594,10 +597,9 @@ class FollowerSpec
       // and votes for its own prepares
       assert(!fsm.stateData.prepareResponses.isEmpty)
       val prapareIds = fsm.stateData.prepareResponses map {
-        case (id, Some(map)) if map.keys.head == 0 && map.values.head.requestId == id =>
+        case (id, Some(map)) if map.keys.headOption == Some(0) && map.values.headOption.getOrElse(fail).requestId == id =>
           id
-        case _ =>
-          fail()
+        case x => fail(s"$x")
       }
       assert(true == prapareIds.toSet.contains(prepare1.id))
       assert(true == prapareIds.toSet.contains(prepare2.id))
