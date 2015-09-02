@@ -15,7 +15,7 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 ## Status /  Work Plan
 
 - [x] replace pickling
-- [x] fi- [x] driver
+- [x] fix driver
 - [x] is retransmission of accepted values actually safe?
 - [x] overrideable send methods
 - [ ] fix the fixmes
