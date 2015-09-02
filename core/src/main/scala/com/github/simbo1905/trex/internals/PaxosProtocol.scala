@@ -173,7 +173,7 @@ case class AcceptAck(requestId: Identifier, from: Int, progress: Progress) exten
 case class AcceptNack(requestId: Identifier, from: Int, progress: Progress) extends AcceptResponse
 
 /**
- * Commit messages indicate the highest committed log stream number. The leader shall periodically heartbeat this message to indicate that it is alive. Followers must:
+ * Commit messages indicate the highest committed log stream number. The leader shall heartbeat this message type to indicate that it is alive. Followers must:
  *
  * 1. Commit the specified message in the log index if-and-only-if all previous values have been committed in order.
  * 1. Request retransmission of any messages not known to have been committed at lower log index slot.
@@ -181,7 +181,7 @@ case class AcceptNack(requestId: Identifier, from: Int, progress: Progress) exte
  * Note that the leader must commit messages in log index order itself which implies that any prior slots user the same leader number have also been committed by the leader.
  *
  * @param identifier Identifies the unique accept message, and hence unique value, which is being committed into the identified slot.
- * @param heartbeat A value which changes as a heartbeat used by nodes cut off from the leader, but not the leaders majority, to learn that a stable leader is making progress.
+ * @param heartbeat A value which changes for each heartbeat message which indicates that the leader is alive. 
  */
 case class Commit(identifier: Identifier, heartbeat: Long) {
   override def toString = s"Commit(${identifier},h=${heartbeat})"
