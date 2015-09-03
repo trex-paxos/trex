@@ -17,6 +17,7 @@ import scala.collection.SortedMap
 import scala.compat.Platform
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import scala.util.Try
 import scala.util.control.NonFatal
 
 // TODO do we really need a custom extension can we not use SerializationExtension directly
@@ -324,14 +325,15 @@ class TypedActorPaxosEndpoint(config: PaxosActor.Configuration, broadcastReferen
     case ClientRequestCommandValue(id, bytes) =>
       val mc@TypedActor.MethodCall(method, parameters) = TrexExtension(context.system).deserialize(bytes)
       log.debug("delivering {}", mc)
-      try {
+      val result = Try {
         val response = Option(method.invoke(target, parameters: _*))
         log.debug(s"invoked ${method.getName} returned $response")
         ServerResponse(id, response)
-      } catch {
-        case NonFatal(ex) =>
+      } recover {
+        case ex =>
           log.error(ex, s"call to $method with $parameters got exception $ex")
           ServerResponse(id, Option(ex))
       }
+      result.get
   }
 }

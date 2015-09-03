@@ -10,7 +10,7 @@ import com.typesafe.config.Config
 import scala.collection.immutable.{Seq, SortedMap}
 import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
-
+import scala.util.Try
 
 class TestJournal extends Journal {
   private var _progress = Journal.minBookwork.copy()
@@ -209,7 +209,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       val fw = new FileWriter(path, true)
 
       log.info(s"dumping state trace to $path")
-      try {
+      Try {
         tracedData.toSeq foreach {
           case (node, t: Seq[TraceData]) =>
             fw.write(s"#node $node\n\n")
@@ -228,8 +228,8 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
               }
             }
         }
-      } finally {
-        fw.close()
+      } match {
+        case _ => fw.close()
       }
 
       log.info("halting all nodes")
