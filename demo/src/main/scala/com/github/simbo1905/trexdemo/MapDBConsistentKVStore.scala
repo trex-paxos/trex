@@ -32,12 +32,6 @@ class MapDBConsistentKVStore(db: DB) extends ConsistentKVStore {
 
   /**
    * Read a value and its version number from the KV store.
-   * The setting of the ‘consistent’ flag is used
-   * to choose the consistency level. Setting it to ‘true’
-   * chooses strong consistency, and the latest value is always
-   * returned. Setting it to ‘false’ chooses timeline
-   * consistency, and a possibly stale value is returned in
-   * exchange for better performance.
    * @param key The key of the value to get
    * @return A tuple of the value and the version number of the value of the key
    */
