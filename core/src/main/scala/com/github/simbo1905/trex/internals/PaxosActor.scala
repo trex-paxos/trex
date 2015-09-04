@@ -190,14 +190,15 @@ with FollowerTimeoutHandler
     case e@Event(vote: PrepareResponse, data@PaxosData(_, _, _, _, prepareResponses, _, _, _)) if prepareResponses.nonEmpty =>
       trace(stateName, e.stateData, sender(), e.event)
       handLowPrepareResponse(nodeUniqueId, stateName, data, sender(), vote) match {
-        case LowPrepareResponseResult(Recoverer, data, highPrepares) =>
+        case LowPrepareResponseResult(Recoverer, newData, highPrepares) =>
           // journal new progress with our self promise then broadcast the high prepares
           journalProgress(data.progress)
           highPrepares foreach {
             broadcast(_)
           }
-          goto(Recoverer) using data
-        case LowPrepareResponseResult(_, data, _) => stay using data
+          goto(Recoverer) using newData
+        case LowPrepareResponseResult(_, newData, _) => stay using newData
+        case x => throw new AssertionError(s"unexpected result $x")
       }
 
     // if we backdown to follower on a majority AcceptNack we may see a late accept response that we will ignore

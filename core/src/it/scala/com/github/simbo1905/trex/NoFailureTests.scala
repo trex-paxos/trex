@@ -31,7 +31,7 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
         case Some(c: ClientRequestCommandValue) =>
           c.bytes.length should be(1)
           c.bytes(0) should be(1.toByte)
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
     }
   }
@@ -50,6 +50,7 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
     expectMsgPF(12 second) {
       case bytes: Array[Byte] if bytes(0) == -1 => // okay first leader committed
       case ex: NoLongerLeaderException if ex.msgId == expectedMsgId => // also okay first leader lost leadership
+      case x => fail(x.toString)
     }
 
     // dig out the values which were committed

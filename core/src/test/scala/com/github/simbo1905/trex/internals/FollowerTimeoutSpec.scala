@@ -64,16 +64,16 @@ with WordSpecLike with Matchers {
             case Some(Some(map)) =>
               map.get(99) match {
                 case Some(nack: PrepareNack) => // good
-                case x => fail(s"$x")
+                case x => fail(x.toString)
               }
             // good
-            case x => fail(s"$x")
+            case x => fail(x.toString)
           }
       }
       // and have broadcast the minPrepare
       sentMsg match {
         case Some(`minPrepare`) => // good
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
     }
     "rebroadcast minPrepare and set a new timeout" in {
@@ -93,7 +93,7 @@ with WordSpecLike with Matchers {
       // and have broadcast the minPrepare
       sentMsg match {
         case Some(`minPrepare`) => // good
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
     }
     "backdown and send retransmit request if sees evidence of higher committed slot in response" in {
@@ -117,14 +117,14 @@ with WordSpecLike with Matchers {
           // it clears its prepares and sets a new timeout
           data.prepareResponses.size shouldBe 0
           data.timeout shouldBe 999L
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
       sentMsg match {
         case Some(m: RetransmitRequest) => m match {
           case RetransmitRequest(0, 3, logIndex) if logIndex == 0 => // good
-          case x => fail(s"$x")
+          case x => fail(x.toString)
         }
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
     }
     "ignores a response that it is not waiting on" in {
@@ -139,7 +139,7 @@ with WordSpecLike with Matchers {
       handler.handLowPrepareResponse(0, Follower, initialDataWithTimeoutAndPrepareResponses, TestProbe().ref, vote) match {
         case LowPrepareResponseResult(Follower, data, _) =>
           data shouldBe initialDataWithTimeoutAndPrepareResponses
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
     }
     "collects responses when it does not have a majority response" in {
@@ -154,11 +154,11 @@ with WordSpecLike with Matchers {
           data.prepareResponses.get(minPrepare.id) match {
             case Some(Some(map)) => map.get(otherNodeUniqueId) match {
               case Some(`vote`) => // and has recorded the other nodes vote
-              case x => fail(s"$x")
+              case x => fail(x.toString)
             }
-            case x => fail(s"$x")
+            case x => fail(x.toString)
           }
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
     }
     "knows to failover when there are no other larger leader heartbeats" in {
@@ -166,7 +166,7 @@ with WordSpecLike with Matchers {
       val nack2 = PrepareNack(minPrepare.id, 0, AllStateSpec.initialData.progress, 0, 999)
       FollowerTimeoutHandler.computeFailover(NoopLoggingAdapter, 0, AllStateSpec.initialData.copy(leaderHeartbeat = 1000), Map(1 -> nack1, 2 -> nack2) ) match {
         case FailoverResult(true, 1000) => // good
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
     }
     "knows not to failover when there is sufficient evidence of other leaders heartbeat" in {
@@ -174,7 +174,7 @@ with WordSpecLike with Matchers {
       val nack2 = PrepareNack(minPrepare.id, 0, AllStateSpec.initialData.progress, 0, 999)
       FollowerTimeoutHandler.computeFailover(NoopLoggingAdapter, 0, AllStateSpec.initialData, Map(1 -> nack1, 2 -> nack2) ) match {
         case FailoverResult(false, 999) => // good
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
     }
     "chooses to failover when there is insufficient evidence of other leaders heartbeat" in {
@@ -182,7 +182,7 @@ with WordSpecLike with Matchers {
       val nack2 = PrepareNack(minPrepare.id, 0, AllStateSpec.initialData.progress, 0, 999)
       FollowerTimeoutHandler.computeFailover(NoopLoggingAdapter, 0, AllStateSpec.initialData.copy(leaderHeartbeat = 998, clusterSize = 5), Map(1 -> nack1, 2 -> nack2) ) match {
         case FailoverResult(true, 999) => // good
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
     }
     "computes high prepares for higher slots when should failover" in {
@@ -197,7 +197,7 @@ with WordSpecLike with Matchers {
           data.timeout shouldBe 12345L
           data.epoch match { // our highest promised should match our epoch and be higher than ballot numbers seen in the responses
             case Some(number) if number > minPrepare.id.number && number == data.progress.highestPromised => // good
-            case x => fail(s"$x")
+            case x => fail(x.toString)
           }
           data.prepareResponses.size shouldBe 1
           highPrepares.headOption match {
@@ -205,13 +205,13 @@ with WordSpecLike with Matchers {
               data.prepareResponses.get(prepare.id) match {
                 case Some(Some(map)) => map.get(0) match {
                   case Some(r: PrepareAck) if r.requestId == prepare.id => // good
-                  case x => fail(s"$x")
+                  case x => fail(x.toString)
                 }
-                case x => fail(s"$x")
+                case x => fail(x.toString)
               }
             case _ => fail // unreachable
           }
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
     }
   }

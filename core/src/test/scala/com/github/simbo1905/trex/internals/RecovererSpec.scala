@@ -147,7 +147,7 @@ class RecovererSpec
             responses.values.headOption match {
               case Some(a: AcceptAck) => // good
               case x =>
-                fail(s"$x")
+                fail(x.toString)
             }
         }
     }

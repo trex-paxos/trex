@@ -9,7 +9,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
-import scala.util.{Failure, Success}
+import scala.util.{Try, Failure, Success}
 
 class MethodCallInvoker(target: Any) extends Actor with ActorLogging {
   override def receive: Receive = {
@@ -17,12 +17,15 @@ class MethodCallInvoker(target: Any) extends Actor with ActorLogging {
       log.debug(s"$methodCall")
       val method = methodCall.method
       val parameters = methodCall.parameters
-      try {
-        Option(method.invoke(target, parameters: _*)).foreach { response => sender() ! response }
-      } catch {
-        case NonFatal(ex) =>
+      Try {
+        Option(method.invoke(target, parameters: _*))
+      } match {
+        case Failure(ex) =>
           log.error(ex, s"call to $method with $parameters got exception $ex")
           sender ! ex
+        case Success(response) => response.foreach {
+          sender() ! _
+        }
       }
   }
 }

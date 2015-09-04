@@ -42,6 +42,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
       expectMsgPF(5 second) {
         case bytes: Array[Byte] if bytes(0) == -1 * data => // okay
         case nlle: NoLongerLeaderException => // okay
+        case x => fail(x.toString)
       }
 
       data = (data + 1).toByte
@@ -83,7 +84,10 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
         delivered foreach { d =>
           if( d.size == 1) {
             // ("killed leader delivered first byte")
-            d.filter(_.isInstanceOf[ClientRequestCommandValue] ).head.asInstanceOf[ClientRequestCommandValue].bytes(0) == 1.toByte
+            d.filter(_.isInstanceOf[ClientRequestCommandValue] ).headOption match {
+              case Some(x) => assert(x.asInstanceOf[ClientRequestCommandValue].bytes(0) == 1.toByte)
+              case None => fail(None.toString)
+            }
           } else {
             // ("follower delivered both bytes")
             val delivered = d.filter(_.isInstanceOf[ClientRequestCommandValue] )
@@ -116,7 +120,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
             // ("killed leader delivered first byte")
             d.filter(_.isInstanceOf[ClientRequestCommandValue] ).headOption match {
               case Some(c: ClientRequestCommandValue) => c.bytes(0) == 1.toByte
-              case x => fail(s"$x")
+              case x => fail(x.toString)
             }
           } else {
             // ("follower delivered both bytes")
@@ -150,7 +154,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
             // ("killed leader delivered first byte")
             d.filter(_.isInstanceOf[ClientRequestCommandValue] ).headOption match {
               case Some(c: ClientRequestCommandValue) => c.bytes(0) == 1.toByte
-              case x => fail(s"$x")
+              case x => fail(x.toString)
             }
           } else {
             // ("follower delivered both bytes")

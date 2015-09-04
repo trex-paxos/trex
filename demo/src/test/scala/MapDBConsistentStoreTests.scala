@@ -62,7 +62,7 @@ class MapDBConsistentStoreTests extends TestKit(ActorSystem("LeaderSpec", MapDBC
         case Some((value, version)) =>
           value should be("world")
           version should be(1L)
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
       store.remove("hello")
       store.get("hello") match {
@@ -105,7 +105,7 @@ class MapDBConsistentStoreTests extends TestKit(ActorSystem("LeaderSpec", MapDBC
 
       store.remove("hello") // noop
       store.put("hello", "world")
-      val (value, version) = store.get("hello").get
+      val (value, version) = store.get("hello").getOrElse(fail())
       value should be("world")
       version should be(1L)
       store.remove("hello")

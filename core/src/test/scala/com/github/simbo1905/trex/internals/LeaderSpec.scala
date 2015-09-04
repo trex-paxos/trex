@@ -129,8 +129,14 @@ class LeaderSpec
       // and creates a slot to record responses
       assert(fsm.stateData.acceptResponses.size == 3)
       // and holds slots in order
-      assert(fsm.stateData.acceptResponses.keys.head.logIndex == 1)
-      assert(fsm.stateData.acceptResponses.keys.last.logIndex == 3)
+      fsm.stateData.acceptResponses.keys.headOption match {
+        case Some(id) => assert(id.logIndex == 1)
+        case x => fail(x.toString)
+      }
+      fsm.stateData.acceptResponses.keys.lastOption match {
+        case Some(id) => assert(id.logIndex == 3)
+        case x => fail(x.toString)
+      }
       // and has journalled the values
       (stubJournal.accept _).verify(Seq(a1))
       (stubJournal.accept _).verify(Seq(a2))
@@ -173,7 +179,10 @@ class LeaderSpec
       }
 
       // and delivered that value
-      assert(fsm.underlyingActor.delivered.head == ClientRequestCommandValue(0, expectedBytes))
+      fsm.underlyingActor.delivered.headOption match {
+        case Some(c) => assert(c == ClientRequestCommandValue(0, expectedBytes))
+        case x => fail(x.toString)
+      }
       // and journal bookwork
       (stubJournal.save _).verify(fsm.stateData.progress)
       // and deletes the pending work

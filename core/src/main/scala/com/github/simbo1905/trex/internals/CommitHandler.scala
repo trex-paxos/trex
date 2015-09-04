@@ -43,9 +43,8 @@ trait CommitHandler {
       }
 
       committable.lastOption match {
-        case Some(v) =>
-          val newHighestCommitted = committable.last.id
-          val newProgress = Progress.highestCommittedLens.set(progress, newHighestCommitted)
+        case Some(newHighestCommitted) =>
+          val newProgress = Progress.highestCommittedLens.set(progress, newHighestCommitted.id)
           journal.save(newProgress)
           (newProgress, results)
         case x =>

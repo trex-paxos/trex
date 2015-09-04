@@ -199,8 +199,8 @@ trait LeaderLikeSpec {
     expectMsgPF(100 millisecond) {
       case a: Accept if a.id == newIdentifier && a.value == a99.value =>
       case a: Accept =>
-
         fail(s"${a.id}, ${newIdentifier} => ${a.id == newIdentifier} || ${a.value}, ${a99.value} => ${a.value == a99.value}")
+      case x => fail(x.toString)
     }
 
     // and sets its
@@ -237,7 +237,7 @@ trait LeaderLikeSpec {
     val newIdentifier = Identifier(0, newEpoch, 99L)
     expectMsgPF(100 millisecond) {
       case a: Accept if a.id == newIdentifier && a.value == a99.value =>
-      case x => fail(s"$x")
+      case x => fail(x.toString)
     }
 
     // and sets its

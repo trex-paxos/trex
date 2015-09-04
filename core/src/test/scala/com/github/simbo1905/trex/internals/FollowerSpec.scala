@@ -96,15 +96,15 @@ class FollowerSpec
       fileJournal.bounds should be(JournalBounds(1, 3))
       fileJournal.accepted(1) match {
         case Some(a) if a.id == a1.id => // good
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
       fileJournal.accepted(2) match {
         case Some(a) if a.id == a2.id => // good
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
       fileJournal.accepted(3) match {
         case Some(a) if a.id == a3.id => // good
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
 
       // and journal the new progress
@@ -211,7 +211,7 @@ class FollowerSpec
       // and delivered that value
       fsm.underlyingActor.delivered.headOption match {
         case Some(ClientRequestCommandValue(0, expectedBytes)) => // good
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
       // and journal bookwork
       (stubJournal.save _).verify(fsm.stateData.progress)
@@ -385,7 +385,7 @@ class FollowerSpec
       // and has responded itself
       fsm.stateData.prepareResponses.get(minPrepare.id) match {
         case Some(map) if map.size == 1 => // good
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
     }
     "re-issues a low prepare on subsequent time-outs when it has not recieved any responses" in {
@@ -599,7 +599,7 @@ class FollowerSpec
       val prapareIds = fsm.stateData.prepareResponses map {
         case (id, Some(map)) if map.keys.headOption == Some(0) && map.values.headOption.getOrElse(fail).requestId == id =>
           id
-        case x => fail(s"$x")
+        case x => fail(x.toString)
       }
       assert(true == prapareIds.toSet.contains(prepare1.id))
       assert(true == prapareIds.toSet.contains(prepare2.id))

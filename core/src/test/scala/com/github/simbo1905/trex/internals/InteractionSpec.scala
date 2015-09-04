@@ -95,10 +95,10 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
             case Some(AcceptResponsesAndTimeout(_, _, responses)) =>
               responses.values.headOption match {
                 case Some(a: AcceptAck) => //good
-                case x => fail(s"$x")
+                case x => fail(x.toString)
               }
           }
-        case _ => fail()
+        case x => fail(x.toString)
       }
       // when we send that to node one
       actor1 ! accept
@@ -301,7 +301,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
             case Some(AcceptResponsesAndTimeout(_, _, responses)) =>
               responses.values.headOption match {
                 case Some(a: AcceptAck) => //good
-                case x => fail(s"$x")
+                case x => fail(x.toString)
               }
           }
         case _ => fail()
@@ -329,9 +329,9 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
             case Some(AcceptResponsesAndTimeout(_, _, responses)) =>
               responses.values.headOption match {
                 case Some(a: AcceptAck) => //good
-                case x => fail(s"$x")
+                case x => fail(x.toString)
               }
-            case x => fail(s"$x")
+            case x => fail(x.toString)
           }
         case _ => fail()
       }
@@ -350,7 +350,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
             case Some(AcceptResponsesAndTimeout(_, _, responses)) =>
               responses.values.headOption match {
                 case Some(a: AcceptAck) => //good
-                case x => fail(s"$x")
+                case x => fail(x.toString)
               }
           }
         case _ => fail()

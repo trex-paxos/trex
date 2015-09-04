@@ -6,7 +6,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
 
-import scala.util.control.NonFatal
+import scala.util.{Try, Success, Failure}
 
 trait MethodCallTestTrait {
   def testMethod(testInput: String): String
@@ -27,12 +27,13 @@ class MethodCallInvokingActor(target: Any) extends Actor with ActorLogging {
       log.debug(s"$methodCall")
       val method = methodCall.method
       val parameters = methodCall.parameters
-      try {
-        Option(method.invoke(target, parameters: _*)) foreach {
+      Try {
+        Option(method.invoke(target, parameters: _*))
+      } match {
+        case Success(response) => response foreach {
           sender ! _
         }
-      } catch {
-        case NonFatal(ex) =>
+        case Failure(ex) =>
           log.error(ex, s"call to $method with ${parameters} got exception $ex")
           sender ! ex
       }

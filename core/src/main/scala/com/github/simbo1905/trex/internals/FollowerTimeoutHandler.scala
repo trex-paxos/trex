@@ -94,6 +94,7 @@ trait FollowerTimeoutHandler {
                 // other nodes are showing a leader behind a partial network partition so we backdown.
                 // we update the local known heartbeat in case that leader dies causing a new scenario were only this node can form a majority.
                 LowPrepareResponseResult(Follower, data.copy(prepareResponses = SortedMap.empty, leaderHeartbeat = maxHeartbeat)) // TODO lens
+              case x => throw new AssertionError(s"unreachable code $x")
             }
           } else {
             // need to wait until we hear from a majority

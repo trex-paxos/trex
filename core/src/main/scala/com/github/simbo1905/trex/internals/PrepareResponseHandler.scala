@@ -44,34 +44,38 @@ trait PrepareResponseHandler {
           // if we have a majority response which show more slots to recover issue new prepare messages
           val dataWithExpandedPrepareResponses: PaxosData = if (votes.size > data.clusterSize / 2) {
             // issue more prepares there are more accepted slots than we so far ran recovery upon
-            val (Identifier(_, _, ourLastHighestAccepted), _) = data.prepareResponses.last
-            val theirHighestAccepted = votes.values.map(_.highestAcceptedIndex).max
-            if (theirHighestAccepted > ourLastHighestAccepted) {
-              val prepares = (ourLastHighestAccepted + 1) to theirHighestAccepted map { id =>
-                Prepare(Identifier(nodeUniqueId, data.epoch.get, id))
-              }
-              log.info("Node {} Recoverer broadcasting {} new prepare messages for expanded slots {} to {}", nodeUniqueId, prepares.size, (ourLastHighestAccepted + 1), theirHighestAccepted)
-              prepares foreach { p =>
-                log.debug("Node {} sending {}", nodeUniqueId, p)
-                broadcast(p)
-              }
-
-              // accept our own prepare if we have not made a higher promise
-              val newPrepareSelfVotes: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] =
-                (prepares map { prepare =>
-                  val ackOrNack = if (prepare.id.number >= data.progress.highestPromised) {
-                    PrepareAck(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))
-                  } else {
-                    // FIXME no test for this
-                    PrepareNack(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat)
+            data.prepareResponses.lastOption match {
+              case Some((Identifier(_, _, ourLastHighestAccepted), _)) =>
+                val theirHighestAccepted = votes.values.map(_.highestAcceptedIndex).max
+                if (theirHighestAccepted > ourLastHighestAccepted) {
+                  val prepares = (ourLastHighestAccepted + 1) to theirHighestAccepted map { id =>
+                    Prepare(Identifier(nodeUniqueId, data.epoch.get, id))
                   }
-                  val selfVote = Some(Map(nodeUniqueId -> ackOrNack))
-                  (prepare.id -> selfVote)
-                })(scala.collection.breakOut)
-              // FIXME no test for this
-              PaxosData.prepareResponsesLens.set(data, data.prepareResponses ++ newPrepareSelfVotes)
-            } else {
-              data
+                  log.info("Node {} Recoverer broadcasting {} new prepare messages for expanded slots {} to {}", nodeUniqueId, prepares.size, (ourLastHighestAccepted + 1), theirHighestAccepted)
+                  prepares foreach { p =>
+                    log.debug("Node {} sending {}", nodeUniqueId, p)
+                    broadcast(p)
+                  }
+
+                  // accept our own prepare if we have not made a higher promise
+                  val newPrepareSelfVotes: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] =
+                    (prepares map { prepare =>
+                      val ackOrNack = if (prepare.id.number >= data.progress.highestPromised) {
+                        PrepareAck(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))
+                      } else {
+                        // FIXME no test for this
+                        PrepareNack(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat)
+                      }
+                      val selfVote = Some(Map(nodeUniqueId -> ackOrNack))
+                      (prepare.id -> selfVote)
+                    })(scala.collection.breakOut)
+                  // FIXME no test for this
+                  PaxosData.prepareResponsesLens.set(data, data.prepareResponses ++ newPrepareSelfVotes)
+                } else {
+                  data
+                }
+              case None =>
+                data
             }
           } else {
             data
