@@ -73,12 +73,6 @@
 
 <span class="pl-c">  /**</span>
 <span class="pl-c">   * Read a value and its version number from the KV store.</span>
-<span class="pl-c">   * The setting of the ‘consistent’ flag is used</span>
-<span class="pl-c">   * to choose the consistency level. Setting it to ‘true’</span>
-<span class="pl-c">   * chooses strong consistency, and the latest value is always</span>
-<span class="pl-c">   * returned. Setting it to ‘false’ chooses timeline</span>
-<span class="pl-c">   * consistency, and a possibly stale value is returned in</span>
-<span class="pl-c">   * exchange for better performance.</span>
 <span class="pl-c">   * <span class="pl-k">@param</span> <span class="pl-v">key</span> The key of the value to get</span>
 <span class="pl-c">   * <span class="pl-k">@return</span> A tuple of the value and the version number of the value of the key</span>
 <span class="pl-c">   */</span>
@@ -149,6 +143,7 @@ trex {
       println(s<span class="pl-s"><span class="pl-pds">"</span>node kv data store is ${dataFile.getCanonicalPath}<span class="pl-pds">"</span></span>)
       <span class="pl-k">val</span> <span class="pl-en">db</span><span class="pl-k">:</span> <span class="pl-en">DB</span> <span class="pl-k">=</span> <span class="pl-en">DBMaker</span>.newFileDB(dataFile).make
       <span class="pl-k">val</span> <span class="pl-en">clientApp</span> <span class="pl-k">=</span> <span class="pl-k">new</span> <span class="pl-en">MapDBConsistentKVStore</span>(db)
+      <span class="pl-c">// journal for paxos state</span>
       <span class="pl-k">val</span> <span class="pl-en">logFile</span> <span class="pl-k">=</span> <span class="pl-k">new</span> <span class="pl-en">java.io.File</span>(folder.getCanonicalPath <span class="pl-k">+</span> <span class="pl-s"><span class="pl-pds">"</span>/paxos<span class="pl-pds">"</span></span>)
       println(s<span class="pl-s"><span class="pl-pds">"</span>paxos data log is ${logFile.getCanonicalPath}<span class="pl-pds">"</span></span>)
       <span class="pl-k">val</span> <span class="pl-en">journal</span> <span class="pl-k">=</span> <span class="pl-k">new</span> <span class="pl-en">FileJournal</span>(logFile, cluster.retained)
