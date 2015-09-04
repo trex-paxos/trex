@@ -304,8 +304,7 @@ class LeaderSpec
       assert(fsm.stateData.acceptResponses.size == 0)
     }
 
-    // TODO surely this should not happen?
-    "request retransmission when it sees a higher committed watermark in a majority response" in {
+    "backdown when it sees a higher committed watermark in a response" in {
       // given accepts 99 and 100 are in the store can have committed up to 97
       val lastCommitted = Identifier(0, epoch, 97L)
       val id99 = Identifier(0, epoch, 99L)
@@ -326,17 +325,11 @@ class LeaderSpec
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
       fsm.setState(Leader, responses.copy(progress = committed))
 
-      // when it gets one accept giving it a majority on 100
-      fsm ! AcceptAck(id100, 1, initialData.progress)
+      // when it gets one accept giving it a majority on 100 but showing a higher commit mark
+      fsm ! AcceptAck(id100, 1, Progress(epoch, Identifier(0, epoch, 98L)))
 
-      // it does not yet send the commit
+      // it does not send a message
       expectNoMsg(25 millisecond)
-
-      // then gets a majority response to 99 with a higher commit watermark indicating another node is up to 98
-      fsm ! AcceptAck(id99, 1, Progress(epoch, Identifier(0, epoch, 98L)))
-
-      // it sends a retransmit request
-      expectMsg(100 millisecond, RetransmitRequest(0, 1, 97L))
 
       // and becomes a follower
       fsm.stateName should be(Follower)
