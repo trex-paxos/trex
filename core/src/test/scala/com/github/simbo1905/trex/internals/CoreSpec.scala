@@ -68,6 +68,7 @@ class CoreSpec extends WordSpecLike with Matchers {
       {
         val commandValue = new CommandValue {
           override def msgId: Long = 0L
+
           override def bytes: Array[Byte] = Array()
         }
         val clientCommands = Map(id ->(commandValue, null))
@@ -91,6 +92,7 @@ class CoreSpec extends WordSpecLike with Matchers {
         val acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(id -> AcceptResponsesAndTimeout(0L, a1, Map.empty))
         val commandValue = new CommandValue {
           override def msgId: Long = 0L
+
           override def bytes: Array[Byte] = Array()
         }
         val clientCommands = Map(id ->(commandValue, null))
@@ -312,6 +314,35 @@ class CoreSpec extends WordSpecLike with Matchers {
           assertAccept(s2(0), a3)
           assertAccept(s2(1), a4)
       }
+    }
+  }
+
+  "Backing down" should {
+    "should reset Paxos data" in {
+      import Ordering._
+      // given lots of leadership data
+      val number = BallotNumber(Int.MinValue, Int.MinValue)
+      val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
+      val leaderData = PaxosData(
+        progress = Progress(
+          number, id
+        ),
+        leaderHeartbeat = 0,
+        timeout = 0,
+        clusterSize = 3,
+        prepareResponses = TreeMap(id -> Map.empty),
+        epoch = Some(number),
+        acceptResponses = TreeMap(id -> AcceptResponsesAndTimeout(0, null, Map.empty)),
+        clientCommands = Map(id ->(null, null))
+      )
+      // when we backdown
+      val followerData = PaxosActor.backdownData(leaderData, 99L)
+      // then it has a new timeout and the leader data is gone
+      followerData.timeout shouldBe 99L
+      followerData.prepareResponses.isEmpty shouldBe true
+      followerData.epoch shouldBe None
+      followerData.acceptResponses.isEmpty shouldBe true
+      followerData.clientCommands.isEmpty shouldBe true
     }
   }
 }

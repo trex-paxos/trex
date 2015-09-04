@@ -241,7 +241,6 @@ with FollowerTimeoutHandler
       stay
   }
 
-  // FIXME add explicit test for this
   def backdownData(data: PaxosData) = PaxosActor.backdownData(data, randomTimeout)
 
   def requestRetransmissionIfBehind(data: PaxosData, sender: ActorRef, from: Int, highestCommitted: Identifier): Unit = {
