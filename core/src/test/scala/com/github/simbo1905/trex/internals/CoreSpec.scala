@@ -37,13 +37,13 @@ class CoreSpec extends WordSpecLike with Matchers {
 
     "set prepare responses" in {
       {
-        val newData = PaxosData.prepareResponsesLens.set(nodeData, SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]])
+        val newData = PaxosData.prepareResponsesLens.set(nodeData, SortedMap.empty[Identifier, Map[Int, PrepareResponse]])
         assert(newData == nodeData)
       }
       {
-        val prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] = TreeMap(id -> None)
+        val prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]] = TreeMap(id -> Map.empty)
         val newData = PaxosData.prepareResponsesLens.set(nodeData, prepareResponses)
-        assert(newData.prepareResponses(id) == None)
+        assert(newData.prepareResponses(id) == Map.empty)
       }
     }
 
@@ -79,14 +79,14 @@ class CoreSpec extends WordSpecLike with Matchers {
     "set leader state" in {
       {
         val newData = PaxosData.leaderLens.set(nodeData, (
-          SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]],
+          SortedMap.empty[Identifier, Map[Int, PrepareResponse]],
           SortedMap.empty[Identifier, AcceptResponsesAndTimeout],
           Map.empty[Identifier, (CommandValue, ActorRef)])
         )
         assert(newData == nodeData)
       }
       {
-        val prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] = TreeMap(id -> None)
+        val prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]] = TreeMap(id -> Map.empty)
         val a1 = Accept(Identifier(1, BallotNumber(1, 1), 1L), ClientRequestCommandValue(0, Array[Byte](1, 1)))
         val acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(id -> AcceptResponsesAndTimeout(0L, a1, Map.empty))
         val commandValue = new CommandValue {
@@ -95,7 +95,7 @@ class CoreSpec extends WordSpecLike with Matchers {
         }
         val clientCommands = Map(id ->(commandValue, null))
         val newData = PaxosData.leaderLens.set(nodeData, (prepareResponses, acceptResponses, clientCommands))
-        assert(newData.prepareResponses(id) == None)
+        assert(newData.prepareResponses(id) == Map.empty)
         assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, a1, Map.empty))
         assert(newData.clientCommands(id) == (commandValue -> null))
       }

@@ -156,7 +156,7 @@ with FollowerTimeoutHandler
       // if the leadership has changed or we see a new heartbeat from the same leader cancel any timeout work
       val newData = heartbeat match {
         case heartbeat if heartbeat > oldData.leaderHeartbeat || i.number > oldData.progress.highestPromised =>
-          oldData.copy(leaderHeartbeat = heartbeat, prepareResponses = SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]], timeout = freshTimeout(randomInterval)) // TODO lens
+          oldData.copy(leaderHeartbeat = heartbeat, prepareResponses = SortedMap.empty[Identifier, Map[Int, PrepareResponse]], timeout = freshTimeout(randomInterval)) // TODO lens
         case _ =>
           log.debug("Node {} {} not setting a new timeout from commit {}", nodeUniqueId, stateName, c)
           oldData
@@ -286,7 +286,7 @@ with FollowerTimeoutHandler
       // prepares we only retransmit as we handle all outcomes on the prepare response such as backing down
       log.debug("Node {} {} time-out on {} prepares", nodeUniqueId, stateName, prepareResponses.size)
       prepareResponses foreach {
-        case (id, None) => // is committed
+        case (id, map) if map.isEmpty => // is committed
         // FIXME no test
         case (id, _) =>
           // broadcast is preferred as previous responses may be stale

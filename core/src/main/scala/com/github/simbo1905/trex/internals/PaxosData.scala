@@ -21,7 +21,7 @@ case class PaxosData(progress: Progress,
                      leaderHeartbeat: Long,
                      timeout: Long,
                      clusterSize: Int,
-                     prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] = SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]](Ordering.IdentifierLogOrdering),
+                     prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]] = SortedMap.empty[Identifier, Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering),
                      epoch: Option[BallotNumber] = None,
                      acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering),
                      clientCommands: Map[Identifier, (CommandValue, ActorRef)] = Map.empty)
@@ -29,7 +29,7 @@ case class PaxosData(progress: Progress,
 object PaxosData {
   val prepareResponsesLens = Lens(
     get = (_: PaxosData).prepareResponses,
-    set = (nodeData: PaxosData, prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]]) => nodeData.copy(prepareResponses = prepareResponses))
+    set = (nodeData: PaxosData, prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]]) => nodeData.copy(prepareResponses = prepareResponses))
 
   val acceptResponsesLens = Lens(
     get = (_: PaxosData).acceptResponses,
@@ -62,11 +62,11 @@ object PaxosData {
 
   val leaderLens = Lens(
     get = (nodeData: PaxosData) => ((prepareResponsesLens(nodeData), acceptResponsesLens(nodeData), clientCommandsLens(nodeData))),
-    set = (nodeData: PaxosData, value: (SortedMap[Identifier, Option[Map[Int, PrepareResponse]]],
+    set = (nodeData: PaxosData, value: (SortedMap[Identifier, Map[Int, PrepareResponse]],
       SortedMap[Identifier, AcceptResponsesAndTimeout],
       Map[Identifier, (CommandValue, ActorRef)])) =>
       value match {
-        case (prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]],
+        case (prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]],
         acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout],
         clientCommands: Map[Identifier, (CommandValue, ActorRef)]) =>
           prepareResponsesLens.set(acceptResponsesLens.set(clientCommandsLens.set(nodeData, clientCommands), acceptResponses), prepareResponses)
@@ -75,10 +75,10 @@ object PaxosData {
 
   val backdownLens = Lens(
     get = (n: PaxosData) => ((prepareResponsesLens(n), acceptResponsesLens(n), clientCommandsLens(n), epochLens(n), timeoutLens(n))),
-    set = (n: PaxosData, value: (SortedMap[Identifier, Option[Map[Int, PrepareResponse]]], SortedMap[Identifier, AcceptResponsesAndTimeout], Map[Identifier, (CommandValue, ActorRef)], Option[BallotNumber], Long)) =>
+    set = (n: PaxosData, value: (SortedMap[Identifier, Map[Int, PrepareResponse]], SortedMap[Identifier, AcceptResponsesAndTimeout], Map[Identifier, (CommandValue, ActorRef)], Option[BallotNumber], Long)) =>
       value match {
         case
-          (prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]],
+          (prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]],
           acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout],
           clientCommands: Map[Identifier, (CommandValue, ActorRef)],
           epoch: Option[BallotNumber],
@@ -96,10 +96,10 @@ object PaxosData {
 
   val timeoutPrepareResponsesLens = Lens(
     get = (nodeData: PaxosData) => ((timeoutLens(nodeData), prepareResponsesLens(nodeData))),
-    set = (nodeData: PaxosData, value: (Long, SortedMap[Identifier, Option[Map[Int, PrepareResponse]]])) =>
+    set = (nodeData: PaxosData, value: (Long, SortedMap[Identifier, Map[Int, PrepareResponse]])) =>
       value match {
-        case (timeout: Long, prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]]) =>
-          timeoutLens.set(prepareResponsesLens.set(nodeData, prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]]), timeout)
+        case (timeout: Long, prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]]) =>
+          timeoutLens.set(prepareResponsesLens.set(nodeData, prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]]), timeout)
       }
   )
 
@@ -114,9 +114,9 @@ object PaxosData {
 
   val highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens = Lens(
     get = (n: PaxosData) => (highestPromisedLens(n), timeoutLens(n), epochLens(n), prepareResponsesLens(n), acceptResponsesLens(n)),
-    set = (n: PaxosData, value: (BallotNumber, Long, Option[BallotNumber], SortedMap[Identifier, Option[Map[Int, PrepareResponse]]], SortedMap[Identifier, AcceptResponsesAndTimeout])) =>
+    set = (n: PaxosData, value: (BallotNumber, Long, Option[BallotNumber], SortedMap[Identifier, Map[Int, PrepareResponse]], SortedMap[Identifier, AcceptResponsesAndTimeout])) =>
       value match {
-        case (promise: BallotNumber, timeout: Long, epoch: Option[BallotNumber], prepareResponses: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]], acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout]) =>
+        case (promise: BallotNumber, timeout: Long, epoch: Option[BallotNumber], prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]], acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout]) =>
           highestPromisedLens.set(timeoutLens.set(epochLens.set(prepareResponsesLens.set(acceptResponsesLens.set(n, acceptResponses), prepareResponses), epoch), timeout), promise)
       }
   )

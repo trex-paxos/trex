@@ -492,8 +492,8 @@ class FollowerSpec
     }
 
     def followerNoResponsesInClusterOfSize(numberOfNodes: Int, highestAccepted: Long = 0L, cfg: Config = AllStateSpec.config) = {
-      val prepareSelfVotes = SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]] ++
-        Seq((minPrepare.id -> Some(Map(0 -> PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None)))))
+      val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
+        Seq((minPrepare.id -> Map(0 -> PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None))))
 
       val state = initialData.copy(clusterSize = numberOfNodes, epoch = Some(minPrepare.id.number), prepareResponses = prepareSelfVotes)
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(cfg, numberOfNodes), 0, self, new TestAcceptMapJournal, ArrayBuffer.empty, None) {
@@ -610,7 +610,7 @@ class FollowerSpec
       // and votes for its own prepares
       assert(!fsm.stateData.prepareResponses.isEmpty)
       val prapareIds = fsm.stateData.prepareResponses map {
-        case (id, Some(map)) if map.keys.headOption == Some(0) && map.values.headOption.getOrElse(fail).requestId == id =>
+        case (id, map) if map.keys.headOption == Some(0) && map.values.headOption.getOrElse(fail).requestId == id =>
           id
         case x => fail(x.toString)
       }

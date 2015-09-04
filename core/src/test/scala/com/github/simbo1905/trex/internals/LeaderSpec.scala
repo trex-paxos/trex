@@ -28,7 +28,7 @@ class LeaderSpec
   val epoch = BallotNumber(1, 1)
 
   val dataNewEpoch = PaxosData.epochLens.set(initialData, Some(epoch))
-  val initailLeaderData = PaxosData.leaderLens.set(dataNewEpoch, (SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]], freshAcceptResponses, Map.empty))
+  val initailLeaderData = PaxosData.leaderLens.set(dataNewEpoch, (SortedMap.empty[Identifier, Map[Int, PrepareResponse]], freshAcceptResponses, Map.empty))
 
   val expectedString2 = "Paxos"
   val expectedBytes2 = expectedString2.getBytes

@@ -19,7 +19,7 @@ object TestFollowerTimeoutHandler {
 
   val selfNack = PrepareNack(minPrepare.id, 0, AllStateSpec.initialData.progress, 0, 999)
 
-  val initialDataWithTimeoutAndPrepareResponses = PaxosData.timeoutPrepareResponsesLens.set(AllStateSpec.initialData, (99L, TreeMap(minPrepare.id -> Some(Map(0 -> selfNack)))))
+  val initialDataWithTimeoutAndPrepareResponses = PaxosData.timeoutPrepareResponsesLens.set(AllStateSpec.initialData, (99L, TreeMap(minPrepare.id -> Map(0 -> selfNack))))
 }
 
 class TestFollowerTimeoutHandler extends FollowerTimeoutHandler {
@@ -60,13 +60,8 @@ with WordSpecLike with Matchers {
           // it should set a fresh timeout
           data.timeout shouldBe 12345L
           // and have nacked its own minPrepare
-          data.prepareResponses.get(minPrepare.id) match {
-            case Some(Some(map)) =>
-              map.get(99) match {
-                case Some(nack: PrepareNack) => // good
-                case x => fail(x.toString)
-              }
-            // good
+          data.prepareResponses.getOrElse(minPrepare.id, Map.empty).get(99) match {
+            case Some(nack: PrepareNack) => // good
             case x => fail(x.toString)
           }
       }
@@ -151,13 +146,10 @@ with WordSpecLike with Matchers {
       // when it sees that response and does not have a majority as cluster size is 5
       handler.handLowPrepareResponse(0, Follower, initialDataWithTimeoutAndPrepareResponses.copy(clusterSize = 5), TestProbe().ref, vote) match {
         case LowPrepareResponseResult(Follower, data, _) => // it stays as follower
-          data.prepareResponses.get(minPrepare.id) match {
-            case Some(Some(map)) => map.get(otherNodeUniqueId) match {
+          data.prepareResponses.getOrElse(minPrepare.id, Map.empty).get(otherNodeUniqueId) match {
               case Some(`vote`) => // and has recorded the other nodes vote
               case x => fail(x.toString)
             }
-            case x => fail(x.toString)
-          }
         case x => fail(x.toString)
       }
     }
@@ -202,13 +194,10 @@ with WordSpecLike with Matchers {
           data.prepareResponses.size shouldBe 1
           highPrepares.headOption match {
             case Some(prepare) =>
-              data.prepareResponses.get(prepare.id) match {
-                case Some(Some(map)) => map.get(0) match {
-                  case Some(r: PrepareAck) if r.requestId == prepare.id => // good
-                  case x => fail(x.toString)
-                }
-                case x => fail(x.toString)
-              }
+              data.prepareResponses.getOrElse(prepare.id, Map.empty).get(0) match {
+              case Some(r: PrepareAck) if r.requestId == prepare.id => // good
+              case x => fail(x.toString)
+            }
             case _ => fail // unreachable
           }
         case x => fail(x.toString)

@@ -345,8 +345,8 @@ class RecovererSpec
 
   def recovererNoResponsesInClusterOfSize(numberOfNodes: Int, timenow: Long = Platform.currentTime) = {
 
-    val prepareSelfVotes = SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]] ++
-      Seq((recoverHighPrepare.id -> Some(Map(0 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None)))))
+    val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
+      Seq((recoverHighPrepare.id -> Map(0 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None))))
 
     val state = initialData.copy(clusterSize = numberOfNodes, epoch = Some(recoverHighPrepare.id.number), prepareResponses = prepareSelfVotes, acceptResponses = SortedMap.empty)
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, numberOfNodes), 0, self, new TestAcceptMapJournal {

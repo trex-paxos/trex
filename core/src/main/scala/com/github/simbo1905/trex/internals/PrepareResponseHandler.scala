@@ -31,12 +31,12 @@ trait PrepareResponseHandler {
       log.info("Node {} {} message with id {} is not for this node", nodeUniqueId, stateName, id)
       (stateName, data) // FIXME test for this and do we want to add such a guard to the accept response processor?
     } else {
-      data.prepareResponses.getOrElse(id, None) match {
-        case None =>
+      data.prepareResponses.getOrElse(id, Map.empty) match {
+        case map if map.isEmpty  =>
           // we already had a majority positive response so nothing to do
           log.debug("Node {} Ignored prepare response as no longer tracking this request: {}", nodeUniqueId, vote)
           (stateName, data)
-        case Some(map) =>
+        case map =>
           // register the vote
           val votes = map + (vote.from -> vote)
 
@@ -58,7 +58,7 @@ trait PrepareResponseHandler {
                   }
 
                   // accept our own prepare if we have not made a higher promise
-                  val newPrepareSelfVotes: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] =
+                  val newPrepareSelfVotes: SortedMap[Identifier, Map[Int, PrepareResponse]] =
                     (prepares map { prepare =>
                       val ackOrNack = if (prepare.id.number >= data.progress.highestPromised) {
                         PrepareAck(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))
@@ -66,7 +66,7 @@ trait PrepareResponseHandler {
                         // FIXME no test for this
                         PrepareNack(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat)
                       }
-                      val selfVote = Some(Map(nodeUniqueId -> ackOrNack))
+                      val selfVote = Map(nodeUniqueId -> ackOrNack)
                       (prepare.id -> selfVote)
                     })(scala.collection.breakOut)
                   // FIXME no test for this
@@ -131,7 +131,7 @@ trait PrepareResponseHandler {
             (Follower, backdownData(data))
           }
           else {
-            val updated = data.prepareResponses + (vote.requestId -> Some(votes))
+            val updated = data.prepareResponses + (vote.requestId -> votes)
             (stateName, PaxosData.prepareResponsesLens.set(dataWithExpandedPrepareResponses, updated))
           }
       }

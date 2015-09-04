@@ -40,8 +40,8 @@ trait FollowerTimeoutHandler {
     log.info("Node {} {} timed-out progress: {}", nodeUniqueId, stateName, data.progress)
     broadcast(minPrepare)
     // nack our own prepare
-    val prepareSelfVotes = SortedMap.empty[Identifier, Option[Map[Int, PrepareResponse]]] ++
-      Map(minPrepare.id -> Some(Map(nodeUniqueId -> PrepareNack(minPrepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat))))
+    val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
+      Map(minPrepare.id -> Map(nodeUniqueId -> PrepareNack(minPrepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat)))
 
     PaxosData.timeoutPrepareResponsesLens.set(data, (randomTimeout, prepareSelfVotes))
   }
@@ -55,7 +55,7 @@ trait FollowerTimeoutHandler {
       LowPrepareResponseResult(Follower, backdownData(data))
     } else {
       data.prepareResponses.get(vote.requestId) match {
-        case Some(Some(map)) =>
+        case Some(map) =>
           val votes = map + (vote.from -> vote)
 
           def haveMajorityResponse = votes.size > data.clusterSize / 2
@@ -75,9 +75,9 @@ trait FollowerTimeoutHandler {
                   case Some(p) =>
                     val selfPromise = p.id.number
                     // accept our own promise and load from the journal any values previous accepted in those slots
-                    val prepareSelfVotes: SortedMap[Identifier, Option[Map[Int, PrepareResponse]]] =
+                    val prepareSelfVotes: SortedMap[Identifier, Map[Int, PrepareResponse]] =
                       (prepares map { prepare =>
-                        val selfVote = Some(Map(nodeUniqueId -> PrepareAck(prepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))))
+                        val selfVote = Map(nodeUniqueId -> PrepareAck(prepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex)))
                         prepare.id -> selfVote
                       })(scala.collection.breakOut)
 
@@ -98,7 +98,7 @@ trait FollowerTimeoutHandler {
             }
           } else {
             // need to wait until we hear from a majority
-            LowPrepareResponseResult(Follower, data.copy(prepareResponses = TreeMap(Map(minPrepare.id -> Option(votes)).toArray: _*))) // TODO lens
+            LowPrepareResponseResult(Follower, data.copy(prepareResponses = TreeMap(Map(minPrepare.id -> votes).toArray: _*))) // TODO lens
           }
         case x =>
           log.debug("Node {} {} is no longer awaiting responses to {} so ignoring {}", nodeUniqueId, stateName, vote.requestId, x)
