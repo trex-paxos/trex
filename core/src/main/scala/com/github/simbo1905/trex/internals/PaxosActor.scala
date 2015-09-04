@@ -286,8 +286,6 @@ with FollowerTimeoutHandler
       // prepares we only retransmit as we handle all outcomes on the prepare response such as backing down
       log.debug("Node {} {} time-out on {} prepares", nodeUniqueId, stateName, prepareResponses.size)
       prepareResponses foreach {
-        case (id, map) if map.isEmpty => // is committed
-        // FIXME no test
         case (id, _) =>
           // broadcast is preferred as previous responses may be stale
           broadcast(Prepare(id))
