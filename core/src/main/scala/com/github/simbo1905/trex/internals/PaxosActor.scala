@@ -202,7 +202,6 @@ with FollowerTimeoutHandler
       }
 
     // if we backdown to follower on a majority AcceptNack we may see a late accept response that we will ignore
-    // FIXME no test for this
     case e@Event(ar: AcceptResponse, data) =>
       trace(stateName, e.stateData, sender, e.event)
       log.debug("Node {} {} ignoring accept response {}", nodeUniqueId, stateName, ar)

@@ -20,7 +20,7 @@ object FollowerSpec {
 class FollowerSpec
   extends TestKit(ActorSystem("FollowerSpec", FollowerSpec.config))
   with DefaultTimeout with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with AllStateSpec with FollowerLikeSpec {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with AllStateSpec with NotLeaderSpec {
 
   import AllStateSpec._
   import Ordering._
@@ -503,12 +503,12 @@ class FollowerSpec
       fsm
     }
 
-    "ignores accept responses" in {
+    "ignores an accept response" in {
       // given a follower in a cluster size of three
       val fsm = followerNoResponsesInClusterOfSize(3)
       val startData = fsm.stateData
 
-      // when it get an accept resonse
+      // when it get an accept response
       fsm ! AcceptAck(minPrepare.id, 0, initialData.progress)
 
       // then it does nothing

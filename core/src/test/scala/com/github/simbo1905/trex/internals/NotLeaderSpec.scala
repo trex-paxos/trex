@@ -6,7 +6,7 @@ import org.scalamock.scalatest.MockFactory
 
 import scala.collection.mutable.ArrayBuffer
 
-trait FollowerLikeSpec { self: TestKit with MockFactory with AllStateSpec =>
+trait NotLeaderSpec { self: TestKit with MockFactory with AllStateSpec =>
   import AllStateSpec._
   import PaxosActor.Configuration
 
