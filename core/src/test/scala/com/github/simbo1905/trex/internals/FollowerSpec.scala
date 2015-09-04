@@ -503,6 +503,19 @@ class FollowerSpec
       fsm
     }
 
+    "ignores accept responses" in {
+      // given a follower in a cluster size of three
+      val fsm = followerNoResponsesInClusterOfSize(3)
+      val startData = fsm.stateData
+
+      // when it get an accept resonse
+      fsm ! AcceptAck(minPrepare.id, 0, initialData.progress)
+
+      // then it does nothing
+      expectNoMsg(25 milliseconds)
+      assert( fsm.stateData == startData)
+    }
+
     "switch to recoverer if in a five node cluster it sees a majority response with no heartbeats" in {
       // given a follower in a cluster size of five
       val fsm = followerNoResponsesInClusterOfSize(5)
