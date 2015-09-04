@@ -63,11 +63,10 @@ trait AcceptResponsesHandler {
                   // FIXME was no test checking that this was broadcast not just replied to sender
                   broadcast(Commit(newProgress.highestCommitted))
 
-                  if (stateName == Leader && oldData.clientCommands.nonEmpty) {
-                    // TODO the nonEmpty guard is due to test data not setting this should fix the test data and remove it
-
+                  if (oldData.clientCommands.nonEmpty) {
                     val (committedIds, _) = results.unzip
 
+                    // TODO do the tests check that we clear out the responses which match the work we have committed?
                     val (responds, remainders) = oldData.clientCommands.partition {
                       idCmdRef: (Identifier, (CommandValue, ActorRef)) =>
                         val (id, (_, _)) = idCmdRef
@@ -81,7 +80,6 @@ trait AcceptResponsesHandler {
                         send(client, bytes)
                       }
                     }
-                    // FIXME memory leak we have not GCed the stuff we are no longer awaiting responses in votesData.acceptResponses
                     (stateName, PaxosData.progressLens.set(votesData, newProgress).copy(clientCommands = remainders))// TODO new lens?
                   } else {
                     (stateName, PaxosData.progressLens.set(votesData, newProgress))
@@ -94,7 +92,7 @@ trait AcceptResponsesHandler {
               (stateName, PaxosData.acceptResponsesLens.set(oldData, updated))
             }
           case None =>
-            log.debug("Node {} {} ignoring late response as saw a majority response: {}", nodeUniqueId, stateName, vote)
+            log.debug("Node {} {} ignoring response we are not awaiting: {}", nodeUniqueId, stateName, vote)
             (stateName, oldData)
 
         }
