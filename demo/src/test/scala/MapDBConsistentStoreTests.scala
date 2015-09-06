@@ -35,7 +35,7 @@ class InMemoryJournal extends Journal {
 }
 
 class MapDBConsistentStoreTests extends TestKit(ActorSystem("LeaderSpec", MapDBConsistentStoreTests.config))
-  with DefaultTimeout with ImplicitSender with SpecLike with Matchers with BeforeAndAfter with BeforeAndAfterAll {
+with DefaultTimeout with ImplicitSender with SpecLike with Matchers with BeforeAndAfter with BeforeAndAfterAll with OptionValues {
 
   var db: DB = DBMaker.newMemoryDB().make()
 
@@ -65,32 +65,18 @@ class MapDBConsistentStoreTests extends TestKit(ActorSystem("LeaderSpec", MapDBC
         case x => fail(x.toString)
       }
       store.remove("hello")
-      store.get("hello") match {
-        case None => // success
-        case x => fail(s"found $x when key should have been removed")
-      }
+      store.get("hello") should be(None)
     }
 
     object `has oplock semantics` {
       val store: ConsistentKVStore = new MapDBConsistentKVStore(db)
       store.put("hello", "world", 10) should be(false)
-      store.get("hello") match {
-        case None => // success
-        case other => fail(s"$other")
-      }
+      store.get("hello") should be(None)
       store.put("hello", "world", 0) should be(true)
-      store.get("hello") match {
-        case None => fail
-        case Some((data, version)) if version == 1 => // success
-        case other => fail(s"$other")
-      }
+      store.get("hello").value should be(("world", 1))
       store.put("hello", "world", 0) should be(false)
       store.put("hello", "world", 1) should be(true)
-      store.get("hello") match {
-        case None => fail
-        case Some((data, version)) if version == 2 => // success
-        case other => fail(s"$other")
-      }
+      store.get("hello").value should be(("world", 2))
     }
 
   }
@@ -109,10 +95,7 @@ class MapDBConsistentStoreTests extends TestKit(ActorSystem("LeaderSpec", MapDBC
       value should be("world")
       version should be(1L)
       store.remove("hello")
-      store.get("hello") match {
-        case None => // success
-        case x => fail(s"found $x when key should have been removed")
-      }
+      store.get("hello") should be(None)
     }
 
     object `has oplock semantics` {
@@ -121,49 +104,40 @@ class MapDBConsistentStoreTests extends TestKit(ActorSystem("LeaderSpec", MapDBC
           new MapDBConsistentKVStore(db)))
 
       store.put("hello", "world", 10) should be(false)
-      store.get("hello") match {
-        case None => // success
-        case other => fail(s"$other")
-      }
+      store.get("hello") should be(None)
       store.put("hello", "world", 0) should be(true)
-      store.get("hello") match {
-        case None => fail
-        case Some((data, version)) if version == 1 => // success
-        case other => fail(s"$other")
-      }
+      store.get("hello").value should be (("world", 1))
       store.put("hello", "world", 0) should be(false)
       store.put("hello", "world", 1) should be(true)
-      store.get("hello") match {
-        case None => fail
-        case Some((data, version)) if version == 2 => // success
-        case other => fail(s"$other")
-      }
+      store.get("hello").value should be (("world", 2))
     }
 
   }
 
   object `Driver wrapped store` {
+
     object `can put, get and remove values` {
 
       // the paxos actor nodes in our cluster
       var children = Map.empty[Int, ActorRef]
 
-      var journals = Map.empty[Int,InMemoryJournal]
+      var journals = Map.empty[Int, InMemoryJournal]
 
       val size = 3
 
-//      (0 until size) foreach { i =>
-//        val node = new InMemoryJournal
-//        journals = journals + (i -> node)
-//        val actor: ActorRef = system.actorOf(Props(classOf[TestPaxosActorWithTimeout],
-//          PaxosActor.Configuration(MapDBConsistentStoreTests.config, size), i, self, node, node.deliver, recordTraceData _))
-//        children = children + (i -> actor)
-//        log.info(s"$i -> $actor")
-//        lastLeader = actor
-//        tracedData = tracedData + (i -> Seq.empty)
-//      }
+      //      (0 until size) foreach { i =>
+      //        val node = new InMemoryJournal
+      //        journals = journals + (i -> node)
+      //        val actor: ActorRef = system.actorOf(Props(classOf[TestPaxosActorWithTimeout],
+      //          PaxosActor.Configuration(MapDBConsistentStoreTests.config, size), i, self, node, node.deliver, recordTraceData _))
+      //        children = children + (i -> actor)
+      //        log.info(s"$i -> $actor")
+      //        lastLeader = actor
+      //        tracedData = tracedData + (i -> Seq.empty)
+      //      }
 
     }
+
   }
 
 }
