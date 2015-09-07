@@ -253,14 +253,11 @@ with FollowerTimeoutHandler
   }
 
   val takeoverStateFunction: StateFunction = {
-
     case e@Event(vote: PrepareResponse, oldData: PaxosData) =>
       trace(stateName, e.stateData, sender, e.event)
       log.debug("Node {} Recoverer received a prepare response: {}", nodeUniqueId, vote)
-
       val (role, data) = handlePrepareResponse(nodeUniqueId, stateName, sender(), vote, oldData)
       goto(role) using data
-
   }
 
   val acceptResponseStateFunction: StateFunction = {
