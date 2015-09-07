@@ -19,7 +19,7 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 - [x] fix driver
 - [x] is retransmission of accepted values actually safe?
 - [x] overrideable send methods
-- [ ] fix the fixmes
+- [x] fix the fixmes
 - [ ] actor refactor to handlers
 - [ ] nemesis (jepsen style destruction testing)
 
