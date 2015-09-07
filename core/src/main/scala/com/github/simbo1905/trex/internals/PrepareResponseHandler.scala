@@ -64,13 +64,11 @@ trait PrepareResponseHandler {
                       val ackOrNack = if (prepare.id.number >= data.progress.highestPromised) {
                         PrepareAck(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))
                       } else {
-                        // FIXME no test for this
                         PrepareNack(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat)
                       }
                       val selfVote = Map(nodeUniqueId -> ackOrNack)
                       (prepare.id -> selfVote)
                     })(scala.collection.breakOut)
-                  // FIXME no test for this
                   PaxosData.prepareResponsesLens.set(data, data.prepareResponses ++ newPrepareSelfVotes)
                 } else {
                   data
@@ -95,12 +93,10 @@ trait PrepareResponseHandler {
           }
           // only accept your own broadcast if we have not made a higher promise whilst awaiting responses from other nodes
           val selfResponse: AcceptResponse = if (accept.id.number >= dataWithExpandedPrepareResponses.progress.highestPromised) {
-            // FIXME had the inequality wrong way around and Recoverer tests didn't catch it. Add a test to cover this.
             log.debug("Node {} {} accepting own message {}", nodeUniqueId, stateName, accept.id)
             journal.accept(accept)
             AcceptAck(accept.id, nodeUniqueId, dataWithExpandedPrepareResponses.progress)
           } else {
-            // FIXME no test for this
             log.debug("Node {} {} not accepting own message with number {} as have made a higher promise {}", nodeUniqueId, stateName, accept.id.number, dataWithExpandedPrepareResponses.progress.highestPromised)
             AcceptNack(accept.id, nodeUniqueId, dataWithExpandedPrepareResponses.progress)
           }
@@ -123,7 +119,6 @@ trait PrepareResponseHandler {
           }
         } else if (negatives.size > data.clusterSize / 2) {
           log.info("Node {} {} received {} prepare nacks returning to follower", nodeUniqueId, stateName, negatives.size)
-          // FIXME not test for this
           (Follower, backdownData(data))
           }
         else {

@@ -41,7 +41,7 @@ class TestTimingsFileJournal(storeFile: File, retained: Int) extends FileJournal
 
   var actionsWithTimestamp = Seq.empty[(String, TimeAndParameter)]
 
-  save(Journal.minBookwork)
+  super.save(Journal.minBookwork)
 
   override def save(progress: Progress): Unit = {
     actionsWithTimestamp = actionsWithTimestamp :+("save", TimeAndParameter(System.nanoTime(), progress))
@@ -78,12 +78,16 @@ object AllStateSpec {
 
   val lowValue = Int.MinValue + 1
 
-  val minIdentifier = Identifier(0, BallotNumber(lowValue, lowValue), Long.MinValue)
+  val minIdentifier = Identifier(from = 0, number = BallotNumber(lowValue, lowValue), logIndex = Long.MinValue)
 
   val initialData = PaxosData(
-    Progress(
-      BallotNumber(lowValue, lowValue), Identifier(0, BallotNumber(lowValue, lowValue), 0)
-    ), 0, 0, 3)
+    progress = Progress(
+      highestPromised = BallotNumber(lowValue, lowValue),
+      highestCommitted = Identifier(from = 0, number = BallotNumber(lowValue, lowValue), logIndex = 0)
+    ),
+    leaderHeartbeat = 0,
+    timeout = 0,
+    clusterSize = 3)
 
   val minute = 1000 * 60 // ms
 

@@ -251,11 +251,15 @@ class LeaderSpec
     }
 
     "commit in order when responses arrive out of order" in {
-      // given a journal which records the save time.
+      // given a journal which records the save time and saved progress.
       var saveTime = 0L
+      var savedProgress: Option[Progress] = None
       val stubJournal: Journal = stub[Journal]
       val delgatingJournal = new DelegatingJournal(stubJournal) {
-        override def save(progress: Progress): Unit = saveTime = System.nanoTime()
+        override def save(progress: Progress): Unit = {
+          saveTime = System.nanoTime()
+          savedProgress = Option(progress)
+        }
       }
       // and accepts 99 and 100 are in the store with 98 committed
       val lastCommitted = Identifier(0, epoch, 98L)
@@ -307,8 +311,8 @@ class LeaderSpec
       // updated bookwork
       assert(fsm.stateData.progress.highestCommitted.logIndex == 100)
       // and journal bookwork
-      tempRecordTimesFileJournal.actionsWithTimestamp.toMap.getOrElse("save", fail).parameter match {
-        case p: Progress => p == fsm.stateData.progress
+      savedProgress match {
+        case Some(p: Progress) => p == fsm.stateData.progress
         case x => fail(x.toString)
       }
       // and deletes the pending work
