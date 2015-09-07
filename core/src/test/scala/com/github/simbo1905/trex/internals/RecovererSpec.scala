@@ -164,6 +164,10 @@ class RecovererSpec
     fsm ! ack2
     // it boardcasts a no-op
     expectMsg(100 millisecond, Accept(prepareId, NoOperationCommandValue))
+    // and saves before it sends
+    assert(saveTime != 0L && sendTime != 0L && saveTime < sendTime)
+    saveTime = 0L
+    sendTime = 0L
     // when a majority accept response with an ack from node1 and node2
     fsm ! AcceptAck(prepareId, 1, initialData.progress)
     fsm ! AcceptAck(prepareId, 2, initialData.progress)
@@ -179,7 +183,8 @@ class RecovererSpec
     assert(fsm.stateData.prepareResponses.isEmpty)
     // and sets a fresh timeout
     fsm.stateData.timeout shouldBe 1234L
-    // FIXME test the timings of the save actions and sends in two places
+    // and it saves before it sends
+    assert(saveTime != 0L && sendTime != 0L && saveTime < sendTime)
   }
 
   "fix a high value and promote to Leader then commits if in a three node cluster gets a majority with one ack" in {
@@ -353,6 +358,11 @@ class RecovererSpec
       override def save(p: Progress): Unit = {
         saveTime = System.nanoTime()
         super.save(p)
+      }
+
+      override def accept(accepted: Accept*): Unit = {
+        saveTime = System.nanoTime()
+        super.accept(accepted: _*)
       }
     }, ArrayBuffer.empty, None) {
       override def highestAcceptedIndex = 1L

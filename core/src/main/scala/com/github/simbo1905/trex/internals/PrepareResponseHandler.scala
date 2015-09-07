@@ -97,9 +97,6 @@ trait PrepareResponseHandler {
               log.info("Node {} {} got a majority of positive prepare response with highest accept message {} sending fresh message {}", nodeUniqueId, stateName, max.id, accept)
               accept
             }
-            // broadcast accept
-            log.debug("Node {} {} sending {}", nodeUniqueId, stateName, accept)
-            broadcast(accept)
             // only accept your own broadcast if we have not made a higher promise whilst awaiting responses from other nodes
             val selfResponse: AcceptResponse = if (accept.id.number >= dataWithExpandedPrepareResponses.progress.highestPromised) {
               // FIXME had the inequality wrong way around and Recoverer tests didn't catch it. Add a test to cover this.
@@ -111,6 +108,9 @@ trait PrepareResponseHandler {
               log.debug("Node {} {} not accepting own message with number {} as have made a higher promise {}", nodeUniqueId, stateName, accept.id.number, dataWithExpandedPrepareResponses.progress.highestPromised)
               AcceptNack(accept.id, nodeUniqueId, dataWithExpandedPrepareResponses.progress)
             }
+            // broadcast accept
+            log.debug("Node {} {} sending {}", nodeUniqueId, stateName, accept)
+            broadcast(accept)
             // create a fresh vote for your new accept message
             val selfVoted = dataWithExpandedPrepareResponses.acceptResponses + (accept.id -> AcceptResponsesAndTimeout(randomTimeout, accept, Map(nodeUniqueId -> selfResponse)))
             // we are no longer awaiting responses to the prepare
