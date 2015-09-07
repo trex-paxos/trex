@@ -23,6 +23,7 @@ trait PrepareResponseHandler {
   def backdownData(data: PaxosData): PaxosData
 
   def handlePrepareResponse(nodeUniqueId: Int, stateName: PaxosRole, sender: ActorRef, vote: PrepareResponse, data: PaxosData): (PaxosRole, PaxosData) = {
+    require(stateName == Recoverer, s"handle prepare response must be called in state Recoverer not $stateName")
     requestRetransmissionIfBehind(data, sender, vote.from, vote.progress.highestCommitted)
 
     val id = vote.requestId
@@ -36,51 +37,50 @@ trait PrepareResponseHandler {
         // register the vote
         val votes = map + (vote.from -> vote)
 
-        // FIXME we send more messages here then have a path below where we ignore the responses by backing down.
-        // if we have a majority response which show more slots to recover issue new prepare messages
-        val dataWithExpandedPrepareResponses: PaxosData = if (votes.size > data.clusterSize / 2) {
-          // issue more prepares there are more accepted slots than we so far ran recovery upon
-          data.prepareResponses.lastOption match {
-            case Some((Identifier(_, _, ourLastHighestAccepted), _)) =>
-              val theirHighestAccepted = votes.values.map(_.highestAcceptedIndex).max
-              if (theirHighestAccepted > ourLastHighestAccepted) {
-                val prepares = (ourLastHighestAccepted + 1) to theirHighestAccepted map { id =>
-                  Prepare(Identifier(nodeUniqueId, data.epoch.get, id))
-                }
-                log.info("Node {} Recoverer broadcasting {} new prepare messages for expanded slots {} to {}", nodeUniqueId, prepares.size, (ourLastHighestAccepted + 1), theirHighestAccepted)
-                prepares foreach { p =>
-                  log.debug("Node {} sending {}", nodeUniqueId, p)
-                  broadcast(p)
-                }
-
-                // accept our own prepare if we have not made a higher promise
-                val newPrepareSelfVotes: SortedMap[Identifier, Map[Int, PrepareResponse]] =
-                  (prepares map { prepare =>
-                    val ackOrNack = if (prepare.id.number >= data.progress.highestPromised) {
-                      PrepareAck(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))
-                    } else {
-                      // FIXME no test for this
-                      PrepareNack(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat)
-                    }
-                    val selfVote = Map(nodeUniqueId -> ackOrNack)
-                    (prepare.id -> selfVote)
-                  })(scala.collection.breakOut)
-                // FIXME no test for this
-                PaxosData.prepareResponsesLens.set(data, data.prepareResponses ++ newPrepareSelfVotes)
-              } else {
-                data
-              }
-            case None =>
-              data
-          }
-        } else {
-          data
-        }
         // tally the votes
         val (positives, negatives) = votes.partition {
           case (_, response) => response.isInstanceOf[PrepareAck]
         }
         if (positives.size > data.clusterSize / 2) {
+          // issue new prepare messages if others have accepted higher slot indexes
+          val dataWithExpandedPrepareResponses: PaxosData = if (votes.size > data.clusterSize / 2) {
+            // issue more prepares there are more accepted slots than we so far ran recovery upon
+            data.prepareResponses.lastOption match {
+              case Some((Identifier(_, _, ourLastHighestAccepted), _)) =>
+                val theirHighestAccepted = votes.values.map(_.highestAcceptedIndex).max
+                if (theirHighestAccepted > ourLastHighestAccepted) {
+                  val prepares = (ourLastHighestAccepted + 1) to theirHighestAccepted map { id =>
+                    Prepare(Identifier(nodeUniqueId, data.epoch.get, id))
+                  }
+                  log.info("Node {} Recoverer broadcasting {} new prepare messages for expanded slots {} to {}", nodeUniqueId, prepares.size, (ourLastHighestAccepted + 1), theirHighestAccepted)
+                  prepares foreach { p =>
+                    log.debug("Node {} sending {}", nodeUniqueId, p)
+                    broadcast(p)
+                  }
+
+                  // accept our own prepare if we have not made a higher promise
+                  val newPrepareSelfVotes: SortedMap[Identifier, Map[Int, PrepareResponse]] =
+                    (prepares map { prepare =>
+                      val ackOrNack = if (prepare.id.number >= data.progress.highestPromised) {
+                        PrepareAck(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex))
+                      } else {
+                        // FIXME no test for this
+                        PrepareNack(prepare.id, nodeUniqueId, data.progress, ourLastHighestAccepted, data.leaderHeartbeat)
+                      }
+                      val selfVote = Map(nodeUniqueId -> ackOrNack)
+                      (prepare.id -> selfVote)
+                    })(scala.collection.breakOut)
+                  // FIXME no test for this
+                  PaxosData.prepareResponsesLens.set(data, data.prepareResponses ++ newPrepareSelfVotes)
+                } else {
+                  data
+                }
+              case None =>
+                data
+            }
+          } else {
+            data
+          }
           // success gather any values
           val accepts = positives.values.map(_.asInstanceOf[PrepareAck]).flatMap(_.highestUncommitted)
           val accept = if (accepts.isEmpty) {
@@ -125,10 +125,11 @@ trait PrepareResponseHandler {
           log.info("Node {} {} received {} prepare nacks returning to follower", nodeUniqueId, stateName, negatives.size)
           // FIXME not test for this
           (Follower, backdownData(data))
-        }
+          }
         else {
+          // TODO what happens if we have an even number of nodes and a slip vote?
           val updated = data.prepareResponses + (vote.requestId -> votes)
-          (stateName, PaxosData.prepareResponsesLens.set(dataWithExpandedPrepareResponses, updated))
+          (stateName, PaxosData.prepareResponsesLens.set(data, updated))
         }
     }
   }
