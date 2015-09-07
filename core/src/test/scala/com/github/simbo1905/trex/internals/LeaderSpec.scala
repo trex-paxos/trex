@@ -145,22 +145,25 @@ class LeaderSpec
     }
 
     "commit when it receives a majority of accept acks" in {
+      // given a journal which records the save time and the progress
+      var saveTime = 0L
+      var savedProgress: Option[Progress] = None
       val stubJournal: Journal = stub[Journal]
-      // given a leader who has boardcast slot 99 and self voted on it and committed 98
+      val delegatingJournal = new DelegatingJournal(stubJournal) {
+        override def save(progress: Progress): Unit = {
+          saveTime = System.nanoTime()
+          savedProgress = Option(progress)
+        }
+      }
+      // and a leader who has boardcast slot 99 and self voted on it and committed 98
       val lastCommitted = Identifier(0, epoch, 98L)
       val id99 = Identifier(0, epoch, 99L)
       val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
       val responses = PaxosData.acceptResponsesLens.set(initialData, votes)
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
-      // and a journal which records when save as invoked
-      var saveTime = 0L
-      stubJournal.save _ when * returns {
-        saveTime = System.nanoTime()
-        Unit
-      }
       var sendTime = 0L
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, delegatingJournal, ArrayBuffer.empty, None) {
         override def send(actor: ActorRef, msg: Any): Unit = {
           sendTime = System.nanoTime()
           super.send(actor, msg)
@@ -178,14 +181,16 @@ class LeaderSpec
       expectMsgPF(100 millisecond) {
         case Commit(prepareId, _) => Unit
       }
-
       // and delivered that value
       fsm.underlyingActor.delivered.headOption match {
         case Some(c) => assert(c == ClientRequestCommandValue(0, expectedBytes))
         case x => fail(x.toString)
       }
       // and journal bookwork
-      //(stubJournal.save _).verify(fsm.stateData.progress) FIXME
+      savedProgress match {
+        case Some(p) if p == fsm.stateData.progress => // good
+        case x => fail(x.toString)
+      }
       // and deletes the pending work
       assert(fsm.stateData.acceptResponses.size == 0)
       // and send happens after save
@@ -246,8 +251,13 @@ class LeaderSpec
     }
 
     "commit in order when responses arrive out of order" in {
+      // given a journal which records the save time.
+      var saveTime = 0L
       val stubJournal: Journal = stub[Journal]
-      // given accepts 99 and 100 are in the store with 98 committed
+      val delgatingJournal = new DelegatingJournal(stubJournal) {
+        override def save(progress: Progress): Unit = saveTime = System.nanoTime()
+      }
+      // and accepts 99 and 100 are in the store with 98 committed
       val lastCommitted = Identifier(0, epoch, 98L)
       val id99 = Identifier(0, epoch, 99L)
       val a99 = Accept(id99, ClientRequestCommandValue(0, expectedBytes))
@@ -263,17 +273,9 @@ class LeaderSpec
 
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
 
-      // and a journal which records when save as invoked
-      var saveTime = 0L
-      stubJournal.save _ when * returns {
-        // FIXME broken as this runs immediately
-        saveTime = System.nanoTime()
-        Unit
-      }
-
       // and an actor which records the send time
       var sendTime = 0L
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, delgatingJournal, ArrayBuffer.empty, None) {
         override def send(actor: ActorRef, msg: Any): Unit = {
           sendTime = System.nanoTime()
           super.send(actor, msg)
@@ -296,14 +298,19 @@ class LeaderSpec
       }
 
       // and send happens after save
-      assert(saveTime > 0L && sendTime > 0L && saveTime < sendTime)
+      assert(saveTime > 0L)
+      assert(sendTime > 0L)
+      assert(saveTime < sendTime)
 
       // and delivered both values
       assert(fsm.underlyingActor.delivered.size == 2)
       // updated bookwork
       assert(fsm.stateData.progress.highestCommitted.logIndex == 100)
       // and journal bookwork
-      //(stubJournal.save _).verify(fsm.stateData.progress) FIXME
+      tempRecordTimesFileJournal.actionsWithTimestamp.toMap.getOrElse("save", fail).parameter match {
+        case p: Progress => p == fsm.stateData.progress
+        case x => fail(x.toString)
+      }
       // and deletes the pending work
       assert(fsm.stateData.acceptResponses.size == 0)
     }

@@ -176,7 +176,7 @@ trait LeaderLikeSpec {
   // TODO these next few tests need to be DRYed
   def resendsHigherAcceptOnLearningOtherNodeHigherPromise(role: PaxosRole)(implicit sender: ActorRef): Unit = {
     require(role == Leader || role == Recoverer)
-    val stubJournal: Journal = stub[Journal]
+    val tempJournal = AllStateSpec.tempRecordTimesFileJournal
 
     val lastCommitted = Identifier(0, BallotNumber(1, 0), 98L)
     // given a leader who has boardcast slot 99 and seen a nack
@@ -190,7 +190,7 @@ trait LeaderLikeSpec {
     val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
     val timenow = 999L
     var sendTime = 0L
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
+    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, tempJournal, ArrayBuffer.empty, None) {
       override def clock() = timenow
       override def send(actor: ActorRef, msg: Any): Unit = {
         sendTime = System.nanoTime()
@@ -198,13 +198,6 @@ trait LeaderLikeSpec {
       }
     })
     fsm.setState(role, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))))
-    // and a journal which records the save time
-    var saveTime = 0L
-    (stubJournal.save _) when(*) returns {
-      // FIXME broken as this runs immediately
-      saveTime = System.nanoTime()
-      Unit
-    }
 
     // when it gets a timeout
     fsm ! PaxosActor.CheckTimeout
@@ -218,13 +211,13 @@ trait LeaderLikeSpec {
         fail(s"${a.id}, ${newIdentifier} => ${a.id == newIdentifier} || ${a.value}, ${a99.value} => ${a.value == a99.value}")
       case x => fail(x.toString)
     }
-
     // and sets its
     assert(fsm.stateData.epoch == Some(newEpoch))
     // and sets a fresh timeout
     assert(fsm.stateData.timeout > 0 && fsm.stateData.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
 
     // and it sent out the messages only after having journalled its own promise
+    val saveTime = tempJournal.actionsWithTimestamp.toMap.getOrElse("save", fail).time
     assert(saveTime != 0 && sendTime != 0 && saveTime < sendTime)
   }
 

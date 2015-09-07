@@ -58,6 +58,18 @@ class TestTimingsFileJournal(storeFile: File, retained: Int) extends FileJournal
   }
 }
 
+class DelegatingJournal(val inner: Journal) extends Journal {
+  override def save(progress: Progress): Unit = inner.save(progress)
+
+  override def bounds: JournalBounds = inner.bounds
+
+  override def load(): Progress = inner.load()
+
+  override def accepted(logIndex: Long): Option[Accept] = inner.accepted(logIndex)
+
+  override def accept(a: Accept*): Unit = inner.accept(a: _*)
+}
+
 object AllStateSpec {
   val config = ConfigFactory.parseString("trex.leader-timeout-min=10\ntrex.leader-timeout-max=20\nakka.loglevel = \"DEBUG\"\nakka.actor.serialize-messages=on")
 
@@ -437,8 +449,7 @@ trait AllStateSpec {
 
   def ackHigherPrepare(state: PaxosRole)(implicit sender: ActorRef) = {
     // given no previous value
-    val stubJournal: Journal = stub[Journal]
-    stubJournal.accepted _ when 1L returns None
+    val testJournal = AllStateSpec.tempRecordTimesFileJournal
     // given low initial state
     val low = BallotNumber(5, 1)
     val initialData = PaxosData(Progress(low, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3)
@@ -446,18 +457,9 @@ trait AllStateSpec {
     val high = BallotNumber(10, 2)
     val highIdentifier = Identifier(0, high, 1L)
     val highPrepare = Prepare(highIdentifier)
-    // and an empty accept journal
-    stubJournal.bounds _ when() returns minJournalBounds
-    // which records the time save was called
-    var saveTs = 0L
-    stubJournal.save _ when * returns {
-      // FIXME broken as this runs immediately
-      saveTs = System.nanoTime()
-      Unit
-    }
     var sendTs = 0L
     // when our node sees this
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
+    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, testJournal, ArrayBuffer.empty, None) {
       override def send(actor: ActorRef, msg: Any): Unit = {
         sendTs = System.nanoTime()
         super.send(actor, msg)
@@ -471,9 +473,13 @@ trait AllStateSpec {
     assert(fsm.stateName == Follower)
     // it must have upated its highest promised
     assert(fsm.stateData.progress.highestPromised == high)
-    // and checks the journal
-    (stubJournal.accepted _).verify(1L)
-    (stubJournal.save _).verify(fsm.stateData.progress)
+    // journals the new progress
+    val actionsWithTimestamp = testJournal.actionsWithTimestamp.toMap
+    val TimeAndParameter(saveTs, progress: Progress) = actionsWithTimestamp.get("save").getOrElse(fail)
+    progress match {
+      case p if p == fsm.stateData.progress => // good
+      case x => fail(x.toString)
+    }
     // and the timestamps show that the save happened before the send
     saveTs should not be 0L
     sendTs should not be 0L

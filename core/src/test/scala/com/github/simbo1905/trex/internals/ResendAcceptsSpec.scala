@@ -112,28 +112,19 @@ class ResendAcceptsSpec extends WordSpecLike with Matchers with MockFactory {
     }
     "journalling and sending happens in the correct order" in {
       // given a journal which records saving and accepting
-      val stubJournal = stub[Journal]
-      var saveJournalTime = 0L
-      var acceptJournalTime = 0L
-      stubJournal.save _ when * returns {
-        // FIXME broken as this runs immediately
-        saveJournalTime = System.nanoTime()
-        Unit
-      }
-      stubJournal.accept _ when * returns {
-        // FIXME broken as this runs immediately
-        acceptJournalTime = System.nanoTime()
-        Unit
-      }
+      val tempJournal = AllStateSpec.tempRecordTimesFileJournal
       // and a handler that records broadcase time
       var sendTime = 0L
       val handler = new TestResendAcceptsHandler {
         override def randomTimeout = 121L
-        override def journal: Journal = stubJournal
+        override def journal: Journal = tempJournal
         override def broadcast(msg: Any): Unit = sendTime = System.nanoTime()
       }
       // when we get it to do work
       handler.handleResendAccepts(Leader, AllStateSpec.initialData.copy(acceptResponses = emptyAcceptResponses), 100L)
+      val journalledWork = tempJournal.actionsWithTimestamp.toMap
+      val saveJournalTime = journalledWork.getOrElse("save",fail).time
+      val acceptJournalTime = journalledWork.getOrElse("accept",fail).time
       // then we saved, accepted and sent
       assert(saveJournalTime > 0 && acceptJournalTime > 0 && sendTime > 0)
       // in the correct order had we done a full round of paxos which is promise, accept then send last

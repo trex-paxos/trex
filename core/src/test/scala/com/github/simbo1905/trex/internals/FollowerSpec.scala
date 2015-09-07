@@ -555,11 +555,21 @@ class FollowerSpec
     }
 
     "switch to recoverer and issue multiple prepare messages if there are slots to recover and no leader" in {
-      val stubJournal: Journal = stub[Journal]
       // given that we control the clock
       val timenow = 999L
+      var saveTime = 0L
+      // and a journal which records the save time
+      val stubJournal: Journal = stub[Journal]
+      val delegatingJournal = new DelegatingJournal(stubJournal) {
+        override def save(progress: Progress): Unit = {
+          saveTime = System.nanoTime()
+          super.save(progress)
+        }
+      }
+
+      // and that we record the send time
       var sendTime = 0L
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, delegatingJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
 
         override def send(actor: ActorRef, msg: Any): Unit = {
@@ -581,14 +591,6 @@ class FollowerSpec
 
       val id3 = Identifier(0, BallotNumber(lowValue + 1, 0), 3)
       (stubJournal.accepted _) when (3L) returns Some(Accept(id3, ClientRequestCommandValue(0, expectedBytes)))
-
-      // and a journal which records the save time
-      var saveTime = 0L
-      (stubJournal.save _) when (*) returns {
-        // FIXME broken as this runs immediately
-        saveTime = System.nanoTime()
-        Unit
-      }
 
       val id4 = Identifier(0, BallotNumber(lowValue + 1, 0), 4)
 
@@ -635,7 +637,9 @@ class FollowerSpec
       assert(fsm.stateData.acceptResponses.isEmpty)
 
       // and it sent out the messages only after having journalled its own promise
-      assert(saveTime != 0 && sendTime != 0 && saveTime < sendTime)
+      assert(saveTime != 0)
+      assert(sendTime != 0)
+      assert(saveTime < sendTime)
 
     }
 

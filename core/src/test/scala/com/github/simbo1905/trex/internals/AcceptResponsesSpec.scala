@@ -43,9 +43,6 @@ with WordSpecLike with Matchers with MockFactory {
         epoch = Some(a98.id.number),
         acceptResponses = selfAcceptResponses)
 
-      // and a journal that records save time and action
-      val testJournal = AllStateSpec.tempRecordTimesFileJournal
-
       // when we send accept to the handler which records the send time and save time
       var sendTime = 0L
       var saveTime = 0L
