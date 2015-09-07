@@ -25,6 +25,8 @@ class CoreSpec extends WordSpecLike with Matchers {
       assert(BallotNumber(1, 1) <= BallotNumber(2, 1))
       assert(BallotNumber(1, 1) <= BallotNumber(1, 2))
       assert(BallotNumber(1, 2) <= BallotNumber(1, 2))
+
+      assert(!(BallotNumber(2,1) <= BallotNumber(1,1)))
     }
   }
 
