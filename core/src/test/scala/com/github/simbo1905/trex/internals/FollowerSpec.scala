@@ -72,7 +72,7 @@ class FollowerSpec
       val retransmission = RetransmitResponse(1, 0, Seq(a1, a2, a3), Seq.empty)
 
       // and an empty node
-      val fileJournal: FileJournal = AllStateSpec.tempFileJournal
+      val fileJournal: FileJournal = AllStateSpec.tempRecordTimesFileJournal
       val delivered = ArrayBuffer[CommandValue]()
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, fileJournal, delivered, None))
 
@@ -129,6 +129,7 @@ class FollowerSpec
       ackHigherAcceptMakingPromise(Follower)
     }
     "not switch to recoverer if it does not timeout" in {
+      val stubJournal: Journal = stub[Journal]
       // when our node has a high timeout
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
       fsm.setState(Follower, initialData.copy(timeout = System.currentTimeMillis + minute))
@@ -142,6 +143,7 @@ class FollowerSpec
     val timenow = 999L
     "update its timeout when it sees a commit" in {
       // given an initalized journal
+      val stubJournal: Journal = stub[Journal]
       (stubJournal.load _) when() returns (Journal.minBookwork)
       // given we control the clock
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
@@ -156,6 +158,7 @@ class FollowerSpec
       fsm.stateData.leaderHeartbeat should be(9999L)
     }
     "update its heartbeat when it sees a commit" in {
+      val stubJournal: Journal = stub[Journal]
       // given we control the clock
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
@@ -169,6 +172,7 @@ class FollowerSpec
     }
     "commit next slot if same number as previous commit" in {
       // given an initialized journal
+      val stubJournal: Journal = stub[Journal]
       (stubJournal.load _) when() returns (Journal.minBookwork)
 
       // given slot 1 has been accepted under the same number as previously committed slot 0 shown in initialData
@@ -193,6 +197,7 @@ class FollowerSpec
     }
     "commit next slot on a different number as previous commit" in {
       // given an initialized journal
+      val stubJournal: Journal = stub[Journal]
       (stubJournal.load _) when() returns (Journal.minBookwork)
 
       // given slot 1 has been accepted under a different number as previously committed slot 0 shown in initialData
@@ -220,6 +225,7 @@ class FollowerSpec
     }
     "request retranmission if commit of next in slot does not match value in slot" in {
       // given an initalized journal
+      val stubJournal: Journal = stub[Journal]
       (stubJournal.load _) when() returns (Journal.minBookwork)
 
       // given slot 1 has been accepted under the same number as previously committed slot 0 shown in initialData
@@ -243,6 +249,7 @@ class FollowerSpec
     }
     "commit if three slots if previous accepts are from stable leader" in {
       // given an initalized journal
+      val stubJournal: Journal = stub[Journal]
       (stubJournal.load _) when() returns (Journal.minBookwork)
 
       // given slots 1 thru 3 have been accepted under the same number as previously committed slot 0 shown in initialData
@@ -275,6 +282,7 @@ class FollowerSpec
     }
     "request retransmission if it sees a gap in commit sequence" in {
       // given an initalized journal
+      val stubJournal: Journal = stub[Journal]
       (stubJournal.load _) when() returns (Journal.minBookwork)
 
       // given slots 1 thru 3 have been accepted under the same number as previously committed slot 0 shown in initialData
@@ -306,7 +314,7 @@ class FollowerSpec
       // given an journal with a promise to node1 and committed up to last from node2
       val node1 = 1
       val node2 = 2
-
+      val stubJournal: Journal = stub[Journal]
       (stubJournal.load _) when() returns (Progress(BallotNumber(99, node1), Identifier(node2, BallotNumber(98, node2), 0L)))
 
       // given slots 1 and 3 match the promise but slot 2 has old value from failed leader.
@@ -339,6 +347,7 @@ class FollowerSpec
       val otherNodeId = 1
 
       val id1other = Identifier(otherNodeId, BallotNumber(0, 0), 1L)
+      val stubJournal: Journal = stub[Journal]
       (stubJournal.accepted _) when (1L) returns Some(Accept(id1other, ClientRequestCommandValue(0, expectedBytes)))
 
       val id2other = Identifier(otherNodeId, BallotNumber(0, 0), 2L)
@@ -364,6 +373,7 @@ class FollowerSpec
     val minPrepare = Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
 
     "times-out and issues a single low prepare" in {
+      val stubJournal: Journal = stub[Journal]
       // given that we control the clock
       val timenow = 999L
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
@@ -389,6 +399,7 @@ class FollowerSpec
       }
     }
     "re-issues a low prepare on subsequent time-outs when it has not recieved any responses" in {
+      val stubJournal: Journal = stub[Journal]
       // given that we control the clock
       var timenow = 999L
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
@@ -421,6 +432,7 @@ class FollowerSpec
     }
     "backdown from a low prepare on receiving a fresh heartbeat commit from the same leader and request a retransmit" in {
       // given an initalized journal
+      val stubJournal: Journal = stub[Journal]
       (stubJournal.load _) when() returns (Journal.minBookwork)
 
       // given that we control the clock
@@ -543,7 +555,7 @@ class FollowerSpec
     }
 
     "switch to recoverer and issue multiple prepare messages if there are slots to recover and no leader" in {
-
+      val stubJournal: Journal = stub[Journal]
       // given that we control the clock
       val timenow = 999L
       var sendTime = 0L
@@ -573,6 +585,7 @@ class FollowerSpec
       // and a journal which records the save time
       var saveTime = 0L
       (stubJournal.save _) when (*) returns {
+        // FIXME broken as this runs immediately
         saveTime = System.nanoTime()
         Unit
       }

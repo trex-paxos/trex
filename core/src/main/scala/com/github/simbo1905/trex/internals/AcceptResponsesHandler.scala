@@ -18,7 +18,7 @@ trait AcceptResponsesHandler {
 
   def commit(state: PaxosRole, data: PaxosData, identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)])
 
-  def journal: Journal
+  def journalProgress(progress: Progress): Progress
 
   def broadcast(msg: Any): Unit
 
@@ -59,8 +59,8 @@ trait AcceptResponsesHandler {
                 case _ =>
                   val (newProgress, results) = commit(stateName, oldData, committable.last._1, votesData.progress)
 
-                  // FIXME test that the send of the commit happens after saving the progress
-                  // FIXME was no test checking that this was broadcast not just replied to sender
+                  journalProgress(newProgress)
+
                   broadcast(Commit(newProgress.highestCommitted))
 
                   if (oldData.clientCommands.nonEmpty) {
@@ -88,15 +88,13 @@ trait AcceptResponsesHandler {
             } else {
               // insufficient votes keep counting
               val updated = oldData.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(randomTimeout, accept, latestVotes))
-              log.debug("Node {} {} insufficent votes for {} have {}", nodeUniqueId, stateName, vote.requestId, updated)
+              log.debug("Node {} {} insufficient votes for {} have {}", nodeUniqueId, stateName, vote.requestId, updated)
               (stateName, PaxosData.acceptResponsesLens.set(oldData, updated))
             }
           case None =>
             log.debug("Node {} {} ignoring response we are not awaiting: {}", nodeUniqueId, stateName, vote)
             (stateName, oldData)
-
         }
-
     }
   }
 }

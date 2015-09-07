@@ -35,19 +35,21 @@ class TestAcceptMapJournal extends Journal {
   def save(p: Progress): Unit = progress = p
 }
 
+case class TimeAndParameter(time: Long, parameter: Any)
+
 class TestTimingsFileJournal(storeFile: File, retained: Int) extends FileJournal(storeFile, retained) {
 
-  var actionsWithTimestamp = Seq.empty[(String, Long)]
+  var actionsWithTimestamp = Seq.empty[(String, TimeAndParameter)]
 
   save(Journal.minBookwork)
 
   override def save(progress: Progress): Unit = {
-    actionsWithTimestamp = actionsWithTimestamp :+("save", System.nanoTime())
+    actionsWithTimestamp = actionsWithTimestamp :+("save", TimeAndParameter(System.nanoTime(), progress))
     super.save(progress)
   }
 
   override def accept(a: Accept*): Unit = {
-    actionsWithTimestamp = actionsWithTimestamp :+("accept", System.nanoTime())
+    actionsWithTimestamp = actionsWithTimestamp :+("accept", TimeAndParameter(System.nanoTime(), a))
     super.accept(a: _*)
   }
 
@@ -77,8 +79,7 @@ object AllStateSpec {
 
   val atomicCounter = new AtomicInteger()
 
-  def tempFileJournal = new TestTimingsFileJournal(File.createTempFile(s"db${this.getClass.getSimpleName}${AllStateSpec.atomicCounter.getAndIncrement}", "tmp"), 100)
-
+  def tempRecordTimesFileJournal = new TestTimingsFileJournal(File.createTempFile(s"db${this.getClass.getSimpleName}${AllStateSpec.atomicCounter.getAndIncrement}", "tmp"), 100)
 }
 
 trait AllStateSpec {
@@ -87,8 +88,6 @@ trait AllStateSpec {
   import AllStateSpec._
   import PaxosActor.Configuration
 
-  val stubJournal: Journal = stub[Journal]
-
   val leaderHeartbeat2 = 2
   val clusterSize3 = 3
   val clusterSize5 = 5
@@ -96,7 +95,7 @@ trait AllStateSpec {
 
   def retransmitRequestInvokesHandler(state: PaxosRole)(implicit sender: ActorRef): Unit = {
     var handledMessage = false
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, AllStateSpec.tempFileJournal, ArrayBuffer.empty, None) {
+    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, AllStateSpec.tempRecordTimesFileJournal, ArrayBuffer.empty, None) {
       override def handleRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData): Progress = {
         handledMessage = true
         super.handleRetransmitResponse(response, nodeData)
@@ -108,7 +107,7 @@ trait AllStateSpec {
 
   def retransmitResponseInvokesHandler(state: PaxosRole)(implicit sender: ActorRef): Unit = {
     var handledMessage = false
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, AllStateSpec.tempFileJournal, ArrayBuffer.empty, None) {
+    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, AllStateSpec.tempRecordTimesFileJournal, ArrayBuffer.empty, None) {
       override def handleRetransmitRequest(sender: ActorRef, request: RetransmitRequest, nodeData: PaxosData): Unit = {
         handledMessage = true
         super.handleRetransmitRequest(sender, request, nodeData)
@@ -119,6 +118,7 @@ trait AllStateSpec {
   }
 
   def ignoresCommitLessThanLast(state: PaxosRole)(implicit sender: ActorRef) {
+    val stubJournal: Journal = stub[Journal]
     // given a candidate with no responses
     val identifier = Identifier(0, BallotNumber(lowValue + 1, 0), 1L)
     val lessThan = Identifier(0, BallotNumber(lowValue, 0), 0L)
@@ -134,6 +134,7 @@ trait AllStateSpec {
   }
 
   def ackAccept(state: PaxosRole)(implicit sender: ActorRef) {
+    val stubJournal: Journal = stub[Journal]
     // given initial state
     val promised = BallotNumber(6, 1)
     val initialData = PaxosData(Progress(promised, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3)
@@ -159,13 +160,10 @@ trait AllStateSpec {
     val promised = BallotNumber(6, 1)
     val initialData = PaxosData(Progress(promised, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3)
     // and a journal which records the time save was called
-    var saveTs = 0L
-    stubJournal.save _ when * returns {
-      saveTs = System.nanoTime()
-      Unit
-    }
+    val testJournal = AllStateSpec.tempRecordTimesFileJournal
+
     var sendTs = 0L
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
+    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, testJournal, ArrayBuffer.empty, None) {
       override def send(actor: ActorRef, msg: Any): Unit = {
         sendTs = System.nanoTime()
         super.send(actor, msg)
@@ -183,8 +181,16 @@ trait AllStateSpec {
     expectMsg(250 millisecond, AcceptAck(identifier, 0, initialData.progress))
     // stays in the same state
     assert(fsm.stateName == state)
-    // journals the new value
-    (stubJournal.accept _).verify(Seq(accepted))
+    // journals the new accepts
+    val actionsWithTimestamp = testJournal.actionsWithTimestamp.toMap
+    val TimeAndParameter(_, accepts: Seq[Any]) = actionsWithTimestamp.get("accept").getOrElse(fail)
+    assert(accepts == Seq(accepted))
+    // journals the new progress
+    val TimeAndParameter(saveTs, progress: Progress) = actionsWithTimestamp.get("save").getOrElse(fail)
+    progress match {
+      case p if p.highestPromised == higherNumber => // good
+      case x => fail(x.toString)
+    }
     // updates its promise to the new value
     assert(fsm.stateData == initialData.copy(progress = initialData.progress.copy(highestPromised = higherNumber)))
     // and the timestamps show that the save happened before the send
@@ -194,6 +200,7 @@ trait AllStateSpec {
   }
 
   def ackDuplicatedAccept(state: PaxosRole)(implicit sender: ActorRef) {
+    val stubJournal: Journal = stub[Journal]
     // given initial state
     val promised = BallotNumber(6, 1)
     val initialData = PaxosData(Progress(promised, Identifier(0, promised, Long.MinValue)), leaderHeartbeat2, timeout4, clusterSize3)
@@ -216,6 +223,7 @@ trait AllStateSpec {
   }
 
   def nackAcceptAboveCommitWatermark(state: PaxosRole)(implicit sender: ActorRef) {
+    val stubJournal: Journal = stub[Journal]
     // given initial state
     val committedLogIndex = 1
     val promised = BallotNumber(5, 0)
@@ -236,6 +244,7 @@ trait AllStateSpec {
   }
 
   def nackAcceptLowerThanPromise(state: PaxosRole)(implicit sender: ActorRef) {
+    val stubJournal: Journal = stub[Journal]
     // given initial state
     val promised = BallotNumber(5, 1)
     val initialData = PaxosData(Progress(promised, minIdentifier), leaderHeartbeat2, 0, clusterSize3)
@@ -276,7 +285,7 @@ trait AllStateSpec {
     // and an node that has committed to not just prior to those values such that it cannot in-order deliver
     val lastCommitted = Identifier(1, BallotNumber(1, 1), 96L)
     val oldProgress = Progress.highestPromisedHighestCommitted.set(initialData.progress, (lastCommitted.number, lastCommitted))
-    val fileJournal: FileJournal = AllStateSpec.tempFileJournal
+    val fileJournal: FileJournal = AllStateSpec.tempRecordTimesFileJournal
     val delivered = ArrayBuffer[CommandValue]()
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, fileJournal, delivered, None))
     fsm.setState(state, initialData.copy(progress = oldProgress))
@@ -326,7 +335,7 @@ trait AllStateSpec {
     // and an node that has committed to not just prior to those values
     val lastCommitted = Identifier(1, BallotNumber(1, 1), 97L)
     val oldProgress = Progress.highestPromisedHighestCommitted.set(initialData.progress, (lastCommitted.number, lastCommitted))
-    val fileJournal: FileJournal = AllStateSpec.tempFileJournal
+    val fileJournal: FileJournal = AllStateSpec.tempRecordTimesFileJournal
     val delivered = ArrayBuffer[CommandValue]()
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, fileJournal, delivered, None))
     fsm.setState(state, initialData.copy(progress = oldProgress))
@@ -355,6 +364,7 @@ trait AllStateSpec {
   }
 
   def nackLowerCounterPrepare(state: PaxosRole)(implicit sender: ActorRef) {
+    val stubJournal: Journal = stub[Journal]
     // given higher initial state
     val high = BallotNumber(10, 1)
     val initialData = PaxosData(Progress(high, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3)
@@ -377,6 +387,7 @@ trait AllStateSpec {
   }
 
   def nackLowerNumberedPrepare(state: PaxosRole)(implicit sender: ActorRef) {
+    val stubJournal: Journal = stub[Journal]
     // given higher initial state
     val high = BallotNumber(10, 2)
     val initialData = PaxosData(Progress(high, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3)
@@ -400,6 +411,7 @@ trait AllStateSpec {
 
   def ackRepeatedPrepare(state: PaxosRole)(implicit sender: ActorRef) {
     // given no previous value
+    val stubJournal: Journal = stub[Journal]
     stubJournal.accepted _ when 1L returns None
     // given higher initial state
     val high = BallotNumber(10, 1)
@@ -425,6 +437,7 @@ trait AllStateSpec {
 
   def ackHigherPrepare(state: PaxosRole)(implicit sender: ActorRef) = {
     // given no previous value
+    val stubJournal: Journal = stub[Journal]
     stubJournal.accepted _ when 1L returns None
     // given low initial state
     val low = BallotNumber(5, 1)
@@ -438,6 +451,7 @@ trait AllStateSpec {
     // which records the time save was called
     var saveTs = 0L
     stubJournal.save _ when * returns {
+      // FIXME broken as this runs immediately
       saveTs = System.nanoTime()
       Unit
     }

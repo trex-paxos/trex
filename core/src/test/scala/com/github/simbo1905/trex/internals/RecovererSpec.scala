@@ -329,7 +329,7 @@ class RecovererSpec
   }
 
   "reissue same accept messages it gets a timeout and no challenge" in {
-    resendsNoLeaderChallenges(Recoverer)
+    resendsSameAcceptOnTimeoutNoOtherInfo(Recoverer)
   }
 
   "reissue higher accept messages upon learning of another nodes higher promise in a nack" in {
@@ -348,7 +348,7 @@ class RecovererSpec
     val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
       Seq((recoverHighPrepare.id -> Map(0 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None))))
 
-    val state = initialData.copy(clusterSize = numberOfNodes, epoch = Some(recoverHighPrepare.id.number), prepareResponses = prepareSelfVotes, acceptResponses = SortedMap.empty)
+    val data = initialData.copy(clusterSize = numberOfNodes, epoch = Some(recoverHighPrepare.id.number), prepareResponses = prepareSelfVotes, acceptResponses = SortedMap.empty)
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, numberOfNodes), 0, self, new TestAcceptMapJournal {
       override def save(p: Progress): Unit = {
         saveTime = System.nanoTime()
@@ -366,7 +366,7 @@ class RecovererSpec
         super.send(actor, msg)
       }
     })
-    fsm.setState(Recoverer, state)
+    fsm.setState(Recoverer, data)
     (fsm, recoverHighPrepare.id)
   }
 }

@@ -270,7 +270,6 @@ with FollowerTimeoutHandler
       log.debug("Node {} {} {}", nodeUniqueId, stateName, vote)
       val (role, data) = handleAcceptResponse(nodeUniqueId, stateName, sender(), vote, oldData)
       goto(role) using data
-
   }
 
   /**

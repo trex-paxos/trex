@@ -18,28 +18,31 @@ trait LeaderLikeSpec {
   import Ordering._
   import PaxosActor.Configuration
 
-  def ignoreCommitMessageLogIndexLessThanLastCommit(state: PaxosRole)(implicit sender: ActorRef) {
-    require(state == Leader || state == Recoverer)
+  def ignoreCommitMessageLogIndexLessThanLastCommit(role: PaxosRole)(implicit sender: ActorRef) {
+    require(role == Leader || role == Recoverer)
+    val stubJournal: Journal = stub[Journal]
     // given a leaderlike with no responses
     val identifier = Identifier(0, BallotNumber(lowValue + 1, 0), 1L)
     val lessThan = Identifier(0, BallotNumber(lowValue, 0), 0L)
     val data = initialData.copy(clusterSize = 3, progress = initialData.progress.copy(highestCommitted = identifier))
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
-    fsm.setState(state, data)
+    fsm.setState(role, data)
     // when it gets commit
     val commit = Commit(lessThan)
     fsm ! commit
     // it sends no messages
     expectNoMsg(25 millisecond)
     // and stays a recoverer
-    assert(fsm.stateName == state)
+    assert(fsm.stateName == role)
   }
 
-  def ignoreCommitMessageSameSlotLowerNodeIdentifier(state: PaxosRole)(implicit sender: ActorRef) {
+  def ignoreCommitMessageSameSlotLowerNodeIdentifier(role: PaxosRole)(implicit sender: ActorRef) {
+    require(role == Leader || role == Recoverer)
+    val stubJournal: Journal = stub[Journal]
     // given
     val node2slot1Identifier = Identifier(2, BallotNumber(lowValue + 1, 2), 1L)
     val node2 = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 2, sender, stubJournal, ArrayBuffer.empty, None))
-    node2.setState(state, initialData.copy(epoch = Some(node2slot1Identifier.number), clusterSize = 3, progress = initialData.progress.copy(highestCommitted = node2slot1Identifier)))
+    node2.setState(role, initialData.copy(epoch = Some(node2slot1Identifier.number), clusterSize = 3, progress = initialData.progress.copy(highestCommitted = node2slot1Identifier)))
     // when node2 it gets commit for same slot but lower nodeIdentifier
     val node0slot1Identifier = Identifier(0, BallotNumber(lowValue + 1, 0), 1L)
     val commit = Commit(node0slot1Identifier)
@@ -47,17 +50,19 @@ trait LeaderLikeSpec {
     // it sends no messages
     expectNoMsg(25 millisecond)
     // and stays a recoverer
-    assert(node2.stateName == state)
+    assert(node2.stateName == role)
   }
 
-  def backdownToFollowerOnCommitSameSlotHigherNodeIdentifier(state: PaxosRole)(implicit sender: ActorRef) {
+  def backdownToFollowerOnCommitSameSlotHigherNodeIdentifier(role: PaxosRole)(implicit sender: ActorRef) {
+    require(role == Leader || role == Recoverer)
+    val stubJournal: Journal = stub[Journal]
     // given
     val node2slot1Identifier = Identifier(2, BallotNumber(lowValue + 1, 2), 1L)
     val timenow = 999L
     val node2 = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 2, sender, stubJournal, ArrayBuffer.empty, None){
       override def clock() = timenow
     })
-    node2.setState(state, initialData.copy(epoch = Some(node2slot1Identifier.number), clusterSize = 3, progress = initialData.progress.copy(highestCommitted = node2slot1Identifier)))
+    node2.setState(role, initialData.copy(epoch = Some(node2slot1Identifier.number), clusterSize = 3, progress = initialData.progress.copy(highestCommitted = node2slot1Identifier)))
     // when node2 it gets commit for same slot but lower nodeIdentifier
     val node3slot1Identifier = Identifier(0, BallotNumber(lowValue + 1, 3), 1L)
     val commit = Commit(node3slot1Identifier)
@@ -74,7 +79,9 @@ trait LeaderLikeSpec {
     assert(node2.stateData.timeout > 0 && node2.stateData.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
   }
 
-  def backdownToFollowerAndRequestRetransmissionOnCommitHigherThanLastCommitted(state: PaxosRole)(implicit sender: ActorRef) {
+  def backdownToFollowerAndRequestRetransmissionOnCommitHigherThanLastCommitted(role: PaxosRole)(implicit sender: ActorRef) {
+    require(role == Leader || role == Recoverer)
+    val stubJournal: Journal = stub[Journal]
     // given a recoverer with no responses
     val identifier = Identifier(1, BallotNumber(lowValue + 1, 0), 1L)
     val greaterThan = Identifier(1, BallotNumber(lowValue + 2, 2), 2L)
@@ -82,7 +89,7 @@ trait LeaderLikeSpec {
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None){
       override def clock() = timenow
     })
-    fsm.setState(state, initialData.copy(clusterSize = 3, progress = initialData.progress.copy(highestCommitted = identifier)))
+    fsm.setState(role, initialData.copy(clusterSize = 3, progress = initialData.progress.copy(highestCommitted = identifier)))
     // when it gets commit
     val commit = Commit(greaterThan)
     fsm ! commit
@@ -98,7 +105,9 @@ trait LeaderLikeSpec {
     assert(fsm.stateData.timeout > 0 && fsm.stateData.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
   }
 
-  def backdownToFollowerAndCommitOnCommitHigherThanLastCommitted(state: PaxosRole)(implicit sender: ActorRef) {
+  def backdownToFollowerAndCommitOnCommitHigherThanLastCommitted(role: PaxosRole)(implicit sender: ActorRef) {
+    require(role == Leader || role == Recoverer)
+    val stubJournal: Journal = stub[Journal]
 
     val timenow = 999L
 
@@ -115,7 +124,7 @@ trait LeaderLikeSpec {
       override def clock() = timenow
     })
 
-    fsm.setState(state)
+    fsm.setState(role)
 
     // when we see a high commit
     fsm ! Commit(identifier)
@@ -137,7 +146,10 @@ trait LeaderLikeSpec {
     assert(fsm.stateData.timeout > 0 && fsm.stateData.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
   }
 
-  def resendsNoLeaderChallenges(state: PaxosRole)(implicit sender: ActorRef): Unit = {
+  def resendsSameAcceptOnTimeoutNoOtherInfo(role: PaxosRole)(implicit sender: ActorRef): Unit = {
+    require(role == Leader || role == Recoverer)
+    val stubJournal: Journal = stub[Journal]
+
     val lastCommitted = Identifier(0, BallotNumber(1, 0), 98L)
     // self voted on accept id99
     val id99 = Identifier(0, BallotNumber(1, 0), 99L)
@@ -149,7 +161,7 @@ trait LeaderLikeSpec {
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
       override def clock() = timenow
     })
-    fsm.setState(state, responses.copy(epoch = Some(BallotNumber(1, 0)), progress = oldProgress))
+    fsm.setState(role, responses.copy(epoch = Some(BallotNumber(1, 0)), progress = oldProgress))
 
     // when it gets a timeout
     fsm ! PaxosActor.CheckTimeout
@@ -162,7 +174,10 @@ trait LeaderLikeSpec {
   }
 
   // TODO these next few tests need to be DRYed
-  def resendsHigherAcceptOnLearningOtherNodeHigherPromise(state: PaxosRole)(implicit sender: ActorRef): Unit = {
+  def resendsHigherAcceptOnLearningOtherNodeHigherPromise(role: PaxosRole)(implicit sender: ActorRef): Unit = {
+    require(role == Leader || role == Recoverer)
+    val stubJournal: Journal = stub[Journal]
+
     val lastCommitted = Identifier(0, BallotNumber(1, 0), 98L)
     // given a leader who has boardcast slot 99 and seen a nack
     val id99 = Identifier(0, BallotNumber(1, 0), 99L)
@@ -182,10 +197,11 @@ trait LeaderLikeSpec {
         actor ! msg
       }
     })
-    fsm.setState(state, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))))
+    fsm.setState(role, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))))
     // and a journal which records the save time
     var saveTime = 0L
     (stubJournal.save _) when(*) returns {
+      // FIXME broken as this runs immediately
       saveTime = System.nanoTime()
       Unit
     }
@@ -212,7 +228,10 @@ trait LeaderLikeSpec {
     assert(saveTime != 0 && sendTime != 0 && saveTime < sendTime)
   }
 
-  def resendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(state: PaxosRole)(implicit sender: ActorRef): Unit = {
+  def resendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(role: PaxosRole)(implicit sender: ActorRef): Unit = {
+    require(role == Leader || role == Recoverer)
+    val stubJournal: Journal = stub[Journal]
+
     val lastCommitted = Identifier(0, BallotNumber(1, 0), 98L)
     // given a leader who has boardcast slot 99 and seen a nack
     val id99 = Identifier(0, BallotNumber(1, 0), 99L)
@@ -227,7 +246,7 @@ trait LeaderLikeSpec {
       override def clock() = timenow
       override def freshTimeout(interval: Long): Long = 1234L
     })
-    fsm.setState(state, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))))
+    fsm.setState(role, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))))
 
     // when it gets a timeout
     fsm ! PaxosActor.CheckTimeout

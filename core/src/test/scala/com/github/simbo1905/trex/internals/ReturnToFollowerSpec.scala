@@ -4,7 +4,6 @@ import akka.actor.{ActorSystem, ActorRef}
 import akka.event.LoggingAdapter
 import akka.testkit.{TestKit, TestProbe}
 import org.scalatest.{Matchers, WordSpecLike}
-import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class UndefinedReturnToFollowerHandler extends ReturnToFollowerHandler {

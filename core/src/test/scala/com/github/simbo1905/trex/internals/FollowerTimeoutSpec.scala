@@ -180,7 +180,7 @@ with WordSpecLike with Matchers {
     "computes high prepares for higher slots when should failover" in {
       val vote = PrepareNack(minPrepare.id, 1, AllStateSpec.initialData.progress, 3, 0)
       val handler = new TestFollowerTimeoutHandler {
-        override def journal: Journal = AllStateSpec.tempFileJournal
+        override def journal: Journal = AllStateSpec.tempRecordTimesFileJournal
       }
       handler.handLowPrepareResponse(0, Follower, initialDataWithTimeoutAndPrepareResponses.copy(leaderHeartbeat = 999L), TestProbe().ref, vote) match {
         case LowPrepareResponseResult(Recoverer, data, highPrepares) =>
@@ -208,7 +208,7 @@ with WordSpecLike with Matchers {
     "invoke the follower timeout handler" in {
       // given a node who should timeout on a low prepare
       var invoked = false
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, 3), 0, TestProbe().ref, AllStateSpec.tempFileJournal, ArrayBuffer.empty, None) {
+      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, 3), 0, TestProbe().ref, AllStateSpec.tempRecordTimesFileJournal, ArrayBuffer.empty, None) {
         override def handleFollowerTimeout(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData): PaxosData = {
           invoked = true
           super.handleFollowerTimeout(nodeUniqueId, stateName, data)
@@ -228,7 +228,7 @@ with WordSpecLike with Matchers {
     "invoke the resend low prepare handler upon timeout" in {
       // given a node who should timeout on a low prepare
       var invoked = false
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, 3), 0, TestProbe().ref, AllStateSpec.tempFileJournal, ArrayBuffer.empty, None) {
+      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, 3), 0, TestProbe().ref, AllStateSpec.tempRecordTimesFileJournal, ArrayBuffer.empty, None) {
         override def handleResendLowPrepares(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData): PaxosData = {
           invoked = true
           super.handleResendLowPrepares(nodeUniqueId, stateName, data)
@@ -249,7 +249,7 @@ with WordSpecLike with Matchers {
       // given an actor which is hardwired to promote to recoverer
       var saveTs = 0L
       var sendTs = 0L
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, 3), 0, TestProbe().ref, AllStateSpec.tempFileJournal, ArrayBuffer.empty, None) {
+      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, 3), 0, TestProbe().ref, AllStateSpec.tempRecordTimesFileJournal, ArrayBuffer.empty, None) {
         override def handLowPrepareResponse(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData, sender: ActorRef, vote: PrepareResponse): LowPrepareResponseResult = {
           LowPrepareResponseResult(Recoverer, data, Seq(minPrepare))
         }

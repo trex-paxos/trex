@@ -116,10 +116,12 @@ class ResendAcceptsSpec extends WordSpecLike with Matchers with MockFactory {
       var saveJournalTime = 0L
       var acceptJournalTime = 0L
       stubJournal.save _ when * returns {
+        // FIXME broken as this runs immediately
         saveJournalTime = System.nanoTime()
         Unit
       }
       stubJournal.accept _ when * returns {
+        // FIXME broken as this runs immediately
         acceptJournalTime = System.nanoTime()
         Unit
       }
