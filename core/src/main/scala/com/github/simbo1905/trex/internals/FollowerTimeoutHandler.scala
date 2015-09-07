@@ -125,7 +125,7 @@ object FollowerTimeoutHandler {
     val prepares = (highestCommittedIndex + 1) to (highestAcceptedIndex + 1) map {
       slot => Prepare(Identifier(nodeUniqueId, higherNumber, slot))
     }
-    if (prepares.nonEmpty) prepares else Seq(Prepare(Identifier(nodeUniqueId, higherNumber, highestCommittedIndex + 1))) // FIXME empty was not picked up in unit test only when first booting a cluster
+    if (prepares.nonEmpty) prepares else Seq(Prepare(Identifier(nodeUniqueId, higherNumber, highestCommittedIndex + 1)))
   }
 
   def computeFailover(log: LoggingAdapter, nodeUniqueId: Int, data: PaxosData, votes: Map[Int, PrepareResponse]): FailoverResult = {

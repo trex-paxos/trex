@@ -203,6 +203,29 @@ with WordSpecLike with Matchers {
         case x => fail(x.toString)
       }
     }
+    "creates a prepare one higher than committed when highest accepted equals highest committed" in {
+      val minIdentifier = Identifier(0, BallotNumber(0, 0), 0L)
+      FollowerTimeoutHandler.recoverPrepares(0, minIdentifier.number, 0L, 0L) match {
+        case Seq(prepare) if prepare.id.logIndex == 1 && prepare.id.number == BallotNumber(1, 0) => // good
+        case x => fail(x.toString())
+      }
+    }
+    "creates two prepares if the highest accepted is one higher than the highest committed" in {
+      val minIdentifier = Identifier(0, BallotNumber(0, 0), 0L)
+      val higherNumber = BallotNumber(1, 0)
+      FollowerTimeoutHandler.recoverPrepares(0, minIdentifier.number, 0L, 1L) match {
+        case Seq(p1, p2) =>
+          p1 match {
+            case p if p.id.logIndex == 1 && p.id.number == higherNumber => // good
+            case x => fail(x.toString)
+          }
+          p2 match {
+            case p if p.id.logIndex == 2 && p.id.number == higherNumber => // good
+            case x => fail(x.toString)
+          }
+        case x => fail(x.toString())
+      }
+    }
   }
   "PaxosActor" should {
     "invoke the follower timeout handler" in {
