@@ -122,11 +122,10 @@ trait PrepareResponseHandler {
           (Follower, backdownData(data))
           }
         else {
-          // TODO what happens if we have an even number of nodes and a slip vote?
+          // TODO what happens if we have an even number of nodes and a split vote?
           val updated = data.prepareResponses + (vote.requestId -> votes)
           (stateName, PaxosData.prepareResponsesLens.set(data, updated))
         }
     }
   }
-
 }

@@ -11,8 +11,10 @@ import scala.collection.SortedMap
 import scala.collection.mutable.ArrayBuffer
 import Ordering._
 
+case class TimeAndMessage(message: Any, time: Long)
+
 class TestPrepareResponseHandler extends PrepareResponseHandler {
-  val broadcastValues: ArrayBuffer[(Any,Long)] = ArrayBuffer()
+  val broadcastValues: ArrayBuffer[TimeAndMessage] = ArrayBuffer()
 
   override def backdownData(data: PaxosData): PaxosData = PaxosActor.backdownData(data, randomTimeout)
 
@@ -23,7 +25,7 @@ class TestPrepareResponseHandler extends PrepareResponseHandler {
   override def randomTimeout: Long = 1234L
 
   override def broadcast(msg: Any): Unit = {
-    val update = (msg, System.nanoTime())
+    val update = TimeAndMessage(msg, System.nanoTime())
     broadcastValues += update
   }
 
@@ -84,7 +86,7 @@ class PrepareResponseSpec extends TestKit(ActorSystem("PrepareResponseSpec")) wi
       }
       // and we send on prepare and one accept
       handler.broadcastValues match {
-        case ArrayBuffer((p: Prepare, _), (a: Accept, _)) =>
+        case ArrayBuffer(TimeAndMessage(p: Prepare, _), TimeAndMessage(a: Accept, _)) =>
           p match {
             case p if p.id.logIndex == otherAcceptedIndex => // good
             case f => fail(f.toString)
@@ -96,7 +98,7 @@ class PrepareResponseSpec extends TestKit(ActorSystem("PrepareResponseSpec")) wi
         case f => fail(f.toString)
       }
       // and we accepted our own new prepare
-      data.prepareResponses.headOption.get match {
+      data.prepareResponses.headOption.value match {
         case (id, map) if id.logIndex == 2 => map.get(0) match {
           case Some(r: PrepareAck) => // good
           case f => fail(f.toString)
@@ -121,12 +123,12 @@ class PrepareResponseSpec extends TestKit(ActorSystem("PrepareResponseSpec")) wi
       }
       // and we send on prepare and one accept
       handler.broadcastValues match {
-        case ArrayBuffer(pAndTime, aAndTime) =>
-          pAndTime._1 match {
+        case ArrayBuffer(pAndTime: TimeAndMessage, aAndTime: TimeAndMessage) =>
+          pAndTime.message match {
             case p: Prepare if p.id.logIndex == otherAcceptedIndex => // good
             case f => fail(f.toString)
           }
-          aAndTime._1 match {
+          aAndTime.message match {
             case a: Accept if a.id.logIndex == 1L => // good
             case f => fail(f.toString)
           }
@@ -158,7 +160,7 @@ class PrepareResponseSpec extends TestKit(ActorSystem("PrepareResponseSpec")) wi
       }
       // and we send one accept
       handler.broadcastValues match {
-        case ArrayBuffer((a: Accept, _)) =>
+        case ArrayBuffer(TimeAndMessage(a: Accept, _)) =>
           a match {
             case a if a.id.logIndex == 1L => // good
             case f => fail(f.toString)
@@ -175,8 +177,8 @@ class PrepareResponseSpec extends TestKit(ActorSystem("PrepareResponseSpec")) wi
         case f => fail(f.toString)
       }
       // and we have journalled the accept at a time before sent
-      val sendTime = handler.broadcastValues.headOption.get match {
-        case (a: Accept, ts: Long) => ts
+      val sendTime = handler.broadcastValues.headOption.value match {
+        case TimeAndMessage(a: Accept, ts: Long) => ts
         case f => fail(f.toString)
       }
       tempJournal.actionsWithTimestamp.toMap.getOrElse("accept", fail) match {
@@ -202,7 +204,7 @@ class PrepareResponseSpec extends TestKit(ActorSystem("PrepareResponseSpec")) wi
       }
       // and we send one accept
       handler.broadcastValues match {
-        case ArrayBuffer((a: Accept, _)) =>
+        case ArrayBuffer(TimeAndMessage(a: Accept, _)) =>
           a match {
             case a if a.id.logIndex == 1L => // good
             case f => fail(f.toString)
