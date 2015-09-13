@@ -2,9 +2,9 @@ package com.github.simbo1905.trex.internals
 
 import akka.actor.ActorRef
 import com.github.simbo1905.trex.library._
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest.{OptionValues, Matchers, WordSpecLike}
 
-class TestableCommitHandler extends CommitHandler[ActorRef] {
+class TestableCommitHandler extends CommitHandler[ActorRef] with OptionValues {
   override def plog = NoopPaxosLogging
 
   override def nodeUniqueId: Int = 0
@@ -44,25 +44,25 @@ object CommitHandlerSpec {
   
 }
 
-class CommitHandlerSpec extends WordSpecLike with Matchers {
+class CommitHandlerSpec extends WordSpecLike with Matchers with OptionValues {
   import RetransmitSpec._
   import CommitHandlerSpec._
   "CommitHandler" should {
     "do nothing if have committed up to the specified log index" in {
-      CommitHandler.committableValues(accepts98thru100.last.id.number,
-        accepts98thru100.lastOption.getOrElse(throw new AssertionError()).id,
-        accepts98thru100.lastOption.getOrElse(throw new AssertionError()).id.logIndex,
+      CommitHandler.committableValues(accepts98thru100.lastOption.value.id.number,
+        accepts98thru100.lastOption.value.id,
+        accepts98thru100.lastOption.value.id.logIndex,
         journaled98thru100) shouldBe Seq.empty[Accept]
     }
     "do nothing if have committed way beyond the specified log index" in {
-      CommitHandler.committableValues(accepts98thru100.last.id.number,
-        accepts98thru100.lastOption.getOrElse(throw new AssertionError()).id,
+      CommitHandler.committableValues(accepts98thru100.lastOption.value.id.number,
+        accepts98thru100.lastOption.value.id,
         1L,
         journaled98thru100) shouldBe Seq.empty[Accept]
     }
     "do nothing if have a gap in our journal" in {
-      CommitHandler.committableValues(accepts98thru100.last.id.number,
-        accepts98thru100.lastOption.getOrElse(throw new AssertionError()).id,
+      CommitHandler.committableValues(accepts98thru100.lastOption.value.id.number,
+        accepts98thru100.lastOption.value.id,
         999L,
         journaled98thru100) shouldBe Seq.empty[Accept]
     }
@@ -81,10 +81,10 @@ class CommitHandlerSpec extends WordSpecLike with Matchers {
       // when we commit to a14
       val (newProgress, results) = handler.commit(Follower,
         AllStateSpec.initialData.copy(progress = oldProgress),
-        accepts11thru14.lastOption.getOrElse(throw new AssertionError()).id,
+        accepts11thru14.lastOption.value.id,
         oldProgress)
       // then we will have committed
-      newProgress.highestCommitted shouldBe accepts11thru14.last.id
+      newProgress.highestCommitted shouldBe accepts11thru14.lastOption.value.id
       results.size shouldBe 3
       val resultsMap = results.toMap
       resultsMap.get(a12.id) shouldBe Some(NoOperationCommandValue.bytes)

@@ -6,7 +6,9 @@ import scala.compat.Platform
  */
 trait CommandValue {
   val emptyArray: Array[Byte] = Array.empty[Byte]
+
   def bytes: Array[Byte]
+
   def msgId: Long
 }
 
