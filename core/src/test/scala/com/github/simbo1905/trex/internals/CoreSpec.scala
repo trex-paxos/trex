@@ -2,13 +2,14 @@ package com.github.simbo1905.trex.internals
 
 import java.util.Arrays.{equals => bequals}
 
-import akka.actor.ActorRef
+import akka.actor.{ActorSystem, ActorRef}
+import akka.testkit.{TestProbe, TestKit}
 import com.github.simbo1905.trex.library._
 import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.collection.immutable.{TreeMap, SortedMap}
 
-class CoreSpec extends WordSpecLike with Matchers {
+class CoreSpec extends TestKit(ActorSystem("CoreSpec")) with WordSpecLike with Matchers {
   "Paxos Numbers" should {
     "have working equalities" in {
       assert(BallotNumber(2, 2) > BallotNumber(1, 2))
@@ -31,11 +32,16 @@ class CoreSpec extends WordSpecLike with Matchers {
     }
   }
 
+  val progress = Progress(
+    highestPromised = BallotNumber(0, 0),
+    highestCommitted = Identifier(from = 0, number = BallotNumber(0, 0), logIndex = 0)
+  )
+
   "Lens" should {
 
     import Ordering._
 
-    val nodeData = PaxosData(null, 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
+    val nodeData = PaxosData(progress, 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
     val id = Identifier(0, BallotNumber(1, 2), 3L)
 
     "set prepare responses" in {
@@ -74,9 +80,10 @@ class CoreSpec extends WordSpecLike with Matchers {
 
           override def bytes: Array[Byte] = Array()
         }
-        val clientCommands = Map(id ->(commandValue, null))
+        val ref = TestProbe().ref
+        val clientCommands = Map(id ->(commandValue, ref))
         val newData = PaxosActor.clientCommandsLens.set(nodeData, clientCommands)
-        assert(newData.clientCommands(id) == (commandValue -> null))
+        assert(newData.clientCommands(id) == (commandValue -> ref))
       }
     }
 
@@ -98,11 +105,12 @@ class CoreSpec extends WordSpecLike with Matchers {
 
           override def bytes: Array[Byte] = Array()
         }
-        val clientCommands = Map(id ->(commandValue, null))
+        val ref = TestProbe().ref
+        val clientCommands = Map(id ->(commandValue, ref))
         val newData = PaxosActor.leaderLens.set(nodeData, (prepareResponses, acceptResponses, clientCommands))
         assert(newData.prepareResponses(id) == Map.empty)
         assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, a1, Map.empty))
-        assert(newData.clientCommands(id) == (commandValue -> null))
+        assert(newData.clientCommands(id) == (commandValue -> ref))
       }
     }
   }
@@ -320,6 +328,8 @@ class CoreSpec extends WordSpecLike with Matchers {
     }
   }
 
+  val accept = Accept(Identifier(1, BallotNumber(1, 1), 98L), NoOperationCommandValue)
+
   "Backing down" should {
     "should reset Paxos data" in {
       import Ordering._
@@ -335,8 +345,8 @@ class CoreSpec extends WordSpecLike with Matchers {
         clusterSize = 3,
         prepareResponses = TreeMap(id -> Map.empty),
         epoch = Some(number),
-        acceptResponses = TreeMap(id -> AcceptResponsesAndTimeout(0, null, Map.empty)),
-        clientCommands = Map(id ->(null, null))
+        acceptResponses = TreeMap(id -> AcceptResponsesAndTimeout(0, accept, Map.empty)),
+        clientCommands = Map(id ->(NoOperationCommandValue, TestProbe().ref))
       )
       // when we backdown
       val followerData = PaxosActor.backdownData(leaderData, 99L)
