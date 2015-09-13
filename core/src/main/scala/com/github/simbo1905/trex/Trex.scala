@@ -11,6 +11,7 @@ import akka.io.{IO, Udp}
 import akka.serialization._
 import akka.util.Timeout
 import com.github.simbo1905.trex.internals._
+import com.github.simbo1905.trex.library._
 import com.typesafe.config.Config
 
 import scala.collection.SortedMap

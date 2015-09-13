@@ -1,17 +1,16 @@
 package com.github.simbo1905.trex.internals
 
-import akka.event.LoggingAdapter
-import com.github.simbo1905.trex.Journal
+import akka.actor.ActorRef
+import com.github.simbo1905.trex.library._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, WordSpecLike}
 
-import scala.collection.SortedMap
-import scala.collection.immutable.TreeMap
+import scala.collection.immutable.{TreeMap, SortedMap}
 
-class TestResendAcceptsHandler extends ResendAcceptsHandler {
-  override def highestNumberProgressed(data: PaxosData): BallotNumber = ???
+class TestResendAcceptsHandler extends ResendAcceptsHandler[ActorRef] {
+  override def highestNumberProgressed(data: PaxosData[ActorRef]): BallotNumber = ???
 
-  override def log: LoggingAdapter = NoopLoggingAdapter
+  override def plog = NoopPaxosLogging
 
   override def nodeUniqueId: Int = 1
 

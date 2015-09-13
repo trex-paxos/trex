@@ -1,15 +1,15 @@
 package com.github.simbo1905.trex.internals
 
-import akka.event.LoggingAdapter
-import com.github.simbo1905.trex.Journal
+import akka.actor.ActorRef
+import com.github.simbo1905.trex.library._
 import org.scalatest.{Matchers, WordSpecLike}
 
-class TestableCommitHandler extends CommitHandler {
-  override def log: LoggingAdapter = NoopLoggingAdapter
+class TestableCommitHandler extends CommitHandler[ActorRef] {
+  override def plog = NoopPaxosLogging
 
   override def nodeUniqueId: Int = 0
 
-  override def trace(state: PaxosRole, data: PaxosData, payload: CommandValue): Unit = {}
+  override def trace(state: PaxosRole, data: PaxosData[ActorRef], payload: CommandValue): Unit = {}
 
   override def deliver(value: CommandValue): Any = {}
 

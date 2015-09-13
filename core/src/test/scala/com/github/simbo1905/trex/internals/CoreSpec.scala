@@ -3,6 +3,7 @@ package com.github.simbo1905.trex.internals
 import java.util.Arrays.{equals => bequals}
 
 import akka.actor.ActorRef
+import com.github.simbo1905.trex.library._
 import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.collection.immutable.{TreeMap, SortedMap}
@@ -34,37 +35,37 @@ class CoreSpec extends WordSpecLike with Matchers {
 
     import Ordering._
 
-    val nodeData = PaxosData(null, 0, 0, 3)
+    val nodeData = PaxosData(null, 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
     val id = Identifier(0, BallotNumber(1, 2), 3L)
 
     "set prepare responses" in {
       {
-        val newData = PaxosData.prepareResponsesLens.set(nodeData, SortedMap.empty[Identifier, Map[Int, PrepareResponse]])
+        val newData = PaxosActor.prepareResponsesLens.set(nodeData, SortedMap.empty[Identifier, Map[Int, PrepareResponse]])
         assert(newData == nodeData)
       }
       {
         val prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]] = TreeMap(id -> Map.empty)
-        val newData = PaxosData.prepareResponsesLens.set(nodeData, prepareResponses)
+        val newData = PaxosActor.prepareResponsesLens.set(nodeData, prepareResponses)
         assert(newData.prepareResponses(id) == Map.empty)
       }
     }
 
     "set accept responses" in {
       {
-        val newData = PaxosData.acceptResponsesLens.set(nodeData, SortedMap.empty[Identifier, AcceptResponsesAndTimeout])
+        val newData = PaxosActor.acceptResponsesLens.set(nodeData, SortedMap.empty[Identifier, AcceptResponsesAndTimeout])
         assert(newData == nodeData)
       }
       {
         val a1 = Accept(Identifier(1, BallotNumber(1, 1), 1L), ClientRequestCommandValue(0, Array[Byte](1, 1)))
         val acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(id -> AcceptResponsesAndTimeout(0L, a1, Map.empty))
-        val newData = PaxosData.acceptResponsesLens.set(nodeData, acceptResponses)
+        val newData = PaxosActor.acceptResponsesLens.set(nodeData, acceptResponses)
         assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, a1, Map.empty))
       }
     }
 
     "set client commands" in {
       {
-        val newData = PaxosData.clientCommandsLens.set(nodeData, Map.empty[Identifier, (CommandValue, ActorRef)])
+        val newData = PaxosActor.clientCommandsLens.set(nodeData, Map.empty[Identifier, (CommandValue, ActorRef)])
         assert(newData == nodeData)
       }
       {
@@ -74,14 +75,14 @@ class CoreSpec extends WordSpecLike with Matchers {
           override def bytes: Array[Byte] = Array()
         }
         val clientCommands = Map(id ->(commandValue, null))
-        val newData = PaxosData.clientCommandsLens.set(nodeData, clientCommands)
+        val newData = PaxosActor.clientCommandsLens.set(nodeData, clientCommands)
         assert(newData.clientCommands(id) == (commandValue -> null))
       }
     }
 
     "set leader state" in {
       {
-        val newData = PaxosData.leaderLens.set(nodeData, (
+        val newData = PaxosActor.leaderLens.set(nodeData, (
           SortedMap.empty[Identifier, Map[Int, PrepareResponse]],
           SortedMap.empty[Identifier, AcceptResponsesAndTimeout],
           Map.empty[Identifier, (CommandValue, ActorRef)])
@@ -98,7 +99,7 @@ class CoreSpec extends WordSpecLike with Matchers {
           override def bytes: Array[Byte] = Array()
         }
         val clientCommands = Map(id ->(commandValue, null))
-        val newData = PaxosData.leaderLens.set(nodeData, (prepareResponses, acceptResponses, clientCommands))
+        val newData = PaxosActor.leaderLens.set(nodeData, (prepareResponses, acceptResponses, clientCommands))
         assert(newData.prepareResponses(id) == Map.empty)
         assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, a1, Map.empty))
         assert(newData.clientCommands(id) == (commandValue -> null))

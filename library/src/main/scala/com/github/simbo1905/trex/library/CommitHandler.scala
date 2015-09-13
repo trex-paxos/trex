@@ -1,9 +1,6 @@
-package com.github.simbo1905.trex.internals
+package com.github.simbo1905.trex.library
 
-import akka.event.LoggingAdapter
-import com.github.simbo1905.trex.Journal
-
-trait CommitHandler {
+trait CommitHandler[ClientRef] {
 
   import CommitHandler._
 
@@ -13,9 +10,9 @@ trait CommitHandler {
 
   def deliver(value: CommandValue): Any
 
-  def log: LoggingAdapter
+  def plog: PaxosLogging
 
-  def trace(state: PaxosRole, data: PaxosData, payload: CommandValue): Unit
+  def trace(state: PaxosRole, data: PaxosData[ClientRef], payload: CommandValue): Unit
 
   /**
    * Attempts to commit up to the log index specified by the slot specified. A committed value is delivered to the application using the deliver callback. Journals and returns a new progress if it is able to commit data previously accepted else returns the unchanged progress. As a leader must change its proposal number if it looses its leadership and must commit in order. This enables the method to cursor through uncommitted slots and commit them in order if they share the same proposal number as the slot being committed.
@@ -25,7 +22,7 @@ trait CommitHandler {
    * @param progress The current high watermarks of this node.
    * @return A tuple of the new progress and a seq of the identifiers and the response to the deliver operation.
    */
-  def commit(state: PaxosRole, data: PaxosData, identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) = {
+  def commit(state: PaxosRole, data: PaxosData[ClientRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) = {
     val Identifier(_, number, commitIndex) = identifier
     val Progress(_, highestCommitted) = progress
 
@@ -48,7 +45,7 @@ trait CommitHandler {
           journal.save(newProgress)
           (newProgress, results)
         case x =>
-          log.error(s"this code should be unreachable but found $x")
+          plog.error(s"this code should be unreachable but found $x")
           (progress, Seq.empty[(Identifier, Any)])
       }
     }

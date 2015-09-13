@@ -2,13 +2,12 @@ package com.github.simbo1905.trex.internals
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestFSMRef, TestKit, TestProbe}
-import com.github.simbo1905.trex.{Journal, _}
+import com.github.simbo1905.trex.library._
 import com.github.simbo1905.trex.internals.PaxosActor._
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
 
-import scala.collection.SortedMap
-import scala.collection.immutable.TreeMap
+import scala.collection.immutable.{TreeMap, SortedMap}
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.language.postfixOps

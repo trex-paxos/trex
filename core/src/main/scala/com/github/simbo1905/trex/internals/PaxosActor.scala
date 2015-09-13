@@ -3,27 +3,14 @@ package com.github.simbo1905.trex.internals
 import java.security.SecureRandom
 
 import akka.actor.{ActorRef, FSM}
-import com.github.simbo1905.trex._
 import com.github.simbo1905.trex.internals.PaxosActor._
+import com.github.simbo1905.trex.library._
 import com.typesafe.config.Config
 
 import scala.annotation.elidable
-import scala.collection.SortedMap
-import scala.collection.immutable.TreeMap
+import scala.collection.immutable.{TreeMap, SortedMap}
 import scala.util.Try
-
-object Ordering {
-
-  implicit object IdentifierLogOrdering extends Ordering[Identifier] {
-    def compare(o1: Identifier, o2: Identifier) = if (o1.logIndex == o2.logIndex) 0 else if (o1.logIndex >= o2.logIndex) 1 else -1
-  }
-
-  implicit object BallotNumberOrdering extends Ordering[BallotNumber] {
-    def compare(n1: BallotNumber, n2: BallotNumber) = if (n1 == n2) 0 else if (n1 > n2) 1 else -1
-  }
-
-}
-
+import Ordering._
 /**
  * Paxos Actor Finite State Machine using immutable messages and immutable state. Note that for testing this class does
  * not schedule and manage its own timeouts. Extend a subclass which schedules its timeout rather than this baseclass.
@@ -33,18 +20,19 @@ object Ordering {
  * @param broadcaseRef An ActorRef through which the current cluster can be messaged.
  * @param journal The durable journal required to store the state of the node in a stable manner between crashes.
  */
-abstract class PaxosActor(config: Configuration, val nodeUniqueId: Int, broadcaseRef: ActorRef, val journal: Journal) extends FSM[PaxosRole, PaxosData]
-with RetransmitHandler
-with ReturnToFollowerHandler
-with UnhandledHandler
-with CommitHandler
-with ResendAcceptsHandler
-with AcceptResponsesHandler
-with PrepareResponseHandler
-with FollowerTimeoutHandler
+abstract class PaxosActor(config: Configuration, val nodeUniqueId: Int, broadcaseRef: ActorRef, val journal: Journal) extends FSM[PaxosRole, PaxosData[ActorRef]]
+with RetransmitHandler[ActorRef]
+with ReturnToFollowerHandler[ActorRef]
+with UnhandledHandler[ActorRef]
+with CommitHandler[ActorRef]
+with ResendAcceptsHandler[ActorRef]
+with AcceptResponsesHandler[ActorRef]
+with PrepareResponseHandler[ActorRef]
+with FollowerTimeoutHandler[ActorRef]
+with PaxosLoggingAdapter
 {
 
-  import Ordering._
+  val plog = this
 
   val minPrepare = Prepare(Identifier(nodeUniqueId, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
 
@@ -55,7 +43,7 @@ with FollowerTimeoutHandler
 
   log.info("timeout min {}, timeout max {}", config.leaderTimeoutMin, config.leaderTimeoutMax)
 
-  startWith(Follower, PaxosData(journal.load(), 0, 0, config.clusterSize))
+  startWith(Follower, PaxosData[ActorRef](journal.load(), 0, 0, config.clusterSize, TreeMap(),None,TreeMap(),Map.empty[Identifier, (CommandValue, ActorRef)]))
 
   def journalProgress(progress: Progress) = {
     journal.save(progress)
@@ -69,7 +57,8 @@ with FollowerTimeoutHandler
     case e@Event(r@RetransmitResponse(from, to, committed, proposed), oldData@PaxosData(p@Progress(highestPromised, highestCommitted), _, _, _, _, _, _, _)) => // TODO extractors
       trace(stateName, e.stateData, sender, e.event)
       log.debug("Node {} RetransmitResponse with {} committed and {} proposed entries", nodeUniqueId, committed.size, proposed.size)
-      stay using PaxosData.progressLens.set(oldData, handleRetransmitResponse(r, oldData))
+      val newProgress = handleRetransmitResponse(r, oldData)
+      stay using progressLens.set(oldData, newProgress)
 
     case e@Event(r: RetransmitRequest, oldData@HighestCommittedIndex(committedLogIndex)) =>
       trace(stateName, e.stateData, sender, e.event)
@@ -80,23 +69,23 @@ with FollowerTimeoutHandler
 
   val prepareStateFunction: StateFunction = {
     // nack a low prepare
-    case e@Event(Prepare(id), data: PaxosData) if id.number < data.progress.highestPromised =>
+    case e@Event(Prepare(id), data: PaxosData[ActorRef]) if id.number < data.progress.highestPromised =>
       trace(stateName, e.stateData, sender, e.event)
       log.debug("Node {} {} nacking a low prepare {}", nodeUniqueId, stateName, id)
       send(sender, PrepareNack(id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat))
       stay
 
     // ack a high prepare
-    case e@Event(Prepare(id), data: PaxosData) if id.number > data.progress.highestPromised =>
+    case e@Event(Prepare(id), data: PaxosData[ActorRef]) if id.number > data.progress.highestPromised =>
       trace(stateName, e.stateData, sender, e.event)
       log.debug("Node {} {} acking higher prepare {}", nodeUniqueId, stateName, id)
-      val newData = PaxosData.progressLens.set(data, journalProgress(Progress.highestPromisedLens.set(data.progress, id.number)))
+      val newData = progressLens.set(data, journalProgress(Progress.highestPromisedLens.set(data.progress, id.number)))
       send(sender, PrepareAck(id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat, journal.accepted(id.logIndex)))
       // higher promise we can no longer journal client values as accepts under our epoch so cannot commit and must backdown
       goto(Follower) using backdownData(newData)
 
     // ack repeated prepare
-    case e@Event(Prepare(id), data: PaxosData) if id.number == data.progress.highestPromised =>
+    case e@Event(Prepare(id), data: PaxosData[ActorRef]) if id.number == data.progress.highestPromised =>
       trace(stateName, e.stateData, sender, e.event)
       log.debug("Node {} {} acking same prepare {}", nodeUniqueId, stateName, id)
       send(sender, PrepareAck(id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat, journal.accepted(id.logIndex)))
@@ -105,14 +94,14 @@ with FollowerTimeoutHandler
 
   val acceptStateFunction: StateFunction = {
     // nack lower accept
-    case e@Event(Accept(id, _), data: PaxosData) if id.number < data.progress.highestPromised =>
+    case e@Event(Accept(id, _), data: PaxosData[ActorRef]) if id.number < data.progress.highestPromised =>
       trace(stateName, e.stateData, sender, e.event)
       log.debug("Node {} {} nacking low accept {} as progress {}", nodeUniqueId, stateName, id, data.progress)
       send(sender, AcceptNack(id, nodeUniqueId, data.progress))
       stay
 
     // nack higher accept for slot which is committed
-    case e@Event(Accept(id, slot), data: PaxosData) if id.number > data.progress.highestPromised && id.logIndex <= data.progress.highestCommitted.logIndex =>
+    case e@Event(Accept(id, slot), data: PaxosData[ActorRef]) if id.number > data.progress.highestPromised && id.logIndex <= data.progress.highestCommitted.logIndex =>
       trace(stateName, e.stateData, sender, e.event)
       log.debug("Node {} {} nacking high accept {} as progress {}", nodeUniqueId, stateName, id, data.progress)
       send(sender, AcceptNack(id, nodeUniqueId, data.progress))
@@ -173,7 +162,7 @@ with FollowerTimeoutHandler
           log.info("Node {} attempted commit of {} for log index {} found missing accept messages so have only committed up to {} and am requesting retransmission", nodeUniqueId, i, i.logIndex, newHighestCommitted)
           send(sender, RetransmitRequest(nodeUniqueId, i.from, newHighestCommitted))
         }
-        stay using PaxosData.progressLens.set(newData, newProgress)
+        stay using progressLens.set(newData, newProgress)
       }
 
     // upon timeout having not issued low prepares start the leader takeover protocol by issuing a min prepare
@@ -233,7 +222,7 @@ with FollowerTimeoutHandler
     case e@Event(c@Commit(i@Identifier(from, number, logIndex), _), oldData@HighestCommittedIndexAndEpoch(committedLogIndex, epoch)) if logIndex > committedLogIndex || number > epoch && logIndex == committedLogIndex =>
       trace(stateName, e.stateData, sender, e.event)
       val newProgress = handleReturnToFollowerOnHigherCommit(c, oldData, stateName, sender)
-      goto(Follower) using backdownData(PaxosData.progressLens.set(oldData, newProgress))
+      goto(Follower) using backdownData(progressLens.set(oldData, newProgress))
 
     case e@Event(Commit(id@Identifier(_, _, logIndex), _), data) =>
       trace(stateName, e.stateData, sender, e.event)
@@ -241,9 +230,9 @@ with FollowerTimeoutHandler
       stay
   }
 
-  def backdownData(data: PaxosData) = PaxosActor.backdownData(data, randomTimeout)
+  def backdownData(data: PaxosData[ActorRef]) = PaxosActor.backdownData(data, randomTimeout)
 
-  def requestRetransmissionIfBehind(data: PaxosData, sender: ActorRef, from: Int, highestCommitted: Identifier): Unit = {
+  def requestRetransmissionIfBehind(data: PaxosData[ActorRef], sender: ActorRef, from: Int, highestCommitted: Identifier): Unit = {
     val highestCommittedIndex = data.progress.highestCommitted.logIndex
     val highestCommittedIndexOther = highestCommitted.logIndex
     if (highestCommittedIndexOther > highestCommittedIndex) {
@@ -253,7 +242,7 @@ with FollowerTimeoutHandler
   }
 
   val takeoverStateFunction: StateFunction = {
-    case e@Event(vote: PrepareResponse, oldData: PaxosData) =>
+    case e@Event(vote: PrepareResponse, oldData: PaxosData[ActorRef]) =>
       trace(stateName, e.stateData, sender, e.event)
       log.debug("Node {} Recoverer received a prepare response: {}", nodeUniqueId, vote)
       val (role, data) = handlePrepareResponse(nodeUniqueId, stateName, sender(), vote, oldData)
@@ -285,7 +274,7 @@ with FollowerTimeoutHandler
           // broadcast is preferred as previous responses may be stale
           broadcast(Prepare(id))
       }
-      stay using PaxosData.timeoutLens.set(data, freshTimeout(randomInterval))
+      stay using timeoutLens.set(data, freshTimeout(randomInterval))
 
     // else if we have timed-out on accept messages
     case e@Event(PaxosActor.CheckTimeout, data@PaxosData(_, _, timeout, _, _, _, accepts, _)) if accepts.nonEmpty && clock() >= timeout =>
@@ -335,7 +324,7 @@ with FollowerTimeoutHandler
           broadcast(accept)
           // add the sender our client map
           val clients = data.clientCommands + (accept.id ->(value, sender))
-          stay using PaxosData.leaderLens.set(data, (SortedMap.empty, updated, clients))
+          stay using leaderLens.set(data, (SortedMap.empty, updated, clients))
         case x =>
           throw new AssertionError(s"Invariant violation as '$x' does not match case Some(epoch) if ${data.progress.highestPromised} <= epoch")
       }
@@ -355,13 +344,13 @@ with FollowerTimeoutHandler
 
   whenUnhandled {
     case e@Event(msg, data) =>
-      handleUnhandled(nodeUniqueId, stateName, sender, e)
+      handleUnhandled(nodeUniqueId, stateName, sender, data, msg)
       stay
   }
 
   def highestAcceptedIndex: Long = journal.bounds.max
 
-  def highestNumberProgressed(data: PaxosData): BallotNumber = Seq(data.epoch, Option(data.progress.highestPromised), Option(data.progress.highestCommitted.number)).flatten.max
+  def highestNumberProgressed(data: PaxosData[ActorRef]): BallotNumber = Seq(data.epoch, Option(data.progress.highestPromised), Option(data.progress.highestCommitted.number)).flatten.max
 
   def randomInterval: Long = {
     config.leaderTimeoutMin + ((config.leaderTimeoutMax - config.leaderTimeoutMin) * random.nextDouble()).toLong
@@ -381,10 +370,10 @@ with FollowerTimeoutHandler
   type PrepareSelfVotes = SortedMap[Identifier, Option[Map[Int, PrepareResponse]]]
 
   @elidable(elidable.FINE)
-  def trace(state: PaxosRole, data: PaxosData, sender: ActorRef, msg: Any): Unit = {}
+  def trace(state: PaxosRole, data: PaxosData[ActorRef], sender: ActorRef, msg: Any): Unit = {}
 
   @elidable(elidable.FINE)
-  def trace(state: PaxosRole, data: PaxosData, payload: CommandValue): Unit = {}
+  def trace(state: PaxosRole, data: PaxosData[ActorRef], payload: CommandValue): Unit = {}
 
   /**
    * The deliver method is called when the value is committed.
@@ -461,17 +450,7 @@ abstract class PaxosActorWithTimeout(config: Configuration, nodeUniqueId: Int, b
   }
 }
 
-/**
- * Tracks the responses to an accept message and when we timeout on getting a majority response
- * @param timeout The point in time we timeout.
- * @param accept The accept that we are awaiting responses.
- * @param responses The known responses.
- */
-case class AcceptResponsesAndTimeout(timeout: Long, accept: Accept, responses: Map[Int, AcceptResponse])
-
 object PaxosActor {
-
-  import Ordering._
 
   case object CheckTimeout
 
@@ -503,7 +482,7 @@ object PaxosActor {
   val random = new SecureRandom
 
   // Log the nodeUniqueID, stateName, stateData, sender and message for tracing purposes
-  case class TraceData(nodeUniqueId: Int, stateName: PaxosRole, statData: PaxosData, sender: Option[ActorRef], message: Any)
+  case class TraceData(nodeUniqueId: Int, stateName: PaxosRole, statData: PaxosData[ActorRef], sender: Option[ActorRef], message: Any)
 
   type Tracer = TraceData => Unit
 
@@ -511,18 +490,107 @@ object PaxosActor {
 
   val minJournalBounds = JournalBounds(Long.MinValue, Long.MinValue)
 
-  def backdownData(data: PaxosData, timeout: Long) = PaxosData.backdownLens.set(data, (SortedMap.empty, SortedMap.empty, Map.empty, None, timeout))
-
-  object HighestCommittedIndex {
-    def unapply(data: PaxosData) = Some(data.progress.highestCommitted.logIndex)
-  }
+  def backdownData(data: PaxosData[ActorRef], timeout: Long) = backdownLens.set(data, (SortedMap.empty, SortedMap.empty, Map.empty, None, timeout))
 
   object HighestCommittedIndexAndEpoch {
-    def unapply(data: PaxosData) = data.epoch match {
+    def unapply(data: PaxosData[ActorRef]) = data.epoch match {
       case Some(number) => Some(data.progress.highestCommitted.logIndex, number)
       case _ => Some(data.progress.highestCommitted.logIndex, Journal.minBookwork.highestPromised)
     }
   }
 
+  val progressLens = Lens(
+    get = (_: PaxosData[ActorRef]).progress,
+    set = (nodeData: PaxosData[ActorRef], progress: Progress) => nodeData.copy(progress = progress)
+  )
+
+  val backdownLens = Lens(
+    get = (n: PaxosData[ActorRef]) => ((prepareResponsesLens(n), acceptResponsesLens(n), clientCommandsLens(n), epochLens(n), timeoutLens(n))),
+    set = (n: PaxosData[ActorRef], value: (SortedMap[Identifier, Map[Int, PrepareResponse]], SortedMap[Identifier, AcceptResponsesAndTimeout], Map[Identifier, (CommandValue, ActorRef)], Option[BallotNumber], Long)) =>
+      value match {
+        case
+          (prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]],
+          acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout],
+          clientCommands: Map[Identifier, (CommandValue, ActorRef)],
+          epoch: Option[BallotNumber],
+          timeout: Long
+            ) => prepareResponsesLens.set(acceptResponsesLens.set(clientCommandsLens.set(epochLens.set(timeoutLens.set(n, timeout), epoch), clientCommands), acceptResponses), prepareResponses)
+      }
+  )
+
+  val prepareResponsesLens = Lens(
+    get = (_: PaxosData[ActorRef]).prepareResponses,
+    set = (nodeData: PaxosData[ActorRef], prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]]) => nodeData.copy(prepareResponses = prepareResponses))
+
+  val acceptResponsesLens = Lens(
+    get = (_: PaxosData[ActorRef]).acceptResponses,
+    set = (nodeData: PaxosData[ActorRef], acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout]) => nodeData.copy(acceptResponses = acceptResponses)
+  )
+
+  val clientCommandsLens = Lens(
+    get = (_: PaxosData[ActorRef]).clientCommands,
+    set = (nodeData: PaxosData[ActorRef], clientCommands: Map[Identifier, (CommandValue, ActorRef)]) => nodeData.copy(clientCommands = clientCommands)
+  )
+
+  val acceptResponsesClientCommandsLens = Lens(
+    get = (n: PaxosData[ActorRef]) => ((acceptResponsesLens(n), clientCommandsLens(n))),
+    set = (n: PaxosData[ActorRef], value: (SortedMap[Identifier, AcceptResponsesAndTimeout], Map[Identifier, (CommandValue, ActorRef)])) =>
+      value match {
+        case (acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout], clientCommands: Map[Identifier, (CommandValue, ActorRef)]) =>
+          acceptResponsesLens.set(clientCommandsLens.set(n, clientCommands), acceptResponses)
+      }
+  )
+
+  val timeoutLens = Lens(
+    get = (_: PaxosData[ActorRef]).timeout,
+    set = (nodeData: PaxosData[ActorRef], timeout: Long) => nodeData.copy(timeout = timeout)
+  )
+
+  val epochLens = Lens(
+    get = (_: PaxosData[ActorRef]).epoch,
+    set = (nodeData: PaxosData[ActorRef], epoch: Option[BallotNumber]) => nodeData.copy(epoch = epoch)
+  )
+
+  val leaderLens = Lens(
+    get = (nodeData: PaxosData[ActorRef]) => ((prepareResponsesLens(nodeData), acceptResponsesLens(nodeData), clientCommandsLens(nodeData))),
+    set = (nodeData: PaxosData[ActorRef], value: (SortedMap[Identifier, Map[Int, PrepareResponse]],
+      SortedMap[Identifier, AcceptResponsesAndTimeout],
+      Map[Identifier, (CommandValue, ActorRef)])) =>
+      value match {
+        case (prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]],
+        acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout],
+        clientCommands: Map[Identifier, (CommandValue, ActorRef)]) =>
+          prepareResponsesLens.set(acceptResponsesLens.set(clientCommandsLens.set(nodeData, clientCommands), acceptResponses), prepareResponses)
+      }
+  )
+
+  val highestPromisedLens = progressLens andThen Lens(get = (_: Progress).highestPromised, set = (progress: Progress, promise: BallotNumber) => progress.copy(highestPromised = promise))
+
+  val timeoutPrepareResponsesLens = Lens(
+    get = (nodeData: PaxosData[ActorRef]) => ((timeoutLens(nodeData), prepareResponsesLens(nodeData))),
+    set = (nodeData: PaxosData[ActorRef], value: (Long, SortedMap[Identifier, Map[Int, PrepareResponse]])) =>
+      value match {
+        case (timeout: Long, prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]]) =>
+          timeoutLens.set(prepareResponsesLens.set(nodeData, prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]]), timeout)
+      }
+  )
+
+  val progressAcceptResponsesEpochTimeoutLens = Lens(
+    get = (nodeData: PaxosData[ActorRef]) => ((progressLens(nodeData), acceptResponsesLens(nodeData), epochLens(nodeData), timeoutLens(nodeData))),
+    set = (nodeData: PaxosData[ActorRef], value: (Progress, SortedMap[Identifier, AcceptResponsesAndTimeout], Option[BallotNumber], Long)) =>
+      value match {
+        case (progress: Progress, acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout], epoch: Option[BallotNumber], timeout: Long) =>
+          acceptResponsesLens.set(timeoutLens.set(epochLens.set(progressLens.set(nodeData, progress), epoch), timeout), acceptResponses)
+      }
+  )
+
+  val highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens = Lens(
+    get = (n: PaxosData[ActorRef]) => (highestPromisedLens(n), timeoutLens(n), epochLens(n), prepareResponsesLens(n), acceptResponsesLens(n)),
+    set = (n: PaxosData[ActorRef], value: (BallotNumber, Long, Option[BallotNumber], SortedMap[Identifier, Map[Int, PrepareResponse]], SortedMap[Identifier, AcceptResponsesAndTimeout])) =>
+      value match {
+        case (promise: BallotNumber, timeout: Long, epoch: Option[BallotNumber], prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]], acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout]) =>
+          highestPromisedLens.set(timeoutLens.set(epochLens.set(prepareResponsesLens.set(acceptResponsesLens.set(n, acceptResponses), prepareResponses), epoch), timeout), promise)
+      }
+  )
 }
 

@@ -2,12 +2,11 @@ package com.github.simbo1905.trex.internals
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit._
-import com.github.simbo1905.trex.{Journal, JournalBounds}
+import com.github.simbo1905.trex.library._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest._
 
-import scala.collection.SortedMap
-import scala.collection.immutable.TreeMap
+import scala.collection.immutable.{TreeMap, SortedMap}
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -27,8 +26,8 @@ class LeaderSpec
 
   val epoch = BallotNumber(1, 1)
 
-  val dataNewEpoch = PaxosData.epochLens.set(initialData, Some(epoch))
-  val initailLeaderData = PaxosData.leaderLens.set(dataNewEpoch, (SortedMap.empty[Identifier, Map[Int, PrepareResponse]], freshAcceptResponses, Map.empty))
+  val dataNewEpoch = PaxosActor.epochLens.set(initialData, Some(epoch))
+  val initailLeaderData = PaxosActor.leaderLens.set(dataNewEpoch, (SortedMap.empty[Identifier, Map[Int, PrepareResponse]], freshAcceptResponses, Map.empty))
 
   val expectedString2 = "Paxos"
   val expectedBytes2 = expectedString2.getBytes
@@ -160,7 +159,7 @@ class LeaderSpec
       val id99 = Identifier(0, epoch, 99L)
       val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
-      val responses = PaxosData.acceptResponsesLens.set(initialData, votes)
+      val responses = PaxosActor.acceptResponsesLens.set(initialData, votes)
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
       var sendTime = 0L
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, delegatingJournal, ArrayBuffer.empty, None) {
@@ -223,7 +222,7 @@ class LeaderSpec
       val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
 
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
-      val data = PaxosData.acceptResponsesClientCommandsLens.set(initialData, (votes, clientResponses))
+      val data = PaxosActor.acceptResponsesClientCommandsLens.set(initialData, (votes, clientResponses))
       val committed = Progress.highestPromisedHighestCommitted.set(data.progress, (lastCommitted.number, lastCommitted))
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def freshTimeout(interval: Long): Long = 1234L
@@ -273,7 +272,7 @@ class LeaderSpec
 
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress)))) + (id100 -> AcceptResponsesAndTimeout(0L, a100, Map(0 -> AcceptAck(id100, 0, initialData.progress))))
 
-      val responses = PaxosData.acceptResponsesLens.set(initialData, votes)
+      val responses = PaxosActor.acceptResponsesLens.set(initialData, votes)
 
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
 
@@ -333,7 +332,7 @@ class LeaderSpec
 
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress)))) + (id100 -> AcceptResponsesAndTimeout(0L, a100, Map(0 -> AcceptAck(id100, 0, initialData.progress))))
 
-      val responses = PaxosData.acceptResponsesLens.set(initialData, votes)
+      val responses = PaxosActor.acceptResponsesLens.set(initialData, votes)
 
       // and we have committed up to 97
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
@@ -394,7 +393,7 @@ class LeaderSpec
 
       // given low initial state committed up to 97
       val low = BallotNumber(5, 1)
-      val initialData = PaxosData(Progress(low, minIdentifier), leaderHeartbeat2, timeout4, clusterSize5)
+      val initialData = PaxosData(Progress(low, minIdentifier), leaderHeartbeat2, timeout4, clusterSize5, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
       val lastCommitted = Identifier(0, epoch, 97L)
       val committed = Progress.highestPromisedHighestCommitted.set(initialData.progress, (lastCommitted.number, lastCommitted))
       // and some other node high prepare for slot 98

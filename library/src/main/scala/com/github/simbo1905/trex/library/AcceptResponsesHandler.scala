@@ -1,28 +1,32 @@
-package com.github.simbo1905.trex.internals
+package com.github.simbo1905.trex.library
 
-import akka.actor.ActorRef
-import akka.event.LoggingAdapter
-import com.github.simbo1905.trex.Journal
+/**
+ * Tracks the responses to an accept message and when we timeout on getting a majority response
+ * @param timeout The point in time we timeout.
+ * @param accept The accept that we are awaiting responses.
+ * @param responses The known responses.
+ */
+case class AcceptResponsesAndTimeout(timeout: Long, accept: Accept, responses: Map[Int, AcceptResponse])
 
-trait AcceptResponsesHandler {
+trait AcceptResponsesHandler[ClientRef] extends PaxosLenses[ClientRef] {
 
-  def log: LoggingAdapter
+  def plog: PaxosLogging
 
-  def send(actor: ActorRef, msg: Any)
+  def send(actor: ClientRef, msg: Any)
 
-  def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, ActorRef)]): Unit
+  def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, ClientRef)]): Unit
 
   def randomTimeout: Long
 
-  def backdownData(data: PaxosData): PaxosData
+  def backdownData(data: PaxosData[ClientRef]): PaxosData[ClientRef]
 
-  def commit(state: PaxosRole, data: PaxosData, identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)])
+  def commit(state: PaxosRole, data: PaxosData[ClientRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)])
 
   def journalProgress(progress: Progress): Progress
 
   def broadcast(msg: Any): Unit
 
-  def handleAcceptResponse(nodeUniqueId: Int, stateName: PaxosRole, sender: ActorRef, vote: AcceptResponse, oldData: PaxosData): (PaxosRole, PaxosData) = {
+  def handleAcceptResponse(nodeUniqueId: Int, stateName: PaxosRole, sender: ClientRef, vote: AcceptResponse, oldData: PaxosData[ClientRef]): (PaxosRole, PaxosData[ClientRef]) = {
     val highestCommitted = oldData.progress.highestCommitted.logIndex
     val highestCommittedOther = vote.progress.highestCommitted.logIndex
     highestCommitted < highestCommittedOther match {
@@ -34,7 +38,7 @@ trait AcceptResponsesHandler {
             val latestVotes = votes + (vote.from -> vote)
             val (positives, negatives) = latestVotes.toList.partition(_._2.isInstanceOf[AcceptAck])
             if (negatives.size > oldData.clusterSize / 2) {
-              log.info("Node {} {} received a majority accept nack so has lost leadership becoming a follower.", nodeUniqueId, stateName)
+              plog.info("Node {} {} received a majority accept nack so has lost leadership becoming a follower.", nodeUniqueId, stateName)
               sendNoLongerLeader(oldData.clientCommands)
               (Follower,backdownData(oldData))
             } else if (positives.size > oldData.clusterSize / 2) {
@@ -43,17 +47,17 @@ trait AcceptResponsesHandler {
 
               // grab all the accepted values from the beginning of the tree map
               val (committable, uncommittable) = updated.span { case (_, AcceptResponsesAndTimeout(_, _, rs)) => rs.isEmpty }
-              log.debug("Node " + nodeUniqueId + " {} vote {} committable {} uncommittable {}", stateName, vote, committable, uncommittable)
+              plog.debug("Node " + nodeUniqueId + " {} vote {} committable {} uncommittable {}", stateName, vote, committable, uncommittable)
 
               // this will have dropped the committable
-              val votesData = PaxosData.acceptResponsesLens.set(oldData, uncommittable)
+              val votesData = acceptResponsesLens.set(oldData, uncommittable)
 
               // attempt an in-sequence commit
               committable.headOption match {
                 case None =>
                   (stateName, votesData) // gap in committable sequence
                 case Some((id,_)) if id.logIndex != votesData.progress.highestCommitted.logIndex + 1 =>
-                  log.error(s"Node $nodeUniqueId $stateName invariant violation: $stateName has committable work which is not contiguous with progress implying we have not issued Prepare/Accept messages for the correct range of slots. Returning to follower.")
+                  plog.error(s"Node $nodeUniqueId $stateName invariant violation: $stateName has committable work which is not contiguous with progress implying we have not issued Prepare/Accept messages for the correct range of slots. Returning to follower.")
                   sendNoLongerLeader(oldData.clientCommands)
                   (Follower,backdownData(oldData))
                 case _ =>
@@ -68,31 +72,31 @@ trait AcceptResponsesHandler {
 
                     // TODO do the tests check that we clear out the responses which match the work we have committed?
                     val (responds, remainders) = oldData.clientCommands.partition {
-                      idCmdRef: (Identifier, (CommandValue, ActorRef)) =>
+                      idCmdRef: (Identifier, (CommandValue, ClientRef)) =>
                         val (id, (_, _)) = idCmdRef
                         committedIds.contains(id)
                     }
 
-                    log.debug("Node {} {} post commit has responds.size={}, remainders.size={}", nodeUniqueId, stateName, responds.size, remainders.size)
+                    plog.debug("Node {} {} post commit has responds.size={}, remainders.size={}", nodeUniqueId, stateName, responds.size, remainders.size)
                     results foreach { case (id, bytes) =>
                       responds.get(id) foreach { case (cmd, client) =>
-                        log.debug("sending response from accept {} to {}", id, client)
+                        plog.debug("sending response from accept {} to {}", id, client)
                         send(client, bytes)
                       }
                     }
-                    (stateName, PaxosData.progressLens.set(votesData, newProgress).copy(clientCommands = remainders))// TODO new lens?
+                    (stateName, progressLens.set(votesData, newProgress).copy(clientCommands = remainders))// TODO new lens?
                   } else {
-                    (stateName, PaxosData.progressLens.set(votesData, newProgress))
+                    (stateName, progressLens.set(votesData, newProgress))
                   }
               }
             } else {
               // insufficient votes keep counting
               val updated = oldData.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(randomTimeout, accept, latestVotes))
-              log.debug("Node {} {} insufficient votes for {} have {}", nodeUniqueId, stateName, vote.requestId, updated)
-              (stateName, PaxosData.acceptResponsesLens.set(oldData, updated))
+              plog.debug("Node {} {} insufficient votes for {} have {}", nodeUniqueId, stateName, vote.requestId, updated)
+              (stateName, acceptResponsesLens.set(oldData, updated))
             }
           case None =>
-            log.debug("Node {} {} ignoring response we are not awaiting: {}", nodeUniqueId, stateName, vote)
+            plog.debug("Node {} {} ignoring response we are not awaiting: {}", nodeUniqueId, stateName, vote)
             (stateName, oldData)
         }
     }

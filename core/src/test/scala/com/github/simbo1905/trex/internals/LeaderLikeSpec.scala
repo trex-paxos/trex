@@ -3,6 +3,7 @@ package com.github.simbo1905.trex.internals
 import akka.actor.ActorRef
 import akka.testkit.{TestFSMRef, TestKit}
 import com.github.simbo1905.trex._
+import com.github.simbo1905.trex.library._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
 
@@ -155,7 +156,7 @@ trait LeaderLikeSpec {
     val id99 = Identifier(0, BallotNumber(1, 0), 99L)
     val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
     val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
-    val responses: PaxosData = PaxosData.acceptResponsesLens.set(initialData, votes)
+    val responses = PaxosActor.acceptResponsesLens.set(initialData, votes)
     val oldProgress = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
     val timenow = 999L
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
@@ -186,7 +187,7 @@ trait LeaderLikeSpec {
       0 -> AcceptAck(id99, 0, initialData.progress),
       1 -> AcceptNack(id99, 1, initialData.progress.copy(highestPromised = BallotNumber(22, 2)))
     )))
-    val responses = PaxosData.acceptResponsesLens.set(initialData, votes)
+    val responses = PaxosActor.acceptResponsesLens.set(initialData, votes)
     val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
     val timenow = 999L
     var sendTime = 0L
@@ -232,7 +233,7 @@ trait LeaderLikeSpec {
     val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(
       0 -> AcceptAck(id99, 0, initialData.progress)
     )))
-    val responses = PaxosData.acceptResponsesLens.set(initialData, votes)
+    val responses = PaxosActor.acceptResponsesLens.set(initialData, votes)
     val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (BallotNumber(22, 2), lastCommitted))
     val timenow = 999L
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None) {

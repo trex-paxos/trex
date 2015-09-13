@@ -3,9 +3,9 @@ package com.github.simbo1905.trex.internals
 import akka.actor.{ActorRef, ActorSystem}
 import akka.event.LoggingAdapter
 import akka.testkit.{TestProbe, TestFSMRef, TestKit}
-import com.github.simbo1905.trex.Journal
 import com.github.simbo1905.trex.internals.AllStateSpec._
 import com.github.simbo1905.trex.internals.PaxosActor.{CheckTimeout, Configuration}
+import com.github.simbo1905.trex.library._
 import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.collection.immutable.TreeMap
@@ -19,11 +19,11 @@ object TestFollowerTimeoutHandler {
 
   val selfNack = PrepareNack(minPrepare.id, 0, AllStateSpec.initialData.progress, 0, 999)
 
-  val initialDataWithTimeoutAndPrepareResponses = PaxosData.timeoutPrepareResponsesLens.set(AllStateSpec.initialData, (99L, TreeMap(minPrepare.id -> Map(0 -> selfNack))))
+  val initialDataWithTimeoutAndPrepareResponses = PaxosActor.timeoutPrepareResponsesLens.set(AllStateSpec.initialData, (99L, TreeMap(minPrepare.id -> Map(0 -> selfNack))))
 }
 
-class TestFollowerTimeoutHandler extends FollowerTimeoutHandler {
-  override def log: LoggingAdapter = NoopLoggingAdapter
+class TestFollowerTimeoutHandler extends FollowerTimeoutHandler[ActorRef] {
+  override def plog = NoopPaxosLogging
 
   override def minPrepare = TestFollowerTimeoutHandler.minPrepare
 
@@ -35,7 +35,7 @@ class TestFollowerTimeoutHandler extends FollowerTimeoutHandler {
 
   override def send(actor: ActorRef, msg: Any): Unit = ???
 
-  override def backdownData(data: PaxosData): PaxosData = ???
+  override def backdownData(data: PaxosData[ActorRef]): PaxosData[ActorRef] = ???
 
   override def journal: Journal = ???
 }
@@ -56,7 +56,7 @@ with WordSpecLike with Matchers {
       }
       // when timeout on minPrepare logic is invoked
       handler.handleFollowerTimeout(99, Follower, AllStateSpec.initialData) match {
-        case data: PaxosData =>
+        case data: PaxosData[ActorRef] =>
           // it should set a fresh timeout
           data.timeout shouldBe 12345L
           // and have nacked its own minPrepare
@@ -81,7 +81,7 @@ with WordSpecLike with Matchers {
       }
       // when timeout on minPrepare logic is invoked
       handler.handleResendLowPrepares(99, Follower, AllStateSpec.initialData) match {
-        case data: PaxosData =>
+        case data: PaxosData[ActorRef] =>
           // it should set a fresh timeout
           data.timeout shouldBe 12345L
       }
@@ -99,7 +99,7 @@ with WordSpecLike with Matchers {
           sentMsg = Option(msg)
         }
 
-        override def backdownData(data: PaxosData): PaxosData = PaxosActor.backdownData(data, 999L)
+        override def backdownData(data: PaxosData[ActorRef]): PaxosData[ActorRef] = PaxosActor.backdownData(data, 999L)
       }
       // and a vote showing a higher committed slot
       val ballotNumber = BallotNumber(5, 2)
@@ -156,7 +156,7 @@ with WordSpecLike with Matchers {
     "knows to failover when there are no other larger leader heartbeats" in {
       val nack1 = PrepareNack(minPrepare.id, 0, AllStateSpec.initialData.progress, 0, 999)
       val nack2 = PrepareNack(minPrepare.id, 0, AllStateSpec.initialData.progress, 0, 999)
-      FollowerTimeoutHandler.computeFailover(NoopLoggingAdapter, 0, AllStateSpec.initialData.copy(leaderHeartbeat = 1000), Map(1 -> nack1, 2 -> nack2) ) match {
+      FollowerTimeoutHandler.computeFailover(NoopPaxosLogging, 0, AllStateSpec.initialData.copy(leaderHeartbeat = 1000), Map(1 -> nack1, 2 -> nack2) ) match {
         case FailoverResult(true, 1000) => // good
         case x => fail(x.toString)
       }
@@ -164,7 +164,7 @@ with WordSpecLike with Matchers {
     "knows not to failover when there is sufficient evidence of other leaders heartbeat" in {
       val nack1 = PrepareNack(minPrepare.id, 0, AllStateSpec.initialData.progress, 0, 998)
       val nack2 = PrepareNack(minPrepare.id, 0, AllStateSpec.initialData.progress, 0, 999)
-      FollowerTimeoutHandler.computeFailover(NoopLoggingAdapter, 0, AllStateSpec.initialData, Map(1 -> nack1, 2 -> nack2) ) match {
+      FollowerTimeoutHandler.computeFailover(NoopPaxosLogging, 0, AllStateSpec.initialData, Map(1 -> nack1, 2 -> nack2) ) match {
         case FailoverResult(false, 999) => // good
         case x => fail(x.toString)
       }
@@ -172,7 +172,7 @@ with WordSpecLike with Matchers {
     "chooses to failover when there is insufficient evidence of other leaders heartbeat" in {
       val nack1 = PrepareNack(minPrepare.id, 0, AllStateSpec.initialData.progress, 0, 998)
       val nack2 = PrepareNack(minPrepare.id, 0, AllStateSpec.initialData.progress, 0, 999)
-      FollowerTimeoutHandler.computeFailover(NoopLoggingAdapter, 0, AllStateSpec.initialData.copy(leaderHeartbeat = 998, clusterSize = 5), Map(1 -> nack1, 2 -> nack2) ) match {
+      FollowerTimeoutHandler.computeFailover(NoopPaxosLogging, 0, AllStateSpec.initialData.copy(leaderHeartbeat = 998, clusterSize = 5), Map(1 -> nack1, 2 -> nack2) ) match {
         case FailoverResult(true, 999) => // good
         case x => fail(x.toString)
       }
@@ -232,7 +232,7 @@ with WordSpecLike with Matchers {
       // given a node who should timeout on a low prepare
       var invoked = false
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, 3), 0, TestProbe().ref, AllStateSpec.tempRecordTimesFileJournal, ArrayBuffer.empty, None) {
-        override def handleFollowerTimeout(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData): PaxosData = {
+        override def handleFollowerTimeout(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData[ActorRef]): PaxosData[ActorRef] = {
           invoked = true
           super.handleFollowerTimeout(nodeUniqueId, stateName, data)
         }
@@ -252,7 +252,7 @@ with WordSpecLike with Matchers {
       // given a node who should timeout on a low prepare
       var invoked = false
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, 3), 0, TestProbe().ref, AllStateSpec.tempRecordTimesFileJournal, ArrayBuffer.empty, None) {
-        override def handleResendLowPrepares(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData): PaxosData = {
+        override def handleResendLowPrepares(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData[ActorRef]): PaxosData[ActorRef] = {
           invoked = true
           super.handleResendLowPrepares(nodeUniqueId, stateName, data)
         }
@@ -273,8 +273,8 @@ with WordSpecLike with Matchers {
       var saveTs = 0L
       var sendTs = 0L
       val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, 3), 0, TestProbe().ref, AllStateSpec.tempRecordTimesFileJournal, ArrayBuffer.empty, None) {
-        override def handLowPrepareResponse(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData, sender: ActorRef, vote: PrepareResponse): LowPrepareResponseResult = {
-          LowPrepareResponseResult(Recoverer, data, Seq(minPrepare))
+        override def handLowPrepareResponse(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData[ActorRef], sender: ActorRef, vote: PrepareResponse): LowPrepareResponseResult[ActorRef] = {
+          LowPrepareResponseResult[ActorRef](Recoverer, data, Seq(minPrepare))
         }
 
         override def broadcast(msg: Any): Unit = {

@@ -3,6 +3,7 @@ package com.github.simbo1905.trexdemo
 import java.net.InetSocketAddress
 
 import akka.actor._
+import com.github.simbo1905.trex.library._
 import scala.language.postfixOps
 import scala.concurrent.duration._
 import akka.util.Timeout

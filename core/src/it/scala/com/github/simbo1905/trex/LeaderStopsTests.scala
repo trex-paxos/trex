@@ -2,7 +2,7 @@ package com.github.simbo1905.trex
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
-import com.github.simbo1905.trex.internals.{NoLongerLeaderException, ClientRequestCommandValue, CommandValue}
+import com.github.simbo1905.trex.library.{ClientRequestCommandValue, NoLongerLeaderException, CommandValue}
 import org.scalatest._
 
 import scala.collection.mutable.ArrayBuffer

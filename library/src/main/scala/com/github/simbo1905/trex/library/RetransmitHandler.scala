@@ -1,13 +1,8 @@
-package com.github.simbo1905.trex.internals
-
-import akka.actor.ActorRef
-import akka.event.LoggingAdapter
-import com.github.simbo1905.trex.{Journal, JournalBounds}
-import com.github.simbo1905.trex.internals.PaxosActor.HighestCommittedIndex
+package com.github.simbo1905.trex.library
 
 case class Retransmission(newProgress: Progress, accepts: Seq[Accept], committed: Seq[CommandValue])
 
-trait RetransmitHandler {
+trait RetransmitHandler[ClientRef] {
 
   import RetransmitHandler._
 
@@ -17,11 +12,11 @@ trait RetransmitHandler {
 
   def deliver(value: CommandValue): Any
 
-  def log: LoggingAdapter
+  def plog: PaxosLogging
 
-  def send(actor: ActorRef, msg: Any): Unit
+  def send(actor: ClientRef, msg: Any): Unit
 
-  def handleRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData): Progress = {
+  def handleRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData[ClientRef]): Progress = {
     // pure functional computation
     val retransmission = processRetransmitResponse(response, nodeData)
 
@@ -40,7 +35,7 @@ trait RetransmitHandler {
    * halt the progress of the receiving node.  
    * @return
    */
-  def processRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData): Retransmission = {
+  def processRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData[ClientRef]): Retransmission = {
     val highestCommitted = nodeData.progress.highestCommitted
     val highestPromised = nodeData.progress.highestPromised
 
@@ -61,13 +56,13 @@ trait RetransmitHandler {
     // update our progress with new highest commit index and new promise
     val newProgress = Progress.highestPromisedHighestCommitted.set(nodeData.progress, (acceptState.highest, commitState.highestCommitted))
 
-    log.info("Node " + nodeUniqueId + " RetransmitResponse committed {} of {} and accepted {} of {}", committedCount, aboveCommitted.size, acceptState.acceptable.size, response.uncommitted.size)
+    plog.info("Node " + nodeUniqueId + " RetransmitResponse committed {} of {} and accepted {} of {}", committedCount, aboveCommitted.size, acceptState.acceptable.size, response.uncommitted.size)
 
     // return new progress, the accepts that we should journal so that we may retransmit on request, and the committed values
     Retransmission(newProgress, (aboveCommitted ++ acceptState.acceptable).distinct, commitState.committed.map(_.value))
   }
 
-  def handleRetransmitRequest(sender: ActorRef, request: RetransmitRequest, nodeData: PaxosData): Unit = {
+  def handleRetransmitRequest(sender: ClientRef, request: RetransmitRequest, nodeData: PaxosData[ClientRef]): Unit = {
     // extract who to respond to, where they are requesting from and where we are committed up to
     val RetransmitRequest(to, _, requestedLogIndex) = request
     val HighestCommittedIndex(committedLogIndex) = nodeData
@@ -79,7 +74,7 @@ trait RetransmitHandler {
     }
 
     responseData foreach { r =>
-      log.info(s"Node $nodeUniqueId retransmission response to node {} for logIndex {} with {} committed and {} proposed entries", r.from, request.logIndex, r.committed.size, r.uncommitted.size)
+      plog.info(s"Node $nodeUniqueId retransmission response to node {} for logIndex {} with {} committed and {} proposed entries", r.from, request.logIndex, r.committed.size, r.uncommitted.size)
       send(sender, r)
     }
   }

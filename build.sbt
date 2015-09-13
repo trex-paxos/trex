@@ -6,9 +6,12 @@ lazy val commonSettings = Seq(
   scalacOptions := Seq("-feature", "-deprecation", "-Xfatal-warnings")
 )
 
-lazy val root = (project in file(".")).aggregate(core,demo)
+lazy val root = (project in file(".")).aggregate(library,core,demo)
 
-lazy val core = project.
+lazy val library = project.settings(commonSettings: _*).
+  settings( name := "trex-library")
+
+lazy val core = project.dependsOn(library).
   configs(IntegrationTest).
   settings(commonSettings: _*).
   settings(Defaults.itSettings: _*).

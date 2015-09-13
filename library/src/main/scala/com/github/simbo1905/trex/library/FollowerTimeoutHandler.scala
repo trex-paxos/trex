@@ -1,16 +1,11 @@
-package com.github.simbo1905.trex.internals
+package com.github.simbo1905.trex.library
 
-import akka.actor.ActorRef
-import akka.event.LoggingAdapter
-import com.github.simbo1905.trex.Journal
-import scala.collection.SortedMap
+import com.github.simbo1905.trex.library.Ordering._
 
-import Ordering._
+import scala.collection.immutable.{SortedMap, TreeMap}
 
-import scala.collection.immutable.TreeMap
-
-trait FollowerTimeoutHandler {
-  def log: LoggingAdapter
+trait FollowerTimeoutHandler[ClientRef] extends PaxosLenses[ClientRef] {
+  def plog: PaxosLogging
 
   def broadcast(msg: Any): Unit
 
@@ -20,39 +15,39 @@ trait FollowerTimeoutHandler {
 
   def highestAcceptedIndex: Long
 
-  def send(actor: ActorRef, msg: Any): Unit
+  def send(actor: ClientRef, msg: Any): Unit
 
-  def backdownData(data: PaxosData): PaxosData
+  def backdownData(data: PaxosData[ClientRef]): PaxosData[ClientRef]
 
   def journal: Journal
 
-  def computeFailover(log: LoggingAdapter, nodeUniqueId: Int, data: PaxosData, votes: Map[Int, PrepareResponse]): FailoverResult = FollowerTimeoutHandler.computeFailover(log, nodeUniqueId, data, votes)
+  def computeFailover(log: PaxosLogging, nodeUniqueId: Int, data: PaxosData[ClientRef], votes: Map[Int, PrepareResponse]): FailoverResult = FollowerTimeoutHandler.computeFailover(log, nodeUniqueId, data, votes)
 
   def recoverPrepares(nodeUniqueId: Int, highest: BallotNumber, highestCommittedIndex: Long, highestAcceptedIndex: Long) = FollowerTimeoutHandler.recoverPrepares(nodeUniqueId, highest, highestCommittedIndex, highestAcceptedIndex)
 
-  def handleResendLowPrepares(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData): PaxosData = {
-    log.debug("Node {} {} timed-out having already issued a low. rebroadcasting", nodeUniqueId, stateName)
+  def handleResendLowPrepares(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData[ClientRef]): PaxosData[ClientRef] = {
+    plog.debug("Node {} {} timed-out having already issued a low. rebroadcasting", nodeUniqueId, stateName)
     broadcast(minPrepare)
-    PaxosData.timeoutLens.set(data, randomTimeout)
+    timeoutLens.set(data, randomTimeout)
   }
 
-  def handleFollowerTimeout(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData): PaxosData = {
-    log.info("Node {} {} timed-out progress: {}", nodeUniqueId, stateName, data.progress)
+  def handleFollowerTimeout(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData[ClientRef]): PaxosData[ClientRef] = {
+    plog.info("Node {} {} timed-out progress: {}", nodeUniqueId, stateName, data.progress)
     broadcast(minPrepare)
     // nack our own prepare
     val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
       Map(minPrepare.id -> Map(nodeUniqueId -> PrepareNack(minPrepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat)))
 
-    PaxosData.timeoutPrepareResponsesLens.set(data, (randomTimeout, prepareSelfVotes))
+    timeoutPrepareResponsesLens.set(data, (randomTimeout, prepareSelfVotes))
   }
 
-  def handLowPrepareResponse(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData, sender: ActorRef, vote: PrepareResponse): LowPrepareResponseResult = {
+  def handLowPrepareResponse(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData[ClientRef], sender: ClientRef, vote: PrepareResponse): LowPrepareResponseResult[ClientRef] = {
     val selfHighestSlot = data.progress.highestCommitted.logIndex
     val otherHighestSlot = vote.progress.highestCommitted.logIndex
     if (otherHighestSlot > selfHighestSlot) {
-      log.debug("Node {} node {} committed slot {} requesting retransmission", nodeUniqueId, vote.from, otherHighestSlot)
+      plog.debug("Node {} node {} committed slot {} requesting retransmission", nodeUniqueId, vote.from, otherHighestSlot)
       send(sender, RetransmitRequest(nodeUniqueId, vote.from, data.progress.highestCommitted.logIndex))
-      LowPrepareResponseResult(Follower, backdownData(data))
+      LowPrepareResponseResult[ClientRef](Follower, backdownData(data))
     } else {
       data.prepareResponses.get(vote.requestId) match {
         case Some(map) =>
@@ -62,7 +57,7 @@ trait FollowerTimeoutHandler {
 
           if (haveMajorityResponse) {
 
-            computeFailover(log, nodeUniqueId, data, votes) match {
+            computeFailover(plog, nodeUniqueId, data, votes) match {
               case FailoverResult(failover, _) if failover =>
                 val highestNumber = Seq(data.progress.highestPromised, data.progress.highestCommitted.number).max
                 val maxCommittedSlot = data.progress.highestCommitted.logIndex
@@ -83,11 +78,11 @@ trait FollowerTimeoutHandler {
 
                     // the new leader epoch is the promise it made to itself
                     val epoch: Option[BallotNumber] = Some(selfPromise)
-                    log.info("Node {} Follower broadcast {} prepare messages with {} transitioning Recoverer max slot index {}.", nodeUniqueId, prepares.size, selfPromise, maxAcceptedSlot)
+                    plog.info("Node {} Follower broadcast {} prepare messages with {} transitioning Recoverer max slot index {}.", nodeUniqueId, prepares.size, selfPromise, maxAcceptedSlot)
                     // make a promise to self not to accept higher numbered messages and journal that
-                    LowPrepareResponseResult(Recoverer, PaxosData.highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens.set(data, (selfPromise, randomTimeout, epoch, prepareSelfVotes, SortedMap.empty)), prepares)
+                    LowPrepareResponseResult(Recoverer, highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens.set(data, (selfPromise, randomTimeout, epoch, prepareSelfVotes, SortedMap.empty)), prepares)
                   case None =>
-                    log.error("this code should be unreachable")
+                    plog.error("this code should be unreachable")
                     LowPrepareResponseResult(Follower, data)
                 }
               case FailoverResult(_, maxHeartbeat) =>
@@ -101,7 +96,7 @@ trait FollowerTimeoutHandler {
             LowPrepareResponseResult(Follower, data.copy(prepareResponses = TreeMap(Map(minPrepare.id -> votes).toArray: _*))) // TODO lens
           }
         case x =>
-          log.debug("Node {} {} is no longer awaiting responses to {} so ignoring {}", nodeUniqueId, stateName, vote.requestId, x)
+          plog.debug("Node {} {} is no longer awaiting responses to {} so ignoring {}", nodeUniqueId, stateName, vote.requestId, x)
           LowPrepareResponseResult(Follower, data)
       }
     }
@@ -110,7 +105,7 @@ trait FollowerTimeoutHandler {
 
 case class FailoverResult(failover: Boolean, maxHeartbeat: Long)
 
-case class LowPrepareResponseResult(role: PaxosRole, data: PaxosData, highPrepares: Seq[Prepare] = Seq.empty)
+case class LowPrepareResponseResult[ClientRef](role: PaxosRole, data: PaxosData[ClientRef], highPrepares: Seq[Prepare] = Seq.empty)
 
 object FollowerTimeoutHandler {
   /**
@@ -128,7 +123,7 @@ object FollowerTimeoutHandler {
     if (prepares.nonEmpty) prepares else Seq(Prepare(Identifier(nodeUniqueId, higherNumber, highestCommittedIndex + 1)))
   }
 
-  def computeFailover(log: LoggingAdapter, nodeUniqueId: Int, data: PaxosData, votes: Map[Int, PrepareResponse]): FailoverResult = {
+  def computeFailover[ClientRef](log: PaxosLogging, nodeUniqueId: Int, data: PaxosData[ClientRef], votes: Map[Int, PrepareResponse]): FailoverResult = {
 
     val largerHeartbeats: Iterable[Long] = votes.values flatMap {
       case PrepareNack(_, _, _, _, evidenceHeartbeat) if evidenceHeartbeat > data.leaderHeartbeat =>

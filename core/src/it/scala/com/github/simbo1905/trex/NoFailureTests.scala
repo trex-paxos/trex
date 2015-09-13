@@ -2,7 +2,7 @@ package com.github.simbo1905.trex
 
 import akka.actor._
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
-import com.github.simbo1905.trex.internals.{ClientRequestCommandValue, CommandValue, NoLongerLeaderException}
+import com.github.simbo1905.trex.library.{ClientRequestCommandValue, NoLongerLeaderException, CommandValue}
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.{BeforeAndAfterAll, _}
 

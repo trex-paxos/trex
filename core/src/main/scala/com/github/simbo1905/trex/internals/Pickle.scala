@@ -1,6 +1,7 @@
 package com.github.simbo1905.trex.internals
 
 import akka.util.ByteString
+import com.github.simbo1905.trex.library._
 
 import scala.annotation.tailrec
 

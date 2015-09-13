@@ -7,13 +7,17 @@ import akka.actor.ActorRef
 import akka.testkit.{TestFSMRef, TestKit}
 import com.github.simbo1905.trex._
 import com.github.simbo1905.trex.internals.PaxosActor._
+import com.github.simbo1905.trex.library._
 import com.typesafe.config.ConfigFactory
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{OptionValues, Matchers}
 
+import scala.collection.immutable.TreeMap
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.language.postfixOps
+
+import Ordering._
 
 class TestAcceptMapJournal extends Journal {
   var accept: Map[Long, Accept] = Map.empty
@@ -80,14 +84,14 @@ object AllStateSpec {
 
   val minIdentifier = Identifier(from = 0, number = BallotNumber(lowValue, lowValue), logIndex = Long.MinValue)
 
-  val initialData = PaxosData(
+  val initialData = PaxosData[ActorRef](
     progress = Progress(
       highestPromised = BallotNumber(lowValue, lowValue),
       highestCommitted = Identifier(from = 0, number = BallotNumber(lowValue, lowValue), logIndex = 0)
     ),
     leaderHeartbeat = 0,
     timeout = 0,
-    clusterSize = 3)
+    clusterSize = 3, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, ActorRef)])
 
   val minute = 1000 * 60 // ms
 
@@ -112,7 +116,7 @@ trait AllStateSpec {
   def retransmitRequestInvokesHandler(state: PaxosRole)(implicit sender: ActorRef): Unit = {
     var handledMessage = false
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, AllStateSpec.tempRecordTimesFileJournal, ArrayBuffer.empty, None) {
-      override def handleRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData): Progress = {
+      override def handleRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData[ActorRef]): Progress = {
         handledMessage = true
         super.handleRetransmitResponse(response, nodeData)
       }
@@ -124,7 +128,7 @@ trait AllStateSpec {
   def retransmitResponseInvokesHandler(state: PaxosRole)(implicit sender: ActorRef): Unit = {
     var handledMessage = false
     val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, AllStateSpec.tempRecordTimesFileJournal, ArrayBuffer.empty, None) {
-      override def handleRetransmitRequest(sender: ActorRef, request: RetransmitRequest, nodeData: PaxosData): Unit = {
+      override def handleRetransmitRequest(sender: ActorRef, request: RetransmitRequest, nodeData: PaxosData[ActorRef]): Unit = {
         handledMessage = true
         super.handleRetransmitRequest(sender, request, nodeData)
       }
@@ -153,7 +157,7 @@ trait AllStateSpec {
     val stubJournal: Journal = stub[Journal]
     // given initial state
     val promised = BallotNumber(6, 1)
-    val initialData = PaxosData(Progress(promised, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3)
+    val initialData = PaxosData(Progress(promised, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
     val identifier = Identifier(0, promised, 1)
     val accepted = Accept(identifier, ClientRequestCommandValue(0, expectedBytes))
     // when our node sees the accept message
@@ -174,7 +178,7 @@ trait AllStateSpec {
   def ackHigherAcceptMakingPromise(state: PaxosRole)(implicit sender: ActorRef): Unit = {
     // given initial state promised to node 1 count 6
     val promised = BallotNumber(6, 1)
-    val initialData = PaxosData(Progress(promised, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3)
+    val initialData = PaxosData(Progress(promised, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
     // and a journal which records the time save was called
     val testJournal = AllStateSpec.tempRecordTimesFileJournal
 
@@ -219,7 +223,7 @@ trait AllStateSpec {
     val stubJournal: Journal = stub[Journal]
     // given initial state
     val promised = BallotNumber(6, 1)
-    val initialData = PaxosData(Progress(promised, Identifier(0, promised, Long.MinValue)), leaderHeartbeat2, timeout4, clusterSize3)
+    val initialData = PaxosData(Progress(promised, Identifier(0, promised, Long.MinValue)), leaderHeartbeat2, timeout4, clusterSize3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
     val identifier = Identifier(0, promised, 1)
     // and some already journalled accept
     val accepted = Accept(identifier, ClientRequestCommandValue(0, expectedBytes))
@@ -243,7 +247,7 @@ trait AllStateSpec {
     // given initial state
     val committedLogIndex = 1
     val promised = BallotNumber(5, 0)
-    val initialData = PaxosData(Progress(promised, Identifier(0, promised, committedLogIndex)), leaderHeartbeat2, timeout4, clusterSize3)
+    val initialData = PaxosData(Progress(promised, Identifier(0, promised, committedLogIndex)), leaderHeartbeat2, timeout4, clusterSize3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
     val higherIdentifier = Identifier(0, BallotNumber(6, 0), committedLogIndex)
     val acceptedAccept = Accept(higherIdentifier, ClientRequestCommandValue(0, expectedBytes))
     // and some duplicated accept
@@ -263,7 +267,7 @@ trait AllStateSpec {
     val stubJournal: Journal = stub[Journal]
     // given initial state
     val promised = BallotNumber(5, 1)
-    val initialData = PaxosData(Progress(promised, minIdentifier), leaderHeartbeat2, 0, clusterSize3)
+    val initialData = PaxosData(Progress(promised, minIdentifier), leaderHeartbeat2, 0, clusterSize3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
     val lowerIdentifier = Identifier(0, BallotNumber(4, 2), 1)
     val rejectedAccept = Accept(lowerIdentifier, ClientRequestCommandValue(0, expectedBytes))
     // and some duplicated accept
@@ -383,7 +387,7 @@ trait AllStateSpec {
     val stubJournal: Journal = stub[Journal]
     // given higher initial state
     val high = BallotNumber(10, 1)
-    val initialData = PaxosData(Progress(high, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3)
+    val initialData = PaxosData(Progress(high, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
     // and low prepare
     val low = BallotNumber(5, 2)
     val lowIdentifier = Identifier(0, low, 1)
@@ -406,7 +410,7 @@ trait AllStateSpec {
     val stubJournal: Journal = stub[Journal]
     // given higher initial state
     val high = BallotNumber(10, 2)
-    val initialData = PaxosData(Progress(high, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3)
+    val initialData = PaxosData(Progress(high, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
     // and prepare which is lower by node
     val low = BallotNumber(10, 1)
     val lowIdentifier = Identifier(0, low, 1)
@@ -431,7 +435,7 @@ trait AllStateSpec {
     stubJournal.accepted _ when 1L returns None
     // given higher initial state
     val high = BallotNumber(10, 1)
-    val initialData = PaxosData(Progress(high, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3)
+    val initialData = PaxosData(Progress(high, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
     // and same prepare
     val highIdentifier = Identifier(0, high, 1L)
     val highPrepare = Prepare(highIdentifier)
@@ -456,7 +460,7 @@ trait AllStateSpec {
     val testJournal = AllStateSpec.tempRecordTimesFileJournal
     // given low initial state
     val low = BallotNumber(5, 1)
-    val initialData = PaxosData(Progress(low, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3)
+    val initialData = PaxosData(Progress(low, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
     // and same prepare
     val high = BallotNumber(10, 2)
     val highIdentifier = Identifier(0, high, 1L)

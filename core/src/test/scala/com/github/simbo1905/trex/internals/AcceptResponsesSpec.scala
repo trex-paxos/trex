@@ -1,17 +1,15 @@
 package com.github.simbo1905.trex.internals
 
 import akka.actor.{ActorSystem, ActorRef}
-import akka.event.LoggingAdapter
 import akka.testkit.{TestProbe, TestKit}
-import com.github.simbo1905.trex.Journal
 import com.github.simbo1905.trex.internals.AllStateSpec._
+import com.github.simbo1905.trex.library._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, WordSpecLike}
 
-import scala.collection.SortedMap
 import Ordering._
 
-import scala.collection.immutable.TreeMap
+import scala.collection.immutable.{TreeMap, SortedMap}
 
 object AcceptResponsesSpec {
   val identifier98: Identifier = Identifier(1, BallotNumber(1, 1), 98L)
@@ -48,12 +46,13 @@ with WordSpecLike with Matchers with MockFactory {
       var saveTime = 0L
       val vote = AcceptAck(a98.id, 1, progress97)
       val handler = new UndefinedAcceptResponsesHandler {
+        override def plog: PaxosLogging = NoopPaxosLogging
 
         override def broadcast(msg: Any) {
           sendTime = System.nanoTime()
         }
 
-        override def commit(state: PaxosRole, data: PaxosData, identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) =
+        override def commit(state: PaxosRole, data: PaxosData[ActorRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) =
           (progress98,Seq.empty)
 
         override def journalProgress(progress: Progress): Progress = {
@@ -70,10 +69,9 @@ with WordSpecLike with Matchers with MockFactory {
   }
 }
 
-class UndefinedAcceptResponsesHandler extends AcceptResponsesHandler {
-  override def log: LoggingAdapter = NoopLoggingAdapter
+class UndefinedAcceptResponsesHandler extends AcceptResponsesHandler[ActorRef] {
 
-  override def backdownData(data: PaxosData): PaxosData = ???
+  override def backdownData(data: PaxosData[ActorRef]): PaxosData[ActorRef] = ???
 
   override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, ActorRef)]): Unit = {}
 
@@ -83,7 +81,9 @@ class UndefinedAcceptResponsesHandler extends AcceptResponsesHandler {
 
   override def broadcast(msg: Any): Unit = {}
 
-  override def commit(state: PaxosRole, data: PaxosData, identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) = ???
+  override def commit(state: PaxosRole, data: PaxosData[ActorRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) = ???
 
   def journalProgress(progress: Progress): Progress = ???
+
+  override def plog: PaxosLogging = NoopPaxosLogging
 }

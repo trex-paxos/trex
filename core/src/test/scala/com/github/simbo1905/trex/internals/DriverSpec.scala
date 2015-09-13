@@ -3,6 +3,7 @@ package com.github.simbo1905.trex.internals
 import java.util.concurrent.TimeoutException
 import akka.actor._
 import akka.testkit.{TestProbe, TestActorRef, ImplicitSender, TestKit}
+import com.github.simbo1905.trex.library.{ClientRequestCommandValue, ServerResponse, NoLongerLeaderException, NotLeader}
 import org.scalatest.{Matchers, BeforeAndAfterAll, SpecLike}
 import com.typesafe.config.ConfigFactory
 import scala.compat.Platform

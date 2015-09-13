@@ -1,17 +1,17 @@
 package com.github.simbo1905.trex.internals
 
 import akka.actor.{ActorSystem, ActorRef}
-import akka.event.LoggingAdapter
 import akka.testkit.{TestProbe, TestKit}
-import com.github.simbo1905.trex.{JournalBounds, Journal}
-import com.github.simbo1905.trex.internals.RetransmitHandler.{ResponseState, AcceptState, CommitState}
+import com.github.simbo1905.trex.library._
+import RetransmitHandler.{ResponseState, AcceptState, CommitState}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, WordSpecLike}
 
-import scala.collection.generic.SeqFactory
+import scala.collection.immutable.TreeMap
+import Ordering._
 
-class UndefinedRetransmitHandler extends RetransmitHandler {
-  override def log: LoggingAdapter = NoopLoggingAdapter
+class UndefinedRetransmitHandler extends RetransmitHandler[ActorRef] {
+  override def plog = NoopPaxosLogging
 
   override def nodeUniqueId: Int = 0
 
@@ -19,7 +19,7 @@ class UndefinedRetransmitHandler extends RetransmitHandler {
 
   override def journal: Journal = ???
 
-  override def processRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData): Retransmission = ???
+  override def processRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData[ActorRef]): Retransmission = ???
 
   def send(actor: ActorRef, msg: Any): Unit = ???
 }
@@ -77,7 +77,7 @@ object RetransmitSpec {
   val initialDataCommittedSlotOne = PaxosData(
     Progress(
       BallotNumber(lowValue, lowValue), Identifier(0, BallotNumber(lowValue, lowValue), 1)
-    ), 0, 0, 3)
+    ), 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
 }
 
 class RetransmitSpec extends TestKit(ActorSystem("RetransmitSpec", AllStateSpec.config))
@@ -169,7 +169,7 @@ with MockFactory {
       // and a retransmit handler which records what was delivered when
       var deliveredWithTs: Seq[(Long, CommandValue)] = Seq.empty
       val handler = new UndefinedRetransmitHandler {
-        override def processRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData): Retransmission = Retransmission(progress, accepts98thru100, accepts98thru100.map(_.value))
+        override def processRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData[ActorRef]): Retransmission = Retransmission(progress, accepts98thru100, accepts98thru100.map(_.value))
 
         override def journal: Journal = stubJournal
 

@@ -1,26 +1,25 @@
 package com.github.simbo1905.trex.internals
 
 import akka.actor.{ActorRef, ActorSystem}
-import akka.event.LoggingAdapter
 import akka.testkit.{TestProbe, TestKit}
-import com.github.simbo1905.trex.Journal
 import com.github.simbo1905.trex.internals.AllStateSpec._
+import com.github.simbo1905.trex.library._
 import org.scalatest.{OptionValues, Matchers, WordSpecLike}
 
-import scala.collection.SortedMap
+import scala.collection.immutable.SortedMap
 import scala.collection.mutable.ArrayBuffer
 import Ordering._
 
 case class TimeAndMessage(message: Any, time: Long)
 
-class TestPrepareResponseHandler extends PrepareResponseHandler {
+class TestPrepareResponseHandler extends PrepareResponseHandler[ActorRef] {
   val broadcastValues: ArrayBuffer[TimeAndMessage] = ArrayBuffer()
 
-  override def backdownData(data: PaxosData): PaxosData = PaxosActor.backdownData(data, randomTimeout)
+  override def backdownData(data: PaxosData[ActorRef]): PaxosData[ActorRef] = PaxosActor.backdownData(data, randomTimeout)
 
-  override def log: LoggingAdapter = NoopLoggingAdapter
+  override def plog  = NoopPaxosLogging
 
-  override def requestRetransmissionIfBehind(data: PaxosData, sender: ActorRef, from: Int, highestCommitted: Identifier): Unit = {}
+  override def requestRetransmissionIfBehind(data: PaxosData[ActorRef], sender: ActorRef, from: Int, highestCommitted: Identifier): Unit = {}
 
   override def randomTimeout: Long = 1234L
 

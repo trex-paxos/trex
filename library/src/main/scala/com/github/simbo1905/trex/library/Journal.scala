@@ -1,7 +1,4 @@
-package com.github.simbo1905.trex
-
-import com.github.simbo1905.trex.internals._
-import scala.collection.immutable.Seq
+package com.github.simbo1905.trex.library
 
 case class JournalBounds(min: Long, max: Long)
 

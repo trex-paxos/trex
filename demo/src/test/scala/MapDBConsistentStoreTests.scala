@@ -3,7 +3,7 @@ package com.github.simbo1905.trexdemo
 import akka.actor._
 import akka.testkit.{DefaultTimeout, ImplicitSender, TestKit}
 import com.github.simbo1905.trex._
-import com.github.simbo1905.trex.internals.{Accept, Progress}
+import com.github.simbo1905.trex.library.{JournalBounds, Journal, Accept, Progress}
 import com.typesafe.config.ConfigFactory
 import org.mapdb.{DB, DBMaker}
 import org.scalatest._

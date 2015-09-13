@@ -1,4 +1,4 @@
-package com.github.simbo1905.trex.internals
+package com.github.simbo1905.trex.library
 
 import scala.compat.Platform
 /**
@@ -225,6 +225,24 @@ case class NotLeader(val nodeId: Int, val msgId: Long)
  */
 case class NoLongerLeaderException(val nodeId: Int, val msgId: Long) extends RuntimeException {
   override def toString() = s"NoLongerLeaderException($nodeId,$msgId)"
+}
+
+/**
+ * Client request command has an id to correlate to the server response.
+ */
+case class ClientRequestCommandValue(msgId: Long, val bytes: Array[Byte]) extends CommandValue
+
+/**
+ *
+ * @param id The id of the ClientRequestCommandValue being responded to.
+ * @param response The
+ */
+case class ServerResponse(id: Long, val response: Option[AnyRef])
+
+case object NoOperationCommandValue extends CommandValue {
+  def bytes = emptyArray
+
+  val msgId = -1L
 }
 
 /** Paxos node state machine constants */

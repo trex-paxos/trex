@@ -1,8 +1,7 @@
 package com.github.simbo1905.trex.internals
 
 import java.io.File
-
-import com.github.simbo1905.trex.JournalBounds
+import com.github.simbo1905.trex.library._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfter, Matchers, WordSpecLike}
 

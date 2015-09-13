@@ -5,6 +5,7 @@ import java.io.FileWriter
 import akka.actor._
 import com.github.simbo1905.trex.internals.PaxosActor.TraceData
 import com.github.simbo1905.trex.internals._
+import com.github.simbo1905.trex.library._
 import com.typesafe.config.Config
 
 import scala.collection.immutable.{Seq, SortedMap}
@@ -54,11 +55,11 @@ class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, nodeUniqueId: 
   // custom heartbeat interval as things are all in memory
   override def heartbeatInterval = 33
 
-  override def trace(state: PaxosRole, data: PaxosData, sender: ActorRef, msg: Any): Unit = {
+  override def trace(state: PaxosRole, data: PaxosData[ActorRef], sender: ActorRef, msg: Any): Unit = {
     tracer.foreach(t => t(TraceData(nodeUniqueId, state, data, Some(sender), msg)))
   }
 
-  override def trace(state: PaxosRole, data: PaxosData, payload: CommandValue): Unit = {
+  override def trace(state: PaxosRole, data: PaxosData[ActorRef], payload: CommandValue): Unit = {
     tracer.foreach(t => t(TraceData(nodeUniqueId, state, data, None, payload)))
   }
 }

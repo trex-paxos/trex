@@ -2,7 +2,7 @@ package com.github.simbo1905.trex.internals
 
 import akka.actor.ActorRef
 import akka.testkit.{TestFSMRef, TestKit}
-import com.github.simbo1905.trex.Journal
+import com.github.simbo1905.trex.library._
 import org.scalamock.scalatest.MockFactory
 
 import scala.collection.mutable.ArrayBuffer

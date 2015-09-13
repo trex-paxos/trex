@@ -2,13 +2,12 @@ package com.github.simbo1905.trex.internals
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{DefaultTimeout, ImplicitSender, TestFSMRef, TestKit}
-import com.github.simbo1905.trex.internals.AllStateSpec._
-import com.github.simbo1905.trex.{Journal, JournalBounds}
+import com.github.simbo1905.trex.library._
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest._
 
-import scala.collection.SortedMap
+import scala.collection.immutable.SortedMap
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.language.postfixOps
