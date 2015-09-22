@@ -20,7 +20,7 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 - [x] is retransmission of accepted values actually safe?
 - [x] overrideable send methods
 - [x] fix the fixmes
-- [ ] actor refactor to handlers
+- [ ] extract a core library with no dependencies
 - [ ] nemesis (jepsen style destruction testing)
 
 0.6 - practical
