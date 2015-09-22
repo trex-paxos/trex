@@ -15,6 +15,8 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 
 ## Status /  Work Plan
 
+0.5 - library
+
 - [x] replace pickling
 - [x] fix driver
 - [x] is retransmission of accepted values actually safe?
@@ -58,4 +60,3 @@ M1
 ## Attribution
 
 The TRex icon is Tyrannosaurus Rex by Raf Verbraeken from the Noun Project licensed under [CC3.0](http://creativecommons.org/licenses/by/3.0/us/)
-
