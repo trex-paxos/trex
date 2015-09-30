@@ -1,35 +1,26 @@
-package com.github.simbo1905.trex.library;
+package com.github.simbo1905.trex.library
 
-trait ReturnToFollowerHandler[ClientRef] {
-   def plog: PaxosLogging
+trait ReturnToFollowerHandler[ClientRef] extends PaxosLenses[ClientRef] with BackdownData[ClientRef] {
 
-   def randomTimeout: Long
+  def commit(io: PaxosIO[ClientRef], state: PaxosRole, data: PaxosData[ClientRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)])
 
-   def nodeUniqueId: Int
+  def handleReturnToFollowerOnHigherCommit(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef], c: Commit): PaxosAgent[ClientRef] = {
+    io.plog.info("Node {} {} has seen a higher commit {} from node {} so will backdown to be Follower", agent.nodeUniqueId, agent.role, c, c.identifier.from)
 
-   def commit(state: PaxosRole, data: PaxosData[ClientRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)])
+    val higherSlotCommit = c.identifier.logIndex > agent.data.progress.highestCommitted.logIndex
 
-   def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, ClientRef)]): Unit
+    val progress = if (higherSlotCommit) {
+      val (newProgress, _) = commit(io, agent.role, agent.data, c.identifier, agent.data.progress)
+      if (newProgress == agent.data.progress) {
+        io.send(RetransmitRequest(agent.nodeUniqueId, c.identifier.from, agent.data.progress.highestCommitted.logIndex))
+      }
+      newProgress
+    } else {
+      agent.data.progress
+    }
 
-   def send(actor: ClientRef, msg: Any): Unit
+    val data = progressLens.set(agent.data, progress)
 
-   def handleReturnToFollowerOnHigherCommit(c: Commit, nodeData: PaxosData[ClientRef], stateName: PaxosRole, sender: ClientRef): Progress = {
-     plog.info("Node {} {} has seen a higher commit {} from node {} so will backdown to be Follower", nodeUniqueId, stateName, c, c.identifier.from)
-
-     val higherSlotCommit = c.identifier.logIndex > nodeData.progress.highestCommitted.logIndex
-
-     val progress = if( higherSlotCommit ) {
-       val (newProgress, _) = commit(stateName, nodeData, c.identifier, nodeData.progress)
-       if ( newProgress == nodeData.progress) {
-         send(sender, RetransmitRequest(nodeUniqueId, c.identifier.from, nodeData.progress.highestCommitted.logIndex))
-       }
-       newProgress
-     } else {
-       nodeData.progress
-     }
-
-     sendNoLongerLeader(nodeData.clientCommands)
-
-     progress
-   }
- }
+    agent.copy(data = backdownData(io, data), role = Follower)
+  }
+}

@@ -14,7 +14,7 @@ import scala.language.postfixOps
 class LeaderSpec
   extends TestKit(ActorSystem("LeaderSpec", AllStateSpec.config))
   with DefaultTimeout with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with AllStateSpec with LeaderLikeSpec {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with AllStateSpec with LeaderLikeSpec with PaxosLenses[ActorRef] {
 
   import AllStateSpec._
   import Ordering._
@@ -26,8 +26,8 @@ class LeaderSpec
 
   val epoch = BallotNumber(1, 1)
 
-  val dataNewEpoch = PaxosActor.epochLens.set(initialData, Some(epoch))
-  val initailLeaderData = PaxosActor.leaderLens.set(dataNewEpoch, (SortedMap.empty[Identifier, Map[Int, PrepareResponse]], freshAcceptResponses, Map.empty))
+  val dataNewEpoch = epochLens.set(initialData, Some(epoch))
+  val initailLeaderData = leaderLens.set(dataNewEpoch, (SortedMap.empty[Identifier, Map[Int, PrepareResponse]], freshAcceptResponses, Map.empty))
 
   val expectedString2 = "Paxos"
   val expectedBytes2 = expectedString2.getBytes
@@ -36,12 +36,6 @@ class LeaderSpec
   val expectedBytes3 = expectedString2.getBytes
 
   "Leader" should {
-    "handles retransmission responses" in {
-      retransmitRequestInvokesHandler(Leader)
-    }
-    "handles retransmission request" in {
-      retransmitResponseInvokesHandler(Leader)
-    }
     "nack a lower counter prepare" in {
       nackLowerCounterPrepare(Leader)
     }
@@ -96,22 +90,22 @@ class LeaderSpec
     "ignores a late prepare response" in {
       val stubJournal: Journal = stub[Journal]
       // given a leader
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
-      fsm.setState(Leader, initailLeaderData)
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      fsm.underlyingActor.setAgent(Leader, initailLeaderData)
       // when we sent it a late prepare nack
       fsm ! PrepareNack(minPrepare.id, 2, initialData.progress, initialData.progress.highestCommitted.logIndex, Long.MaxValue)
       // then it does nothing
       expectNoMsg(25 milliseconds)
-      fsm.stateName should be(Leader)
-      fsm.stateData should be(initailLeaderData)
+      fsm.underlyingActor.role should be(Leader)
+      fsm.underlyingActor.data should be(initailLeaderData)
     }
 
     "boardcast client value data" in {
       expectNoMsg(10 millisecond)
       val stubJournal: Journal = stub[Journal]
       // given a leader
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
-      fsm.setState(Leader, initailLeaderData)
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      fsm.underlyingActor.setAgent(Leader, initailLeaderData)
       // when we sent it three log entries 
       fsm ! ClientRequestCommandValue(0, expectedBytes)
       fsm ! ClientRequestCommandValue(0, expectedBytes2)
@@ -124,15 +118,15 @@ class LeaderSpec
       expectMsg(100 milliseconds, a2)
       expectMsg(100 milliseconds, a3)
       // stays as leader
-      assert(fsm.stateName == Leader)
+      assert(fsm.underlyingActor.role == Leader)
       // and creates a slot to record responses
-      assert(fsm.stateData.acceptResponses.size == 3)
+      assert(fsm.underlyingActor.data.acceptResponses.size == 3)
       // and holds slots in order
-      fsm.stateData.acceptResponses.keys.headOption match {
+      fsm.underlyingActor.data.acceptResponses.keys.headOption match {
         case Some(id) => assert(id.logIndex == 1)
         case x => fail(x.toString)
       }
-      fsm.stateData.acceptResponses.keys.lastOption match {
+      fsm.underlyingActor.data.acceptResponses.keys.lastOption match {
         case Some(id) => assert(id.logIndex == 3)
         case x => fail(x.toString)
       }
@@ -159,16 +153,15 @@ class LeaderSpec
       val id99 = Identifier(0, epoch, 99L)
       val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
-      val responses = PaxosActor.acceptResponsesLens.set(initialData, votes)
+      val responses = acceptResponsesLens.set(initialData, votes)
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
       var sendTime = 0L
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, delegatingJournal, ArrayBuffer.empty, None) {
-        override def send(actor: ActorRef, msg: Any): Unit = {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, delegatingJournal, ArrayBuffer.empty, None) {
+        override def broadcast(msg: PaxosMessage): Unit = {
           sendTime = System.nanoTime()
-          super.send(actor, msg)
-        }
+          super.broadcast(msg)}
       })
-      fsm.setState(Leader, responses.copy(progress = committed))
+      fsm.underlyingActor.setAgent(Leader, responses.copy(progress = committed))
       // and the accept in the store
       val accept = Accept(id99, ClientRequestCommandValue(0, expectedBytes))
       (stubJournal.accepted _) when (99L) returns Some(accept)
@@ -187,11 +180,11 @@ class LeaderSpec
       }
       // and journal bookwork
       savedProgress match {
-        case Some(p) if p == fsm.stateData.progress => // good
+        case Some(p) if p == fsm.underlyingActor.data.progress => // good
         case x => fail(x.toString)
       }
       // and deletes the pending work
-      assert(fsm.stateData.acceptResponses.size == 0)
+      assert(fsm.underlyingActor.data.acceptResponses.size == 0)
       // and send happens after save
       assert(saveTime > 0L && sendTime > 0L && saveTime < sendTime)
     }
@@ -222,12 +215,12 @@ class LeaderSpec
       val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
 
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
-      val data = PaxosActor.acceptResponsesClientCommandsLens.set(initialData, (votes, clientResponses))
+      val data = acceptResponsesClientCommandsLens.set(initialData, (votes, clientResponses))
       val committed = Progress.highestPromisedHighestCommitted.set(data.progress, (lastCommitted.number, lastCommitted))
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def freshTimeout(interval: Long): Long = 1234L
       })
-      fsm.setState(Leader, data.copy(progress = committed))
+      fsm.underlyingActor.setAgent(Leader, data.copy(progress = committed))
 
       // when it gets one accept giving it a majority
       fsm ! AcceptNack(id99, 1, initialData.progress)
@@ -236,17 +229,17 @@ class LeaderSpec
       // it does not reply
       expectNoMsg(25 millisecond)
       // and returns to follower
-      assert(fsm.stateName == Follower)
+      assert(fsm.underlyingActor.role == Follower)
       // and deletes pending leader work
-      assert(fsm.stateData.acceptResponses.isEmpty)
-      assert(fsm.stateData.epoch == None)
-      assert(fsm.stateData.prepareResponses.isEmpty)
-      assert(fsm.stateData.clientCommands.isEmpty)
+      assert(fsm.underlyingActor.data.acceptResponses.isEmpty)
+      assert(fsm.underlyingActor.data.epoch == None)
+      assert(fsm.underlyingActor.data.prepareResponses.isEmpty)
+      assert(fsm.underlyingActor.data.clientCommands.isEmpty)
       // and sends an exception to the clients
       client1.expectMsg(10 millisecond, NoLongerLeaderException(0, 1L))
       client2.expectMsg(10 millisecond, NoLongerLeaderException(0, 2L))
       // and sets a fresh timeout
-      fsm.stateData.timeout shouldBe 1234L
+      fsm.underlyingActor.data.timeout shouldBe 1234L
     }
 
     "commit in order when responses arrive out of order" in {
@@ -272,19 +265,19 @@ class LeaderSpec
 
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress)))) + (id100 -> AcceptResponsesAndTimeout(0L, a100, Map(0 -> AcceptAck(id100, 0, initialData.progress))))
 
-      val responses = PaxosActor.acceptResponsesLens.set(initialData, votes)
+      val responses = acceptResponsesLens.set(initialData, votes)
 
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
 
       // and an actor which records the send time
       var sendTime = 0L
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, delgatingJournal, ArrayBuffer.empty, None) {
-        override def send(actor: ActorRef, msg: Any): Unit = {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, delgatingJournal, ArrayBuffer.empty, None) {
+        override def broadcast(msg: PaxosMessage): Unit = {
           sendTime = System.nanoTime()
-          super.send(actor, msg)
+          super.broadcast(msg)
         }
       })
-      fsm.setState(Leader, responses.copy(progress = committed))
+      fsm.underlyingActor.setAgent(Leader, responses.copy(progress = committed))
 
       // when it gets one accept giving it a majority on 100
       fsm ! AcceptAck(id100, 1, initialData.progress)
@@ -308,14 +301,14 @@ class LeaderSpec
       // and delivered both values
       assert(fsm.underlyingActor.delivered.size == 2)
       // updated bookwork
-      assert(fsm.stateData.progress.highestCommitted.logIndex == 100)
+      assert(fsm.underlyingActor.data.progress.highestCommitted.logIndex == 100)
       // and journal bookwork
       savedProgress match {
-        case Some(p: Progress) => p == fsm.stateData.progress
+        case Some(p: Progress) => p == fsm.underlyingActor.data.progress
         case x => fail(x.toString)
       }
       // and deletes the pending work
-      assert(fsm.stateData.acceptResponses.size == 0)
+      assert(fsm.underlyingActor.data.acceptResponses.size == 0)
     }
 
     "backdown when it sees a higher committed watermark in a response" in {
@@ -332,13 +325,13 @@ class LeaderSpec
 
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress)))) + (id100 -> AcceptResponsesAndTimeout(0L, a100, Map(0 -> AcceptAck(id100, 0, initialData.progress))))
 
-      val responses = PaxosActor.acceptResponsesLens.set(initialData, votes)
+      val responses = acceptResponsesLens.set(initialData, votes)
 
       // and we have committed up to 97
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
 
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
-      fsm.setState(Leader, responses.copy(progress = committed))
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      fsm.underlyingActor.setAgent(Leader, responses.copy(progress = committed))
 
       // when it gets one accept giving it a majority on 100 but showing a higher commit mark
       fsm ! AcceptAck(id100, 1, Progress(epoch, Identifier(0, epoch, 98L)))
@@ -347,17 +340,17 @@ class LeaderSpec
       expectNoMsg(25 millisecond)
 
       // and becomes a follower
-      fsm.stateName should be(Follower)
-      assert(fsm.stateData.acceptResponses.isEmpty)
+      fsm.underlyingActor.role should be(Follower)
+      assert(fsm.underlyingActor.data.acceptResponses.isEmpty)
     }
 
     "rebroadcasts its commit with a fresh heartbeat when it gets a prompt from the scheduler" in {
       val stubJournal: Journal = stub[Journal]
       // given a leader
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
-      fsm.setState(Leader, initialData)
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      fsm.underlyingActor.setAgent(Leader, initialData)
       // when it gets a tick
-      fsm ! PaxosActor.HeartBeat
+      fsm ! HeartBeat
       // then it issues a heartbeat commit
       var commit: Commit = null
       expectMsgPF(100 millisecond) {
@@ -366,7 +359,7 @@ class LeaderSpec
       val hb1 = commit.heartbeat
       // when it gets another tick
       Thread.sleep(2L)
-      fsm ! PaxosActor.HeartBeat
+      fsm ! HeartBeat
       // it issues a fresh heartbeat commit
       expectMsgPF(100 millisecond) {
         case c: Commit => commit = c
@@ -387,7 +380,7 @@ class LeaderSpec
       resendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(Leader)
     }
 
-    "does backs down to be a follower when it makes a higher promise to another node" in {
+    "backs down to be a follower when it makes a higher promise to another node" in {
       expectNoMsg(10 millisecond)
       val stubJournal: Journal = stub[Journal]
 
@@ -405,10 +398,10 @@ class LeaderSpec
       (stubJournal.bounds _) when() returns (JournalBounds(0L, 97L))
       // the leader
       val timenow = 999L
-      val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize5), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize5), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
       })
-      fsm.setState(Leader, initialData.copy(epoch = Some(epoch), progress = committed))
+      fsm.underlyingActor.setAgent(Leader, initialData.copy(epoch = Some(epoch), progress = committed))
       // when it gets the high prepare
       fsm ! highPrepare
       // then it responds with a ack
@@ -416,13 +409,13 @@ class LeaderSpec
         case ack: PrepareAck =>
       }
       // and returns to be follower
-      assert(fsm.stateName == Follower)
+      assert(fsm.underlyingActor.role == Follower)
       // and clears data
-      assert(fsm.stateData.acceptResponses.isEmpty)
-      assert(fsm.stateData.prepareResponses.isEmpty)
-      assert(fsm.stateData.epoch == None)
+      assert(fsm.underlyingActor.data.acceptResponses.isEmpty)
+      assert(fsm.underlyingActor.data.prepareResponses.isEmpty)
+      assert(fsm.underlyingActor.data.epoch == None)
       // and sets a fresh timeout
-      assert(fsm.stateData.timeout > 0 && fsm.stateData.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
+      assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
     }
   }
 

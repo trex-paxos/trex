@@ -1,122 +1,14 @@
 package com.github.simbo1905.trex.internals
 
-import java.util.Arrays.{equals => bequals}
-
-import akka.actor.{ActorSystem, ActorRef}
-import akka.testkit.{TestProbe, TestKit}
 import com.github.simbo1905.trex.library._
 import org.scalatest.{Matchers, WordSpecLike}
 
-import scala.collection.immutable.{TreeMap, SortedMap}
+import java.util.Arrays.{equals => bequals}
 
-class CoreSpec extends TestKit(ActorSystem("CoreSpec")) with WordSpecLike with Matchers {
-  "Paxos Numbers" should {
-    "have working equalities" in {
-      assert(BallotNumber(2, 2) > BallotNumber(1, 2))
-      assert(BallotNumber(2, 2) > BallotNumber(2, 1))
-      assert(!(BallotNumber(2, 2) > BallotNumber(2, 2)))
-
-      assert(BallotNumber(2, 2) >= BallotNumber(1, 2))
-      assert(BallotNumber(2, 2) >= BallotNumber(2, 1))
-      assert(BallotNumber(2, 2) >= BallotNumber(2, 2))
-
-      assert(BallotNumber(1, 1) < BallotNumber(2, 1))
-      assert(BallotNumber(1, 1) < BallotNumber(1, 2))
-      assert(!(BallotNumber(1, 2) < BallotNumber(1, 2)))
-
-      assert(BallotNumber(1, 1) <= BallotNumber(2, 1))
-      assert(BallotNumber(1, 1) <= BallotNumber(1, 2))
-      assert(BallotNumber(1, 2) <= BallotNumber(1, 2))
-
-      assert(!(BallotNumber(2,1) <= BallotNumber(1,1)))
-    }
-  }
-
-  val progress = Progress(
-    highestPromised = BallotNumber(0, 0),
-    highestCommitted = Identifier(from = 0, number = BallotNumber(0, 0), logIndex = 0)
-  )
-
-  "Lens" should {
-
-    import Ordering._
-
-    val nodeData = PaxosData(progress, 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
-    val id = Identifier(0, BallotNumber(1, 2), 3L)
-
-    "set prepare responses" in {
-      {
-        val newData = PaxosActor.prepareResponsesLens.set(nodeData, SortedMap.empty[Identifier, Map[Int, PrepareResponse]])
-        assert(newData == nodeData)
-      }
-      {
-        val prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]] = TreeMap(id -> Map.empty)
-        val newData = PaxosActor.prepareResponsesLens.set(nodeData, prepareResponses)
-        assert(newData.prepareResponses(id) == Map.empty)
-      }
-    }
-
-    "set accept responses" in {
-      {
-        val newData = PaxosActor.acceptResponsesLens.set(nodeData, SortedMap.empty[Identifier, AcceptResponsesAndTimeout])
-        assert(newData == nodeData)
-      }
-      {
-        val a1 = Accept(Identifier(1, BallotNumber(1, 1), 1L), ClientRequestCommandValue(0, Array[Byte](1, 1)))
-        val acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(id -> AcceptResponsesAndTimeout(0L, a1, Map.empty))
-        val newData = PaxosActor.acceptResponsesLens.set(nodeData, acceptResponses)
-        assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, a1, Map.empty))
-      }
-    }
-
-    "set client commands" in {
-      {
-        val newData = PaxosActor.clientCommandsLens.set(nodeData, Map.empty[Identifier, (CommandValue, ActorRef)])
-        assert(newData == nodeData)
-      }
-      {
-        val commandValue = new CommandValue {
-          override def msgId: Long = 0L
-
-          override def bytes: Array[Byte] = Array()
-        }
-        val ref = TestProbe().ref
-        val clientCommands = Map(id ->(commandValue, ref))
-        val newData = PaxosActor.clientCommandsLens.set(nodeData, clientCommands)
-        assert(newData.clientCommands(id) == (commandValue -> ref))
-      }
-    }
-
-    "set leader state" in {
-      {
-        val newData = PaxosActor.leaderLens.set(nodeData, (
-          SortedMap.empty[Identifier, Map[Int, PrepareResponse]],
-          SortedMap.empty[Identifier, AcceptResponsesAndTimeout],
-          Map.empty[Identifier, (CommandValue, ActorRef)])
-        )
-        assert(newData == nodeData)
-      }
-      {
-        val prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]] = TreeMap(id -> Map.empty)
-        val a1 = Accept(Identifier(1, BallotNumber(1, 1), 1L), ClientRequestCommandValue(0, Array[Byte](1, 1)))
-        val acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(id -> AcceptResponsesAndTimeout(0L, a1, Map.empty))
-        val commandValue = new CommandValue {
-          override def msgId: Long = 0L
-
-          override def bytes: Array[Byte] = Array()
-        }
-        val ref = TestProbe().ref
-        val clientCommands = Map(id ->(commandValue, ref))
-        val newData = PaxosActor.leaderLens.set(nodeData, (prepareResponses, acceptResponses, clientCommands))
-        assert(newData.prepareResponses(id) == Map.empty)
-        assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, a1, Map.empty))
-        assert(newData.clientCommands(id) == (commandValue -> ref))
-      }
-    }
-  }
+class PickleTests extends WordSpecLike with Matchers {
+  import Pickle._
 
   "Pickling simple objects " should {
-    import Pickle._
     "roundtrip int" in {
       unpickleInt(pickleInt(Int.MaxValue)) should be(Int.MaxValue)
       unpickleInt(pickleInt(Int.MinValue)) should be(Int.MinValue)
@@ -325,37 +217,6 @@ class CoreSpec extends TestKit(ActorSystem("CoreSpec")) with WordSpecLike with M
           assertAccept(s2(0), a3)
           assertAccept(s2(1), a4)
       }
-    }
-  }
-
-  val accept = Accept(Identifier(1, BallotNumber(1, 1), 98L), NoOperationCommandValue)
-
-  "Backing down" should {
-    "should reset Paxos data" in {
-      import Ordering._
-      // given lots of leadership data
-      val number = BallotNumber(Int.MinValue, Int.MinValue)
-      val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
-      val leaderData = PaxosData(
-        progress = Progress(
-          number, id
-        ),
-        leaderHeartbeat = 0,
-        timeout = 0,
-        clusterSize = 3,
-        prepareResponses = TreeMap(id -> Map.empty),
-        epoch = Some(number),
-        acceptResponses = TreeMap(id -> AcceptResponsesAndTimeout(0, accept, Map.empty)),
-        clientCommands = Map(id ->(NoOperationCommandValue, TestProbe().ref))
-      )
-      // when we backdown
-      val followerData = PaxosActor.backdownData(leaderData, 99L)
-      // then it has a new timeout and the leader data is gone
-      followerData.timeout shouldBe 99L
-      followerData.prepareResponses.isEmpty shouldBe true
-      followerData.epoch shouldBe None
-      followerData.acceptResponses.isEmpty shouldBe true
-      followerData.clientCommands.isEmpty shouldBe true
     }
   }
 }

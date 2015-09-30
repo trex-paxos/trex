@@ -74,4 +74,27 @@ trait PaxosLenses[ClientRef] {
            prepareResponsesLens.set(acceptResponsesLens.set(clientCommandsLens.set(nodeData, clientCommands), acceptResponses), prepareResponses)
        }
    )
+
+  val backdownLens = Lens(
+    get = (n: PaxosData[ClientRef]) => ((prepareResponsesLens(n), acceptResponsesLens(n), clientCommandsLens(n), epochLens(n), timeoutLens(n))),
+    set = (n: PaxosData[ClientRef], value: (SortedMap[Identifier, Map[Int, PrepareResponse]], SortedMap[Identifier, AcceptResponsesAndTimeout], Map[Identifier, (CommandValue, ClientRef)], Option[BallotNumber], Long)) =>
+      value match {
+        case
+          (prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]],
+          acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout],
+          clientCommands: Map[Identifier, (CommandValue, ClientRef)],
+          epoch: Option[BallotNumber],
+          timeout: Long
+            ) => prepareResponsesLens.set(acceptResponsesLens.set(clientCommandsLens.set(epochLens.set(timeoutLens.set(n, timeout), epoch), clientCommands), acceptResponses), prepareResponses)
+      }
+  )
+
+  val acceptResponsesClientCommandsLens = Lens(
+    get = (n: PaxosData[ClientRef]) => ((acceptResponsesLens(n), clientCommandsLens(n))),
+    set = (n: PaxosData[ClientRef], value: (SortedMap[Identifier, AcceptResponsesAndTimeout], Map[Identifier, (CommandValue, ClientRef)])) =>
+      value match {
+        case (acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout], clientCommands: Map[Identifier, (CommandValue, ClientRef)]) =>
+          acceptResponsesLens.set(clientCommandsLens.set(n, clientCommands), acceptResponses)
+      }
+  )
  }

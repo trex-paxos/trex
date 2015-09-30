@@ -1,10 +1,11 @@
 package com.github.simbo1905.trex.library
 
 import scala.compat.Platform
+
 /**
  * We perform consensus over instances of CommandValue.
  */
-trait CommandValue {
+trait CommandValue extends PaxosMessage {
   val emptyArray: Array[Byte] = Array.empty[Byte]
 
   def bytes: Array[Byte]
@@ -72,18 +73,23 @@ object Progress {
 }
 
 /**
+ * Marker trait for messages
+ */
+sealed trait PaxosMessage
+
+/**
  * Prepare is only sent to either establish a leader else to probe for the uncommitted values of a previous leader during the leader take-over phase. Followers must:
  *
  * 1. Check the [[BallotNumber]] of the [[Identifier]] against the highest value previously acknowledged; if the request is lower acknowledged negatively acknowledge (“nack") it.
  * 1. Check the logIndex of the [[Identifier]] against the highest committed logIndex; if the request is lower nack it.
  * 1. If the [[BallotNumber]] of the [[Identifier]] is higher the then previously acknowledged the node must make the new number durable and promise to nack any messages with a lower [[BallotNumber]]  The positive acknowledgement ("ack") must return the highest uncommitted [[Accept]] message with the same log index or None if there is no uncommitted value at that slot.
  */
-case class Prepare(id: Identifier)
+case class Prepare(id: Identifier) extends PaxosMessage
 
 /**
  * Base type for a response to a prepare message. It provides additional information beyond that prescribed by the core Paxos alogirth which is used during the leader takeover protocol and to prevent unnecessary leader failover attempts.  
  */
-sealed trait PrepareResponse {
+trait PrepareResponse extends PaxosMessage {
   /**
    * @return The identifier of the [[Prepare]] message being acknowledged.
    */
@@ -132,7 +138,7 @@ case class PrepareNack(requestId: Identifier, from: Int, progress: Progress, hig
  * @param id Unique identifier for this request.
  * @param value The value to accept at the slot position indicated by the id
  */
-case class Accept(id: Identifier, value: CommandValue) {
+case class Accept(id: Identifier, value: CommandValue) extends PaxosMessage {
   /**
    * @return The unique identifier of the sender within the cluster.
    */
@@ -142,7 +148,7 @@ case class Accept(id: Identifier, value: CommandValue) {
 /**
  * Base type for a response to an accept message.
  */
-sealed trait AcceptResponse {
+trait AcceptResponse extends PaxosMessage {
   /**
    * @return The request being negatively acknowledged
    */
@@ -185,7 +191,7 @@ case class AcceptNack(requestId: Identifier, from: Int, progress: Progress) exte
  * @param identifier Identifies the unique accept message, and hence unique value, which is being committed into the identified slot.
  * @param heartbeat A value which changes for each heartbeat message which indicates that the leader is alive. 
  */
-case class Commit(identifier: Identifier, heartbeat: Long) {
+case class Commit(identifier: Identifier, heartbeat: Long) extends PaxosMessage {
   override def toString = s"Commit(${identifier},h=${heartbeat})"
 }
 
@@ -199,7 +205,7 @@ object Commit {
  * @param to The node unique id to which the request is to be routed
  * @param logIndex The log index last committed by the requester
  */
-case class RetransmitRequest(from: Int, to: Int, logIndex: Long)
+case class RetransmitRequest(from: Int, to: Int, logIndex: Long) extends PaxosMessage
 
 /**
  * Response to a retransmit request
@@ -208,16 +214,25 @@ case class RetransmitRequest(from: Int, to: Int, logIndex: Long)
  * @param committed A contiguous sequence of committed accept messages in ascending order
  * @param uncommitted A contiguous sequence of proposed but uncommitted accept messages in ascending order
  */
-case class RetransmitResponse(from: Int, to: Int, val committed: Seq[Accept], uncommitted: Seq[Accept])
-
-// TODO now has routing info doesn't need broadcasting
+case class RetransmitResponse(from: Int, to: Int, val committed: Seq[Accept], uncommitted: Seq[Accept]) extends PaxosMessage
 
 /**
- * Response to a client when the node is not currently the leader. The client should retry the message to another node in the cluster. Note the leader may have crashed and the responding node may become the leader next.
+ * Scheduled message used to trigger timeout work.
+ */
+case object CheckTimeout extends PaxosMessage
+
+/**
+ * Scheduled message use by a leader to heatbeat commit messages.
+ */
+case object HeartBeat extends PaxosMessage
+
+/**
+  * Response to a client when the node is not currently the leader. The client should retry the message to another node in the cluster. Note the leader may have crashed and the responding node may become the leader next.
  * @param nodeId The node replying that it is not the leader.
  * @param msgId The client message identifier which the node is responding to.
  */
-case class NotLeader(val nodeId: Int, val msgId: Long)
+case class NotLeader(val nodeId: Int, val msgId: Long) extends PaxosMessage
+
 
 /**
  * Response to a client when the nodes has lost its leadership during a fail-over.
@@ -225,7 +240,7 @@ case class NotLeader(val nodeId: Int, val msgId: Long)
  * @param nodeId The node replying that it is has lost the leader.
  * @param msgId The client message which the node is responding to.
  */
-case class NoLongerLeaderException(val nodeId: Int, val msgId: Long) extends RuntimeException {
+case class NoLongerLeaderException(val nodeId: Int, val msgId: Long) extends RuntimeException with PaxosMessage {
   override def toString() = s"NoLongerLeaderException($nodeId,$msgId)"
 }
 
@@ -247,7 +262,7 @@ case object NoOperationCommandValue extends CommandValue {
   val msgId = -1L
 }
 
-/** Paxos node state machine constants */
+/** Paxos process roles */
 sealed trait PaxosRole
 
 case object Follower extends PaxosRole

@@ -1,48 +1,27 @@
-package com.github.simbo1905.trex.internals
+package com.github.simbo1905.trex.library
 
-import akka.actor.{ActorRef, ActorSystem}
-import akka.testkit.{TestProbe, TestKit}
-import com.github.simbo1905.trex.internals.AllStateSpec._
-import com.github.simbo1905.trex.library._
-import org.scalatest.{OptionValues, Matchers, WordSpecLike}
+import org.scalatest.{Matchers, OptionValues, WordSpecLike}
 
-import scala.collection.immutable.SortedMap
 import scala.collection.mutable.ArrayBuffer
-import Ordering._
 
 case class TimeAndMessage(message: Any, time: Long)
 
-class TestPrepareResponseHandler extends PrepareResponseHandler[ActorRef] {
-  val broadcastValues: ArrayBuffer[TimeAndMessage] = ArrayBuffer()
-
-  override def backdownData(data: PaxosData[ActorRef]): PaxosData[ActorRef] = PaxosActor.backdownData(data, randomTimeout)
-
-  override def plog  = NoopPaxosLogging
-
-  override def requestRetransmissionIfBehind(data: PaxosData[ActorRef], sender: ActorRef, from: Int, highestCommitted: Identifier): Unit = {}
-
-  override def randomTimeout: Long = 1234L
-
-  override def broadcast(msg: Any): Unit = {
-    val update = TimeAndMessage(msg, System.nanoTime())
-    broadcastValues += update
-  }
-
-  override def journal: Journal = ???
+class TestPrepareResponseHandlerNoRetransmission extends PrepareResponseHandler[TestClient] with BackdownData[TestClient] {
+  override def requestRetransmissionIfBehind(io: PaxosIO[TestClient], agent: PaxosAgent[TestClient], from: Int, highestCommitted: Identifier): Unit = {}
 }
 
-class PrepareResponseSpec extends TestKit(ActorSystem("PrepareResponseSpec")) with WordSpecLike with Matchers with OptionValues {
+class PrepareResponseSpec extends WordSpecLike with Matchers with OptionValues {
 
-  import PrepareResponseSpec._
+  import TestHelpers._
 
   "PrepareResponseHandler" should {
     "ignore a response that it is not awaiting" in {
       // given
-      val handler = new TestPrepareResponseHandler
+      val handler = new TestPrepareResponseHandlerNoRetransmission
       val vote = PrepareAck(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), 12, 13, None)
-      val initialData = AllStateSpec.initialData
-      // when
-      val (role, state) = handler.handlePrepareResponse(0, Recoverer, TestProbe().ref, vote, initialData)
+      val PaxosAgent(_, role, state) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
+        override def randomTimeout: Long = 1234L
+      }, PaxosAgent(0, Recoverer, initialData), vote)
       // then
       role match {
         case Recoverer => // good
@@ -55,36 +34,53 @@ class PrepareResponseSpec extends TestKit(ActorSystem("PrepareResponseSpec")) wi
     }
     "not boardcast messages and backs down if it gets a majority nack" in {
       // given
-      val handler = new TestPrepareResponseHandler {
-        override def journal: Journal = AllStateSpec.tempRecordTimesFileJournal
-      }
+      val broadcastValues: ArrayBuffer[TimeAndMessage] = ArrayBuffer()
+      val handler = new TestPrepareResponseHandlerNoRetransmission
       val vote = PrepareNack(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), 12, 13)
       // when
-      val (role, _) = handler.handlePrepareResponse(0, Recoverer, TestProbe().ref, vote, selfNackPrepares)
+      val PaxosAgent(_, role, _) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          val update = TimeAndMessage(msg, System.nanoTime())
+          broadcastValues += update
+        }
+      }, PaxosAgent(0, Recoverer, selfNackPrepares), vote)
       // then we are a follower
       role match {
         case Follower => // good
         case x => fail(x.toString)
       }
       // and we sent no messages
-      handler.broadcastValues.size shouldBe 0
+      broadcastValues.size shouldBe 0
     }
     "issues more prepares and self acks if other nodes show higher accepted index" in {
       // given
-      val handler = new TestPrepareResponseHandler {
-        override def journal: Journal = AllStateSpec.tempRecordTimesFileJournal
-      }
+      val broadcastValues: ArrayBuffer[TimeAndMessage] = ArrayBuffer()
+      val handler = new TestPrepareResponseHandlerNoRetransmission
       val otherAcceptedIndex = 2L // recoverHighPrepare.id.logIndex + 1
       val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), otherAcceptedIndex, 13, None)
+      val emptyJournal = new UndefinedJournal {
+        override def accepted(logIndex: Long): Option[Accept] = None
+
+        override def accept(a: Accept*): Unit = {}
+      }
       // when
-      val (role, data) = handler.handlePrepareResponse(0, Recoverer, TestProbe().ref, vote, selfAckPrepares)
+      val PaxosAgent(_, role, data) = handler.handlePrepareResponse(new TestIO(emptyJournal) {
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          val update = TimeAndMessage(msg, System.nanoTime())
+          broadcastValues += update
+        }
+      }, PaxosAgent(0, Recoverer, selfAckPrepares), vote)
       // then we are still a recoverer as not finished with all prepares
       role match {
         case Recoverer => // good
         case x => fail(x.toString)
       }
       // and we send on prepare and one accept
-      handler.broadcastValues match {
+      broadcastValues match {
         case ArrayBuffer(TimeAndMessage(p: Prepare, _), TimeAndMessage(a: Accept, _)) =>
           p match {
             case p if p.id.logIndex == otherAcceptedIndex => // good
@@ -107,21 +103,27 @@ class PrepareResponseSpec extends TestKit(ActorSystem("PrepareResponseSpec")) wi
     }
     "issues more prepares and self nacks if other nodes show higher accepted index and has given higher promise" in {
       // given
-      val handler = new TestPrepareResponseHandler {
-        override def journal: Journal = AllStateSpec.tempRecordTimesFileJournal
-      }
+      val broadcastValues: ArrayBuffer[TimeAndMessage] = ArrayBuffer()
+      val handler = new TestPrepareResponseHandlerNoRetransmission
       val otherAcceptedIndex = 2L // recoverHighPrepare.id.logIndex + 1
       val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), otherAcceptedIndex, 13, None)
       // when
       val higherPromise = Progress.highestPromisedLens.set(selfAckPrepares.progress, BallotNumber(Int.MaxValue, Int.MaxValue))
-      val (role, data) = handler.handlePrepareResponse(0, Recoverer, TestProbe().ref, vote, selfAckPrepares.copy(progress = higherPromise))
+      val PaxosAgent(_, role, data) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          val update = TimeAndMessage(msg, System.nanoTime())
+          broadcastValues += update
+        }
+      }, PaxosAgent(0, Recoverer, selfAckPrepares.copy(progress = higherPromise)), vote)
       // then we are still a recoverer as not finished with all prepares
       role match {
         case Recoverer => // good
         case x => fail(x.toString)
       }
       // and we send on prepare and one accept
-      handler.broadcastValues match {
+      broadcastValues match {
         case ArrayBuffer(pAndTime: TimeAndMessage, aAndTime: TimeAndMessage) =>
           pAndTime.message match {
             case p: Prepare if p.id.logIndex == otherAcceptedIndex => // good
@@ -144,21 +146,33 @@ class PrepareResponseSpec extends TestKit(ActorSystem("PrepareResponseSpec")) wi
     }
     "issues an accept which it journals if it has not made a higher promise" in {
       // given a handler that records broadcast time
-      val tempJournal = AllStateSpec.tempRecordTimesFileJournal
-      val handler = new TestPrepareResponseHandler {
-        override def journal: Journal = tempJournal
-      }
+      val broadcastValues: ArrayBuffer[TimeAndMessage] = ArrayBuffer()
+      val handler = new TestPrepareResponseHandlerNoRetransmission
       // and an ack vote showing no higher accepted log index
       val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), recoverHighPrepare.id.logIndex, 13, None)
+      // and a journal which records save and send time
+      var saved: Option[TimeAndParameter] = None
+      val journal = new UndefinedJournal {
+        override def accept(a: Accept*): Unit = saved = Some(TimeAndParameter(System.nanoTime(), a))
+      }
+      // and an IO that records send time
+      val io = new TestIO(journal) {
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          val update = TimeAndMessage(msg, System.nanoTime())
+          broadcastValues += update
+        }
+      }
       // when
-      val (role, data) = handler.handlePrepareResponse(0, Recoverer, TestProbe().ref, vote, selfAckPrepares)
+      val PaxosAgent(_, role, data) = handler.handlePrepareResponse(io, PaxosAgent(0, Recoverer, selfAckPrepares), vote)
       // then we promote to leader
       role match {
         case Leader => // good
         case x => fail(x.toString)
       }
       // and we send one accept
-      handler.broadcastValues match {
+      broadcastValues match {
         case ArrayBuffer(TimeAndMessage(a: Accept, _)) =>
           a match {
             case a if a.id.logIndex == 1L => // good
@@ -168,7 +182,7 @@ class PrepareResponseSpec extends TestKit(ActorSystem("PrepareResponseSpec")) wi
       }
       // and we have the self vote for the accept
       data.acceptResponses.headOption.getOrElse(fail) match {
-        case (id,AcceptResponsesAndTimeout(_, a: Accept, responses)) if id == recoverHighPrepare.id && a.id == id=>
+        case (id, AcceptResponsesAndTimeout(_, a: Accept, responses)) if id == recoverHighPrepare.id && a.id == id =>
           responses.headOption.getOrElse(fail) match {
             case (0, r: AcceptAck) => // good
             case f => fail(f.toString)
@@ -176,33 +190,40 @@ class PrepareResponseSpec extends TestKit(ActorSystem("PrepareResponseSpec")) wi
         case f => fail(f.toString)
       }
       // and we have journalled the accept at a time before sent
-      val sendTime = handler.broadcastValues.headOption.value match {
+      val sendTime = broadcastValues.headOption.value match {
         case TimeAndMessage(a: Accept, ts: Long) => ts
         case f => fail(f.toString)
       }
-      tempJournal.actionsWithTimestamp.toMap.getOrElse("accept", fail) match {
-        case TimeAndParameter(saveTime, Seq(a: Accept)) if a.id.logIndex == 1 && saveTime < sendTime => // good
+      assert(saved.value.time < sendTime)
+      saved.value.parameter match {
+        case Seq(a: Accept) if a.id.logIndex == 1  => // good
         case f => fail(f.toString)
       }
     }
     "issues an accept which it does not journal if it has not made a higher promise" in {
       // given a handler
-      val tempJournal = AllStateSpec.tempRecordTimesFileJournal
-      val handler = new TestPrepareResponseHandler {
-        override def journal: Journal = tempJournal
-      }
+      val broadcastValues: ArrayBuffer[TimeAndMessage] = ArrayBuffer()
+      val handler = new TestPrepareResponseHandlerNoRetransmission
       // and an ack vote showing no higher accepted log index
       val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), recoverHighPrepare.id.logIndex, 13, None)
       // when
       val higherPromise = Progress.highestPromisedLens.set(selfAckPrepares.progress, BallotNumber(Int.MaxValue, Int.MaxValue))
-      val (role, data) = handler.handlePrepareResponse(0, Recoverer, TestProbe().ref, vote, selfAckPrepares.copy(progress = higherPromise))
+      val PaxosAgent(_, role, data) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          val update = TimeAndMessage(msg, System.nanoTime())
+          broadcastValues += update
+        }
+
+      }, PaxosAgent(0, Recoverer, selfAckPrepares.copy(progress = higherPromise)), vote)
       // then we promote to leader
       role match {
         case Leader => // good
         case x => fail(x.toString)
       }
       // and we send one accept
-      handler.broadcastValues match {
+      broadcastValues match {
         case ArrayBuffer(TimeAndMessage(a: Accept, _)) =>
           a match {
             case a if a.id.logIndex == 1L => // good
@@ -212,27 +233,13 @@ class PrepareResponseSpec extends TestKit(ActorSystem("PrepareResponseSpec")) wi
       }
       // and we have the self vote for the accept
       data.acceptResponses.headOption.getOrElse(fail) match {
-        case (id,AcceptResponsesAndTimeout(_, a: Accept, responses)) if id == recoverHighPrepare.id && a.id == id=>
+        case (id, AcceptResponsesAndTimeout(_, a: Accept, responses)) if id == recoverHighPrepare.id && a.id == id =>
           responses.headOption.getOrElse(fail) match {
             case (0, r: AcceptNack) => // good
             case f => fail(f.toString)
           }
         case f => fail(f.toString)
       }
-      // and we have not journalled the accept
-      tempJournal.actionsWithTimestamp.size shouldBe 0
     }
   }
-}
-
-object PrepareResponseSpec {
-  val recoverHighPrepare = Prepare(Identifier(0, BallotNumber(lowValue + 1, 0), 1L))
-  val highPrepareEpoch = Some(recoverHighPrepare.id.number)
-  val prepareSelfAck = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
-    Seq((recoverHighPrepare.id -> Map(0 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None))))
-  val selfAckPrepares = initialData.copy(clusterSize = 3, epoch = highPrepareEpoch, prepareResponses = prepareSelfAck, acceptResponses = SortedMap.empty)
-  val prepareSelfNack = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
-    Seq((recoverHighPrepare.id -> Map(0 -> PrepareNack(recoverHighPrepare.id, 0, initialData.progress, 0, 0))))
-  val selfNackPrepares = initialData.copy(clusterSize = 3, epoch = highPrepareEpoch, prepareResponses = prepareSelfNack, acceptResponses = SortedMap.empty)
-
 }

@@ -18,4 +18,5 @@ package object library {
   object HighestCommittedIndex {
     def unapply(data: PaxosData[_]) = Some(data.progress.highestCommitted.logIndex)
   }
+
 }

@@ -4,8 +4,7 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.ActorRef
-import akka.testkit.{TestFSMRef, TestKit}
-import com.github.simbo1905.trex._
+import akka.testkit.{TestActorRef, TestKit}
 import com.github.simbo1905.trex.internals.PaxosActor._
 import com.github.simbo1905.trex.library._
 import com.typesafe.config.ConfigFactory
@@ -19,6 +18,26 @@ import scala.language.postfixOps
 
 import Ordering._
 
+object NoopPaxosLogging extends PaxosLogging {
+  override def info(msg: String): Unit = {}
+
+  override def info(msg: String, one: Any): Unit = {}
+
+  override def info(msg: String, one: Any, two: Any): Unit = {}
+
+  override def info(msg: String, one: Any, two: Any, three: Any): Unit = {}
+
+  override def info(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = {}
+
+  override def debug(msg: String, one: Any, two: Any): Unit = {}
+
+  override def debug(msg: String, one: Any, two: Any, three: Any): Unit = {}
+
+  override def debug(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = {}
+
+  override def error(msg: String): Unit = {}
+}
+
 class TestAcceptMapJournal extends Journal {
   var accept: Map[Long, Accept] = Map.empty
 
@@ -30,7 +49,10 @@ class TestAcceptMapJournal extends Journal {
     accept.get(logIndex)
   }
 
-  def bounds: JournalBounds = ???
+  def bounds: JournalBounds = {
+    val keys = accept.keys
+    if (keys.isEmpty) JournalBounds(0L, 0L) else JournalBounds(keys.head, keys.last)
+  }
 
   var progress: Progress = null
 
@@ -74,6 +96,28 @@ class DelegatingJournal(val inner: Journal) extends Journal {
   override def accept(a: Accept*): Unit = inner.accept(a: _*)
 }
 
+class TestPaxosIO extends PaxosIO[ActorRef] {
+  override def plog: PaxosLogging = NoopPaxosLogging
+
+  override def randomTimeout: Long = 0
+
+  override def clock: Long = 0
+
+  override def deliver(value: CommandValue): Any = {}
+
+  override def journal: Journal = throw new AssertionError("deliberately not implemented")
+
+  override def respond(ref: ActorRef, data: Any): Unit = {}
+
+  override def send(msg: PaxosMessage): Unit = {}
+
+  override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, ActorRef)]): Unit = {}
+
+  override def minPrepare: Prepare = throw new AssertionError("deliberately not implemented")
+
+  override def sender: ActorRef = throw new AssertionError("deliberately not implemented")
+}
+
 object AllStateSpec {
   val config = ConfigFactory.parseString("trex.leader-timeout-min=10\ntrex.leader-timeout-max=20\nakka.loglevel = \"DEBUG\"\nakka.actor.serialize-messages=on")
 
@@ -95,7 +139,7 @@ object AllStateSpec {
 
   val minute = 1000 * 60 // ms
 
-  def noDelivery(value: CommandValue): Array[Byte] = ???
+  def noDelivery(value: CommandValue): Array[Byte] = throw new AssertionError("deliberately not implemented")
 
   val atomicCounter = new AtomicInteger()
 
@@ -108,49 +152,32 @@ trait AllStateSpec {
   import AllStateSpec._
   import PaxosActor.Configuration
 
+  /**
+   * Bugs can leak messages from one test to the next this slow check will tell you which test has a leak if you enable this check with a system property
+   */
+  def checkForLeakedMessages = {
+    if( java.lang.Boolean.getBoolean("checkForLeakedMessages")) expectNoMsg(100 millisecond)
+  }
+
   val leaderHeartbeat2 = 2
   val clusterSize3 = 3
   val clusterSize5 = 5
   val timeout4 = 4
-
-  def retransmitRequestInvokesHandler(state: PaxosRole)(implicit sender: ActorRef): Unit = {
-    var handledMessage = false
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, AllStateSpec.tempRecordTimesFileJournal, ArrayBuffer.empty, None) {
-      override def handleRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData[ActorRef]): Progress = {
-        handledMessage = true
-        super.handleRetransmitResponse(response, nodeData)
-      }
-    })
-    fsm ! RetransmitResponse(1, 0, Seq.empty, Seq.empty)
-    handledMessage shouldBe true
-  }
-
-  def retransmitResponseInvokesHandler(state: PaxosRole)(implicit sender: ActorRef): Unit = {
-    var handledMessage = false
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, AllStateSpec.tempRecordTimesFileJournal, ArrayBuffer.empty, None) {
-      override def handleRetransmitRequest(sender: ActorRef, request: RetransmitRequest, nodeData: PaxosData[ActorRef]): Unit = {
-        handledMessage = true
-        super.handleRetransmitRequest(sender, request, nodeData)
-      }
-    })
-    fsm ! RetransmitRequest(1, 33, 100L)
-    handledMessage shouldBe true
-  }
 
   def ignoresCommitLessThanLast(state: PaxosRole)(implicit sender: ActorRef) {
     val stubJournal: Journal = stub[Journal]
     // given a candidate with no responses
     val identifier = Identifier(0, BallotNumber(lowValue + 1, 0), 1L)
     val lessThan = Identifier(0, BallotNumber(lowValue, 0), 0L)
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
-    fsm.setState(state, initialData.copy(clusterSize = 3, progress = initialData.progress.copy(highestCommitted = identifier)))
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
+    fsm.underlyingActor.setAgent(state, initialData.copy(clusterSize = 3, progress = initialData.progress.copy(highestCommitted = identifier)))
     // when it gets commit
     val commit = Commit(lessThan)
     fsm ! commit
     // it sends no messages
     expectNoMsg(25 millisecond)
     // and stays a candidate
-    assert(fsm.stateName == state)
+    assert(fsm.underlyingActor.role == state)
   }
 
   def ackAccept(state: PaxosRole)(implicit sender: ActorRef) {
@@ -161,15 +188,15 @@ trait AllStateSpec {
     val identifier = Identifier(0, promised, 1)
     val accepted = Accept(identifier, ClientRequestCommandValue(0, expectedBytes))
     // when our node sees the accept message
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
-    fsm.setState(state, initialData)
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
+    fsm.underlyingActor.setAgent(state, initialData)
     fsm ! accepted
     // then it accepts
     expectMsg(250 millisecond, AcceptAck(identifier, 0, initialData.progress))
     // stays in the same state
-    assert(fsm.stateName == state)
+    assert(fsm.underlyingActor.role == state)
     // does not update its data
-    assert(fsm.stateData == initialData)
+    assert(fsm.underlyingActor.data == initialData)
     // journals the new value
     (stubJournal.accept _).verify(Seq(accepted))
   }
@@ -183,13 +210,13 @@ trait AllStateSpec {
     val testJournal = AllStateSpec.tempRecordTimesFileJournal
 
     var sendTs = 0L
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, testJournal, ArrayBuffer.empty, None) {
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, testJournal, ArrayBuffer.empty, None) {
       override def send(actor: ActorRef, msg: Any): Unit = {
         sendTs = System.nanoTime()
         super.send(actor, msg)
       }
     })
-    fsm.setState(state, initialData)
+    fsm.underlyingActor.setAgent(state, initialData)
 
     // when our node sees an accept message for using a higher number
     val higherNumber = BallotNumber(7, 2)
@@ -200,7 +227,7 @@ trait AllStateSpec {
     // then it accepts
     expectMsg(250 millisecond, AcceptAck(identifier, 0, initialData.progress))
     // stays in the same state
-    assert(fsm.stateName == state)
+    assert(fsm.underlyingActor.role == state)
     // journals the new accepts
     val actionsWithTimestamp = testJournal.actionsWithTimestamp.toMap
     val TimeAndParameter(_, accepts: Seq[Any]) = actionsWithTimestamp.get("accept").getOrElse(fail)
@@ -212,7 +239,7 @@ trait AllStateSpec {
       case x => fail(x.toString)
     }
     // updates its promise to the new value
-    assert(fsm.stateData == initialData.copy(progress = initialData.progress.copy(highestPromised = higherNumber)))
+    assert(fsm.underlyingActor.data == initialData.copy(progress = initialData.progress.copy(highestPromised = higherNumber)))
     // and the timestamps show that the save happened before the send
     saveTs should not be 0L
     sendTs should not be 0L
@@ -229,15 +256,15 @@ trait AllStateSpec {
     val accepted = Accept(identifier, ClientRequestCommandValue(0, expectedBytes))
     stubJournal.accepted _ when 0L returns Some(accepted)
     // when our node sees this
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
-    fsm.setState(state, initialData)
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
+    fsm.underlyingActor.setAgent(state, initialData)
     fsm ! accepted
     // then it accepts
     expectMsg(250 millisecond, AcceptAck(identifier, 0, initialData.progress))
     // stays in the same state
-    assert(fsm.stateName == state)
+    assert(fsm.underlyingActor.role == state)
     // does not update its data
-    assert(fsm.stateData == initialData)
+    assert(fsm.underlyingActor.data == initialData)
     // journals the new value
     (stubJournal.accept _).verify(Seq(accepted))
   }
@@ -252,15 +279,15 @@ trait AllStateSpec {
     val acceptedAccept = Accept(higherIdentifier, ClientRequestCommandValue(0, expectedBytes))
     // and some duplicated accept
     // when our node sees this
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
-    fsm.setState(state, initialData)
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
+    fsm.underlyingActor.setAgent(state, initialData)
     fsm ! acceptedAccept
     // then it does not respond
     expectMsg(250 millisecond, AcceptNack(higherIdentifier, 0, initialData.progress))
     // stays in the same state
-    assert(fsm.stateName == state)
+    assert(fsm.underlyingActor.role == state)
     // does not update its data
-    assert(fsm.stateData == initialData)
+    assert(fsm.underlyingActor.data == initialData)
   }
 
   def nackAcceptLowerThanPromise(state: PaxosRole)(implicit sender: ActorRef) {
@@ -272,15 +299,15 @@ trait AllStateSpec {
     val rejectedAccept = Accept(lowerIdentifier, ClientRequestCommandValue(0, expectedBytes))
     // and some duplicated accept
     // when our node sees this
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
-    fsm.setState(state, initialData)
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
+    fsm.underlyingActor.setAgent(state, initialData)
     fsm ! rejectedAccept
     // then it does not respond
     expectMsg(250 millisecond, AcceptNack(lowerIdentifier, 0, initialData.progress))
     // stays in the same state
-    assert(fsm.stateName == state)
+    assert(fsm.underlyingActor.role == state)
     // does not update its data
-    assert(fsm.stateData == initialData)
+    assert(fsm.underlyingActor.data == initialData)
   }
 
   def journalsButDoesNotCommitIfNotContiguousRetransmissionResponse(state: PaxosRole)(implicit sender: ActorRef) = {
@@ -307,8 +334,8 @@ trait AllStateSpec {
     val oldProgress = Progress.highestPromisedHighestCommitted.set(initialData.progress, (lastCommitted.number, lastCommitted))
     val fileJournal: FileJournal = AllStateSpec.tempRecordTimesFileJournal
     val delivered = ArrayBuffer[CommandValue]()
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, fileJournal, delivered, None))
-    fsm.setState(state, initialData.copy(progress = oldProgress))
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, fileJournal, delivered, None))
+    fsm.underlyingActor.setAgent(state, initialData.copy(progress = oldProgress))
 
     // when the retransmission is received
     fsm ! retransmission
@@ -316,11 +343,11 @@ trait AllStateSpec {
     // it sends no messages
     expectNoMsg(25 milliseconds)
     // stays in state
-    assert(fsm.stateName == state)
+    assert(fsm.underlyingActor.role == state)
     // does not update its commit index
-    assert(fsm.stateData.progress.highestCommitted.logIndex == 96L)
+    assert(fsm.underlyingActor.data.progress.highestCommitted.logIndex == 96L)
     // does update highest promise
-    assert(fsm.stateData.progress.highestPromised == a3.id.number)
+    assert(fsm.underlyingActor.data.progress.highestPromised == a3.id.number)
     // does not delivered any committed values
     delivered.size should be(0)
     // does journal the values
@@ -357,8 +384,8 @@ trait AllStateSpec {
     val oldProgress = Progress.highestPromisedHighestCommitted.set(initialData.progress, (lastCommitted.number, lastCommitted))
     val fileJournal: FileJournal = AllStateSpec.tempRecordTimesFileJournal
     val delivered = ArrayBuffer[CommandValue]()
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, fileJournal, delivered, None))
-    fsm.setState(state, initialData.copy(progress = oldProgress))
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, fileJournal, delivered, None))
+    fsm.underlyingActor.setAgent(state, initialData.copy(progress = oldProgress))
 
     // when the retransmission is received
     fsm ! retransmission
@@ -366,11 +393,11 @@ trait AllStateSpec {
     // it sends no messages
     expectNoMsg(25 milliseconds)
     // stays in state
-    assert(fsm.stateName == state)
+    assert(fsm.underlyingActor.role == state)
     // does not update its commit index
-    assert(fsm.stateData.progress.highestCommitted == lastCommitted)
+    assert(fsm.underlyingActor.data.progress.highestCommitted == lastCommitted)
     // does update highest promise
-    assert(fsm.stateData.progress.highestPromised == a3.id.number)
+    assert(fsm.underlyingActor.data.progress.highestPromised == a3.id.number)
     // does not delivered any committed values
     delivered.size should be(0)
     // does journal the values
@@ -395,15 +422,15 @@ trait AllStateSpec {
     // and an empty accept journal
     stubJournal.bounds _ when() returns minJournalBounds
     // when our candidate node sees this
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
-    fsm.setState(state, initialData)
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
+    fsm.underlyingActor.setAgent(state, initialData)
     fsm ! lowPrepare
     // then it responds with a nack
     expectMsg(250 millisecond, PrepareNack(lowIdentifier, 0, initialData.progress, Long.MinValue, leaderHeartbeat2))
     // stays in the same state
-    assert(fsm.stateName == state)
+    assert(fsm.underlyingActor.role == state)
     // does not update its data
-    assert(fsm.stateData == initialData)
+    assert(fsm.underlyingActor.data == initialData)
   }
 
   def nackLowerNumberedPrepare(state: PaxosRole)(implicit sender: ActorRef) {
@@ -418,15 +445,15 @@ trait AllStateSpec {
     // and an empty accept journal
     stubJournal.bounds _ when() returns minJournalBounds
     // when our node sees this
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
-    fsm.setState(state, initialData)
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
+    fsm.underlyingActor.setAgent(state, initialData)
     fsm ! lowPrepare
     // then it responds with a nack
     expectMsg(250 millisecond, PrepareNack(lowIdentifier, 0, initialData.progress, Long.MinValue, 2))
     // stays in the same state
-    assert(fsm.stateName == state)
+    assert(fsm.underlyingActor.role == state)
     // does not update its data
-    assert(fsm.stateData == initialData)
+    assert(fsm.underlyingActor.data == initialData)
   }
 
   def ackRepeatedPrepare(state: PaxosRole)(implicit sender: ActorRef) {
@@ -442,15 +469,15 @@ trait AllStateSpec {
     // and an empty accept journal
     stubJournal.bounds _ when() returns minJournalBounds
     // when our node sees this
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
-    fsm.setState(state, initialData)
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
+    fsm.underlyingActor.setAgent(state, initialData)
     fsm ! highPrepare
     // then it responds with a ack
     expectMsg(250 millisecond, PrepareAck(highIdentifier, 0, initialData.progress, Long.MinValue, leaderHeartbeat2, None))
     // stays in the same state
-    assert(fsm.stateName == state)
+    assert(fsm.underlyingActor.role == state)
     // does not update its data
-    assert(fsm.stateData == initialData)
+    assert(fsm.underlyingActor.data == initialData)
     // and checks the journal
     (stubJournal.accepted _).verify(1L)
   }
@@ -467,25 +494,25 @@ trait AllStateSpec {
     val highPrepare = Prepare(highIdentifier)
     var sendTs = 0L
     // when our node sees this
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, testJournal, ArrayBuffer.empty, None) {
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, testJournal, ArrayBuffer.empty, None) {
       override def send(actor: ActorRef, msg: Any): Unit = {
         sendTs = System.nanoTime()
         super.send(actor, msg)
       }
     })
-    fsm.setState(state, initialData)
+    fsm.underlyingActor.setAgent(state, initialData)
     fsm ! highPrepare
     // then it responds with a ack
-    expectMsg(250 millisecond, PrepareAck(highIdentifier, 0, initialData.progress, Long.MinValue, leaderHeartbeat2, None))
+    expectMsg(250 millisecond, PrepareAck(highIdentifier, 0, initialData.progress.copy(highestPromised = high), Long.MinValue, leaderHeartbeat2, None))
     // it must be a follower as it can no longer journal client data so cannot commit them so cannot lead
-    assert(fsm.stateName == Follower)
+    assert(fsm.underlyingActor.role == Follower)
     // it must have upated its highest promised
-    assert(fsm.stateData.progress.highestPromised == high)
+    assert(fsm.underlyingActor.data.progress.highestPromised == high)
     // journals the new progress
     val actionsWithTimestamp = testJournal.actionsWithTimestamp.toMap
     val TimeAndParameter(saveTs, progress: Progress) = actionsWithTimestamp.get("save").getOrElse(fail)
     progress match {
-      case p if p == fsm.stateData.progress => // good
+      case p if p == fsm.underlyingActor.data.progress => // good
       case x => fail(x.toString)
     }
     // and the timestamps show that the save happened before the send

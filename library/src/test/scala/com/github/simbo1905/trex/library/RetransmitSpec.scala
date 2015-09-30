@@ -1,91 +1,17 @@
-package com.github.simbo1905.trex.internals
+package com.github.simbo1905.trex.library
 
-import akka.actor.{ActorSystem, ActorRef}
-import akka.testkit.{TestProbe, TestKit}
-import com.github.simbo1905.trex.library._
-import RetransmitHandler.{ResponseState, AcceptState, CommitState}
+import com.github.simbo1905.trex.library.RetransmitHandler.{AcceptState, CommitState, ResponseState}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest.{OptionValues, Matchers, WordSpecLike}
 
-import scala.collection.immutable.TreeMap
-import Ordering._
+class TestRetransmitHandler extends RetransmitHandler[TestClient]
 
-class UndefinedRetransmitHandler extends RetransmitHandler[ActorRef] {
-  override def plog = NoopPaxosLogging
-
-  override def nodeUniqueId: Int = 0
-
-  override def deliver(value: CommandValue): Any = ???
-
-  override def journal: Journal = ???
-
-  override def processRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData[ActorRef]): Retransmission = ???
-
-  def send(actor: ActorRef, msg: Any): Unit = ???
-}
-
-class UndefinedJournal extends Journal {
-  override def save(progress: Progress): Unit = ???
-
-  override def bounds: JournalBounds = ???
-
-  override def load(): Progress = ???
-
-  override def accepted(logIndex: Long): Option[Accept] = ???
-
-  override def accept(a: Accept*): Unit = ???
-}
-
-object RetransmitSpec {
-  // given some retransmitted committed values
-  val v1 = ClientRequestCommandValue(0, Array[Byte](0))
-  val v3 = ClientRequestCommandValue(2, Array[Byte](2))
-
-  val identifier98: Identifier = Identifier(1, BallotNumber(1, 1), 98L)
-  val identifier99: Identifier = Identifier(2, BallotNumber(2, 2), 99L)
-  val identifier100: Identifier = Identifier(3, BallotNumber(3, 3), 100L)
-  val identifier101: Identifier = Identifier(3, BallotNumber(3, 3), 101L)
-
-  val a98 = Accept(identifier98, v1)
-  val a99 = Accept(identifier99, NoOperationCommandValue)
-  val a100 = Accept(identifier100, v3)
-  val a101 = Accept(identifier101, v3)
-
-  val accepts98thru100 = Seq(a98, a99, a100)
-  val misorderedAccepts = Seq(a98, a99, a101, a100)
-
-  def journaled98thru100(logIndex: Long): Option[Accept] = {
-    logIndex match {
-      case 98L => Option(a98)
-      case 99L => Option(a99)
-      case 100L => Option(a100)
-      case _ => None
-    }
-  }
-
-  def journaled98thru101(logIndex: Long): Option[Accept] = {
-    logIndex match {
-      case 98L => Option(a98)
-      case 99L => Option(a99)
-      case 100L => Option(a100)
-      case 101L => Option(a101)
-      case _ => None
-    }
-  }
-
-  val lowValue = Int.MinValue + 1
-  val initialDataCommittedSlotOne = PaxosData(
-    Progress(
-      BallotNumber(lowValue, lowValue), Identifier(0, BallotNumber(lowValue, lowValue), 1)
-    ), 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
-}
-
-class RetransmitSpec extends TestKit(ActorSystem("RetransmitSpec", AllStateSpec.config))
-with WordSpecLike
+class RetransmitSpec extends WordSpecLike
 with Matchers
-with MockFactory {
+with MockFactory
+with OptionValues {
 
-  import RetransmitSpec._
+  import TestHelpers._
 
   "RetransmitHandler request handling" should {
     "return committed accepts in order" in {
@@ -128,23 +54,20 @@ with MockFactory {
       (stubJournal.accepted _) when (1L) returns Option(a98)
       (stubJournal.accepted _) when (2L) returns Option(a99)
       // and a retransmit handler which records what it sent
-      val sender: ActorRef = TestProbe().ref
-      var sent: Option[Any] = None
-      val handler = new UndefinedRetransmitHandler {
+      val handler = new TestRetransmitHandler
+      // when we send it a request and we have only uncommitted values
+      val testIO = new TestIO(new UndefinedJournal){
+        override def send(msg: PaxosMessage): Unit = {
+          sent = sent :+ MessageAndTimestamp(msg, 0L)
+        }
 
         override def journal: Journal = stubJournal
-
-        override def send(actor: ActorRef, msg: Any): Unit = {
-          sent = Some(msg)
-          actor shouldBe sender
-        }
       }
-      // when we send it a request and we have only uncommitted values
-      handler.handleRetransmitRequest(sender, RetransmitRequest(2, 0, 0L), initialDataCommittedSlotOne)
+      handler.handleRetransmitRequest(testIO, PaxosAgent(99, Leader, initialDataCommittedSlotOne), RetransmitRequest(2, 0, 0L))
       // then
-      val expected = Some(RetransmitResponse(0, 2, Seq(a98), Seq(a99)))
-      sent match {
-        case `expected` => // good
+      val expected = RetransmitResponse(99, 2, Seq(a98), Seq(a99))
+      testIO.sent.headOption.value match {
+        case MessageAndTimestamp(msg, 0L) if msg == expected => // good
         case x => fail(s"$x != $expected")
       }
     }
@@ -168,19 +91,19 @@ with MockFactory {
       }
       // and a retransmit handler which records what was delivered when
       var deliveredWithTs: Seq[(Long, CommandValue)] = Seq.empty
-      val handler = new UndefinedRetransmitHandler {
-        override def processRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData[ActorRef]): Retransmission = Retransmission(progress, accepts98thru100, accepts98thru100.map(_.value))
+      val handler = new TestRetransmitHandler {
+        override def processRetransmitResponse(io: PaxosIO[TestClient], agent: PaxosAgent[TestClient], response: RetransmitResponse): Retransmission =
+          Retransmission(progress, accepts98thru100, accepts98thru100.map(_.value))
 
-        override def journal: Journal = stubJournal
-
+      }
+      // when it is passed a retransmit response
+      handler.handleRetransmitResponse(new TestIO(new UndefinedJournal){
         override def deliver(value: CommandValue): Any = {
           deliveredWithTs = deliveredWithTs :+(System.nanoTime(), value)
         }
 
-        override def send(actor: ActorRef, msg: Any): Unit = {}
-      }
-      // when it is passed a retransmit response
-      handler.handleRetransmitResponse(RetransmitResponse(1, 0, accepts98thru100, Seq.empty), AllStateSpec.initialData)
+        override def journal: Journal = stubJournal
+      }, PaxosAgent[TestClient](99, Follower, initialData), RetransmitResponse(1, 0, accepts98thru100, Seq.empty))
       // then we deliver before we save
       deliveredWithTs.headOption.getOrElse(fail("empty delivered list")) match {
         case (ts, _) =>
@@ -189,7 +112,7 @@ with MockFactory {
       // and we saved before we accepted
       assert(saveTs != 0 && acceptTs != 0 && saveTs < acceptTs)
       // and we filtered out NoOp values
-      assert(deliveredWithTs.size == 2)
+      assert(deliveredWithTs.size == 1)
     }
 
     "commit contiguous values" in {

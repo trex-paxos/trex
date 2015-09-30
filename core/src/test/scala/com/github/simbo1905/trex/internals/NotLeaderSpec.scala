@@ -1,7 +1,7 @@
 package com.github.simbo1905.trex.internals
 
 import akka.actor.ActorRef
-import akka.testkit.{TestFSMRef, TestKit}
+import akka.testkit.{TestActorRef, TestKit}
 import com.github.simbo1905.trex.library._
 import org.scalamock.scalatest.MockFactory
 
@@ -15,8 +15,8 @@ trait NotLeaderSpec { self: TestKit with MockFactory with AllStateSpec =>
     require(state == Follower || state == Recoverer)
     val stubJournal: Journal = stub[Journal]
     // given a node in the prescribed state
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
-    fsm.setState(state, initialData)
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
+    fsm.underlyingActor.setAgent(state, initialData)
     // when it gets arbitrary client data
     val value = ClientRequestCommandValue(0, "hello world".getBytes("UTF8"))
     fsm ! value

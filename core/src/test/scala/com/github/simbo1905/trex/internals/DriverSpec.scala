@@ -3,7 +3,7 @@ package com.github.simbo1905.trex.internals
 import java.util.concurrent.TimeoutException
 import akka.actor._
 import akka.testkit.{TestProbe, TestActorRef, ImplicitSender, TestKit}
-import com.github.simbo1905.trex.library.{ClientRequestCommandValue, ServerResponse, NoLongerLeaderException, NotLeader}
+import com.github.simbo1905.trex.library._
 import org.scalatest.{Matchers, BeforeAndAfterAll, SpecLike}
 import com.typesafe.config.ConfigFactory
 import scala.compat.Platform
@@ -106,8 +106,8 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
       implicit val ref = bd
 
       clientProbe.send(ref, "hello")
-      ref ! PaxosActor.CheckTimeout
-      ref ! PaxosActor.CheckTimeout
+      ref ! CheckTimeout
+      ref ! CheckTimeout
 
       testProbe3.expectMsgPF(1 seconds) {
         case ClientRequestCommandValue(1, bytes) if fromBinary(bytes) == "hello" =>
@@ -129,7 +129,7 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
         case ClientRequestCommandValue(1, bytes) if fromBinary(bytes) == "hello" =>
         case x => fail(x.toString)
       }
-      ref ! PaxosActor.CheckTimeout
+      ref ! CheckTimeout
 
       testProbe2.expectMsgPF(1 seconds) {
         case ClientRequestCommandValue(1, bytes) if fromBinary(bytes) == "hello" =>
@@ -202,17 +202,17 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
       clientProbe.send(ref, "hello world")
       clientProbe.expectNoMsg(25 millisecond)
 
-      ref ! PaxosActor.CheckTimeout
+      ref ! CheckTimeout
       clientProbe.expectNoMsg(25 millisecond)
-      ref ! PaxosActor.CheckTimeout
+      ref ! CheckTimeout
       clientProbe.expectNoMsg(25 millisecond)
-      ref ! PaxosActor.CheckTimeout
+      ref ! CheckTimeout
       clientProbe.expectNoMsg(25 millisecond)
-      ref ! PaxosActor.CheckTimeout
+      ref ! CheckTimeout
       clientProbe.expectNoMsg(25 millisecond)
-      ref ! PaxosActor.CheckTimeout
+      ref ! CheckTimeout
       clientProbe.expectNoMsg(25 millisecond)
-      ref ! PaxosActor.CheckTimeout
+      ref ! CheckTimeout
       clientProbe.expectMsgPF(1 seconds) {
         case ex: TimeoutException =>
           ex.getMessage.indexOf(s"Exceeded maxAttempts 6") should be(0)

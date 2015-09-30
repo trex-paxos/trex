@@ -8,96 +8,81 @@ package com.github.simbo1905.trex.library
  */
 case class AcceptResponsesAndTimeout(timeout: Long, accept: Accept, responses: Map[Int, AcceptResponse])
 
-trait AcceptResponsesHandler[ClientRef] extends PaxosLenses[ClientRef] {
+trait AcceptResponsesHandler[ClientRef] extends PaxosLenses[ClientRef] with BackdownData[ClientRef] {
 
-  def plog: PaxosLogging
+  def commit(io: PaxosIO[ClientRef], state: PaxosRole, data: PaxosData[ClientRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)])
 
-  def send(actor: ClientRef, msg: Any)
+  def handleAcceptResponse(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef], vote: AcceptResponse): PaxosAgent[ClientRef] = {
 
-  def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, ClientRef)]): Unit
-
-  def randomTimeout: Long
-
-  def backdownData(data: PaxosData[ClientRef]): PaxosData[ClientRef]
-
-  def commit(state: PaxosRole, data: PaxosData[ClientRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)])
-
-  def journalProgress(progress: Progress): Progress
-
-  def broadcast(msg: Any): Unit
-
-  def handleAcceptResponse(nodeUniqueId: Int, stateName: PaxosRole, sender: ClientRef, vote: AcceptResponse, oldData: PaxosData[ClientRef]): (PaxosRole, PaxosData[ClientRef]) = {
-    val highestCommitted = oldData.progress.highestCommitted.logIndex
+    val highestCommitted = agent.data.progress.highestCommitted.logIndex
     val highestCommittedOther = vote.progress.highestCommitted.logIndex
     highestCommitted < highestCommittedOther match {
       case true =>
-        (Follower,backdownData(oldData))
+        PaxosAgent(agent.nodeUniqueId, Follower, backdownData(io, agent.data))
       case false =>
-        oldData.acceptResponses.get(vote.requestId) match {
+        agent.data.acceptResponses.get(vote.requestId) match {
           case Some(AcceptResponsesAndTimeout(_, accept, votes)) =>
             val latestVotes = votes + (vote.from -> vote)
             val (positives, negatives) = latestVotes.toList.partition(_._2.isInstanceOf[AcceptAck])
-            if (negatives.size > oldData.clusterSize / 2) {
-              plog.info("Node {} {} received a majority accept nack so has lost leadership becoming a follower.", nodeUniqueId, stateName)
-              sendNoLongerLeader(oldData.clientCommands)
-              (Follower,backdownData(oldData))
-            } else if (positives.size > oldData.clusterSize / 2) {
+            if (negatives.size > agent.data.clusterSize / 2) {
+              io.plog.info("Node {} {} received a majority accept nack so has lost leadership becoming a follower.", agent.nodeUniqueId, agent.role)
+              PaxosAgent(agent.nodeUniqueId, Follower, backdownData(io, agent.data))
+            } else if (positives.size > agent.data.clusterSize / 2) {
               // this slot is fixed record that we are not awaiting any more votes
-              val updated = oldData.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(randomTimeout, accept, Map.empty))
+              val updated = agent.data.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(io.randomTimeout, accept, Map.empty))
 
               // grab all the accepted values from the beginning of the tree map
               val (committable, uncommittable) = updated.span { case (_, AcceptResponsesAndTimeout(_, _, rs)) => rs.isEmpty }
-              plog.debug("Node " + nodeUniqueId + " {} vote {} committable {} uncommittable {}", stateName, vote, committable, uncommittable)
+              io.plog.debug("Node " + agent.nodeUniqueId + " {} vote {} committable {} uncommittable {}", agent.role, vote, committable, uncommittable)
 
               // this will have dropped the committable
-              val votesData = acceptResponsesLens.set(oldData, uncommittable)
+              val votesData = acceptResponsesLens.set(agent.data, uncommittable)
 
               // attempt an in-sequence commit
               committable.headOption match {
                 case None =>
-                  (stateName, votesData) // gap in committable sequence
-                case Some((id,_)) if id.logIndex != votesData.progress.highestCommitted.logIndex + 1 =>
-                  plog.error(s"Node $nodeUniqueId $stateName invariant violation: $stateName has committable work which is not contiguous with progress implying we have not issued Prepare/Accept messages for the correct range of slots. Returning to follower.")
-                  sendNoLongerLeader(oldData.clientCommands)
-                  (Follower,backdownData(oldData))
+                  PaxosAgent(agent.nodeUniqueId, agent.role, votesData) // gap in committable sequence
+                case Some((id, _)) if id.logIndex != votesData.progress.highestCommitted.logIndex + 1 =>
+                  io.plog.error(s"Node ${agent.nodeUniqueId} ${agent.role} invariant violation: ${agent.role} has committable work which is not contiguous with progress implying we have not issued Prepare/Accept messages for the correct range of slots. Returning to follower.")
+                  PaxosAgent(agent.nodeUniqueId, Follower, backdownData(io, agent.data))
                 case _ =>
-                  val (newProgress, results) = commit(stateName, oldData, committable.last._1, votesData.progress)
+                  val (newProgress, results) = commit(io, agent.role, agent.data, committable.last._1, votesData.progress)
 
-                  journalProgress(newProgress)
+                  io.journal.save(newProgress)
 
-                  broadcast(Commit(newProgress.highestCommitted))
+                  io.send(Commit(newProgress.highestCommitted))
 
-                  if (oldData.clientCommands.nonEmpty) {
+                  if (agent.data.clientCommands.nonEmpty) {
                     val (committedIds, _) = results.unzip
 
-                    // TODO do the tests check that we clear out the responses which match the work we have committed?
-                    val (responds, remainders) = oldData.clientCommands.partition {
+                    // FIXME do the tests check that we clear out the responses which match the work we have committed?
+                    val (responds, remainders) = agent.data.clientCommands.partition {
                       idCmdRef: (Identifier, (CommandValue, ClientRef)) =>
                         val (id, (_, _)) = idCmdRef
                         committedIds.contains(id)
                     }
 
-                    plog.debug("Node {} {} post commit has responds.size={}, remainders.size={}", nodeUniqueId, stateName, responds.size, remainders.size)
+                    io.plog.debug("Node {} {} post commit has responds.size={}, remainders.size={}", agent.nodeUniqueId, agent.role, responds.size, remainders.size)
                     results foreach { case (id, bytes) =>
                       responds.get(id) foreach { case (cmd, client) =>
-                        plog.debug("sending response from accept {} to {}", id, client)
-                        send(client, bytes)
+                        io.plog.debug("sending response from accept {} to {}", id, client)
+                        io.respond(client, bytes)
                       }
                     }
-                    (stateName, progressLens.set(votesData, newProgress).copy(clientCommands = remainders))// TODO new lens?
+                    PaxosAgent(agent.nodeUniqueId, agent.role, progressLens.set(votesData, newProgress).copy(clientCommands = remainders)) // TODO new lens?
                   } else {
-                    (stateName, progressLens.set(votesData, newProgress))
+                    PaxosAgent(agent.nodeUniqueId, agent.role, progressLens.set(votesData, newProgress))
                   }
               }
             } else {
               // insufficient votes keep counting
-              val updated = oldData.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(randomTimeout, accept, latestVotes))
-              plog.debug("Node {} {} insufficient votes for {} have {}", nodeUniqueId, stateName, vote.requestId, updated)
-              (stateName, acceptResponsesLens.set(oldData, updated))
+              val updated = agent.data.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(io.randomTimeout, accept, latestVotes))
+              io.plog.debug("Node {} {} insufficient votes for {} have {}", agent.nodeUniqueId, agent.role, vote.requestId, updated)
+              PaxosAgent(agent.nodeUniqueId, agent.role, acceptResponsesLens.set(agent.data, updated))
             }
           case None =>
-            plog.debug("Node {} {} ignoring response we are not awaiting: {}", nodeUniqueId, stateName, vote)
-            (stateName, oldData)
+            io.plog.debug("Node {} {} ignoring response we are not awaiting: {}", agent.nodeUniqueId, agent.role, vote)
+            PaxosAgent(agent.nodeUniqueId, agent.role, agent.data)
         }
     }
   }

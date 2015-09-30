@@ -6,52 +6,50 @@ import scala.collection.SortedMap
 
 case class AcceptsAndData[ClientRef](accepts: Traversable[Accept], data: PaxosData[ClientRef])
 
-trait ResendAcceptsHandler[ClientRef] extends PaxosLenses[ClientRef] {
+trait ResendHandler[ClientRef] extends PaxosLenses[ClientRef] {
 
-  import ResendAcceptsHandler._
+  import ResendHandler._
 
-  def highestNumberProgressed(data: PaxosData[ClientRef]): BallotNumber
-
-  def nodeUniqueId: Int
-
-  def plog: PaxosLogging
-
-  def journal: Journal
-
-  def broadcast(msg: Any): Unit
-
-  def randomTimeout: Long
+  def highestNumberProgressed(data: PaxosData[ClientRef]): BallotNumber = Seq(data.epoch, Option(data.progress.highestPromised), Option(data.progress.highestCommitted.number)).flatten.max
 
   /**
    * Locates the accepts where we have timed-out on getting a majority accept response. If we have seen evidence of
    * other nodes using a higher BallotNumber we "go higher" moving to a new epoch and refreshing our accepts to use the
    * new ballot number.
-   * @param stateName Current PaxosState for logging purpose.
-   * @param oldData The current PaxosData
+   * @param io input and output
+   * @param agent The current role and state
    * @param time The current time
    * @return
    */
-  def handleResendAccepts(stateName: PaxosRole, oldData: PaxosData[ClientRef], time: Long): PaxosData[ClientRef] = {
+  def handleResendAccepts(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef], time: Long): PaxosAgent[ClientRef] = {
     // compute the timed out accepts, making fresh ones with higher numbers on a new epoch if required
-    val AcceptsAndData(accepts, newData) = computeResendAccepts(stateName, oldData, time)
+    val AcceptsAndData(accepts, newData) = computeResendAccepts(io, agent, time)
     // if we have bumped the epoch we need to save fresh accepts and journal the new procis
-    if (newData.epoch != oldData.epoch) {
-      journal.save(newData.progress)
-      journal.accept(accepts.toSeq: _*)
+    if (newData.epoch != agent.data.epoch) {
+      io.journal.save(newData.progress)
+      io.journal.accept(accepts.toSeq: _*)
     }
     // broadcast the requests
-    accepts.foreach(broadcast(_))
-    newData
+    accepts.foreach(io.send(_))
+    agent.copy(data = newData)
   }
 
-  def computeResendAccepts(stateName: PaxosRole, oldData: PaxosData[ClientRef], time: Long): AcceptsAndData[ClientRef] = {
+  def handleResendPrepares(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef], time: Long): PaxosAgent[ClientRef] = {
+    agent.data.prepareResponses foreach {
+      case (id, _) =>
+        io.send(Prepare(id))
+    }
+    agent.copy(data = timeoutLens.set(agent.data, io.randomTimeout))
+  }
 
-    val oldEpoch: BallotNumber = oldData.epoch.getOrElse(Journal.minBookwork.highestPromised)
+  def computeResendAccepts(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef], time: Long): AcceptsAndData[ClientRef] = {
 
-    val newTimeout = randomTimeout
+    val oldEpoch: BallotNumber = agent.data.epoch.getOrElse(Journal.minBookwork.highestPromised)
+
+    val newTimeout = io.randomTimeout
 
     // update the top level timeout which is a fast check guard on timeouts
-    val data = timeoutLens.set(oldData, randomTimeout)
+    val data = timeoutLens.set(agent.data, io.randomTimeout)
 
     // find the individual responses that have timed out
     val late = timedOutResponse(time, data.acceptResponses)
@@ -60,7 +58,7 @@ trait ResendAcceptsHandler[ClientRef] extends PaxosLenses[ClientRef] {
       // nothing more to do
       AcceptsAndData[ClientRef](Seq.empty, data)
     } else {
-      plog.info(s"timed out on ${late.size} accepts")
+      io.plog.info(s"timed out on ${late.size} accepts")
 
       // the accepts we timed out on responses for
       val oldAccepts = late.map {
@@ -72,14 +70,14 @@ trait ResendAcceptsHandler[ClientRef] extends PaxosLenses[ClientRef] {
 
       // go one higher if response show higher promises than our epoch
       val (higherNumber, newProgress) = if (highPromise > oldEpoch) {
-        plog.info(s"going one higher than highest other promise ${highPromise}")
+        io.plog.info(s"going one higher than highest other promise ${highPromise}")
         // increment
-        val higherNumber = highPromise.copy(counter = highPromise.counter + 1, nodeIdentifier = nodeUniqueId)
+        val higherNumber = highPromise.copy(counter = highPromise.counter + 1, nodeIdentifier = agent.nodeUniqueId)
         // make a self promise
         val newProgress = data.progress.copy(highestPromised = higherNumber)
         (higherNumber, newProgress)
       } else {
-        (oldEpoch, oldData.progress)
+        (oldEpoch, agent.data.progress)
       }
 
       // no longer track the responses to the old accepts
@@ -88,7 +86,7 @@ trait ResendAcceptsHandler[ClientRef] extends PaxosLenses[ClientRef] {
       val newAccepts = refreshAccepts(higherNumber, oldAccepts)
       // accept own higher accepts
       val newVotes = newAccepts.foldLeft(removedOld) { (responses, accept) =>
-        responses + (accept.id -> AcceptResponsesAndTimeout(newTimeout, accept, Map(nodeUniqueId -> AcceptAck(accept.id, nodeUniqueId, newProgress))))
+        responses + (accept.id -> AcceptResponsesAndTimeout(newTimeout, accept, Map(agent.nodeUniqueId -> AcceptAck(accept.id, agent.nodeUniqueId, newProgress))))
       }
       // set a new epoch, top level timeout, progress and responses
       AcceptsAndData(newAccepts, progressAcceptResponsesEpochTimeoutLens.set(data, (newProgress, newVotes, Some(higherNumber), newTimeout)))
@@ -96,7 +94,7 @@ trait ResendAcceptsHandler[ClientRef] extends PaxosLenses[ClientRef] {
   }
 }
 
-object ResendAcceptsHandler {
+object ResendHandler {
   def timedOutResponse(time: Long, responses: SortedMap[Identifier, AcceptResponsesAndTimeout]) = responses.filter {
     case (_, AcceptResponsesAndTimeout(to, _, _)) if to <= time => true
     case _ => false

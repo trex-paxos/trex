@@ -4,67 +4,52 @@ import com.github.simbo1905.trex.library.Ordering._
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 
-trait FollowerTimeoutHandler[ClientRef] extends PaxosLenses[ClientRef] {
-  def plog: PaxosLogging
-
-  def broadcast(msg: Any): Unit
-
-  def minPrepare: Prepare
-
-  def randomTimeout: Long
-
-  def highestAcceptedIndex: Long
-
-  def send(actor: ClientRef, msg: Any): Unit
-
-  def backdownData(data: PaxosData[ClientRef]): PaxosData[ClientRef]
-
-  def journal: Journal
+trait FollowerTimeoutHandler[ClientRef] extends PaxosLenses[ClientRef] with BackdownData[ClientRef] {
+  def highestAcceptedIndex(io: PaxosIO[ClientRef]): Long = io.journal.bounds.max
 
   def computeFailover(log: PaxosLogging, nodeUniqueId: Int, data: PaxosData[ClientRef], votes: Map[Int, PrepareResponse]): FailoverResult = FollowerTimeoutHandler.computeFailover(log, nodeUniqueId, data, votes)
 
   def recoverPrepares(nodeUniqueId: Int, highest: BallotNumber, highestCommittedIndex: Long, highestAcceptedIndex: Long) = FollowerTimeoutHandler.recoverPrepares(nodeUniqueId, highest, highestCommittedIndex, highestAcceptedIndex)
 
-  def handleResendLowPrepares(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData[ClientRef]): PaxosData[ClientRef] = {
-    plog.debug("Node {} {} timed-out having already issued a low. rebroadcasting", nodeUniqueId, stateName)
-    broadcast(minPrepare)
-    timeoutLens.set(data, randomTimeout)
+  def handleResendLowPrepares(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef]): PaxosAgent[ClientRef] = {
+    io.plog.debug("Node {} {} timed-out having already issued a low. rebroadcasting", agent.nodeUniqueId, agent.role)
+    io.send(io.minPrepare)
+    agent.copy(data = timeoutLens.set(agent.data, io.randomTimeout))
   }
 
-  def handleFollowerTimeout(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData[ClientRef]): PaxosData[ClientRef] = {
-    plog.info("Node {} {} timed-out progress: {}", nodeUniqueId, stateName, data.progress)
-    broadcast(minPrepare)
+  def handleFollowerTimeout(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef]): PaxosAgent[ClientRef] = {
+    io.plog.info("Node {} {} timed-out progress: {}", agent.nodeUniqueId, agent.role, agent.data.progress)
     // nack our own prepare
     val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
-      Map(minPrepare.id -> Map(nodeUniqueId -> PrepareNack(minPrepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat)))
-
-    timeoutPrepareResponsesLens.set(data, (randomTimeout, prepareSelfVotes))
+      Map(io.minPrepare.id -> Map(agent.nodeUniqueId -> PrepareNack(io.minPrepare.id, agent.nodeUniqueId, agent.data.progress, highestAcceptedIndex(io), agent.data.leaderHeartbeat)))
+    io.send(io.minPrepare)
+    PaxosAgent(agent.nodeUniqueId, Follower, timeoutPrepareResponsesLens.set(agent.data, (io.randomTimeout, prepareSelfVotes)))
   }
 
-  def handLowPrepareResponse(nodeUniqueId: Int, stateName: PaxosRole, data: PaxosData[ClientRef], sender: ClientRef, vote: PrepareResponse): LowPrepareResponseResult[ClientRef] = {
-    val selfHighestSlot = data.progress.highestCommitted.logIndex
+  def handleLowPrepareResponse(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef], vote: PrepareResponse): PaxosAgent[ClientRef] = {
+    val selfHighestSlot = agent.data.progress.highestCommitted.logIndex
     val otherHighestSlot = vote.progress.highestCommitted.logIndex
     if (otherHighestSlot > selfHighestSlot) {
-      plog.debug("Node {} node {} committed slot {} requesting retransmission", nodeUniqueId, vote.from, otherHighestSlot)
-      send(sender, RetransmitRequest(nodeUniqueId, vote.from, data.progress.highestCommitted.logIndex))
-      LowPrepareResponseResult[ClientRef](Follower, backdownData(data))
+      io.plog.debug("Node {} node {} committed slot {} requesting retransmission", agent.nodeUniqueId, vote.from, otherHighestSlot)
+      io.send(RetransmitRequest(agent.nodeUniqueId, vote.from, agent.data.progress.highestCommitted.logIndex))
+      agent.copy(role = Follower, data = backdownData(io, agent.data))
     } else {
-      data.prepareResponses.get(vote.requestId) match {
+      agent.data.prepareResponses.get(vote.requestId) match {
         case Some(map) =>
           val votes = map + (vote.from -> vote)
 
-          def haveMajorityResponse = votes.size > data.clusterSize / 2
+          def haveMajorityResponse = votes.size > agent.data.clusterSize / 2
 
           if (haveMajorityResponse) {
 
-            computeFailover(plog, nodeUniqueId, data, votes) match {
+            computeFailover(io.plog, agent.nodeUniqueId, agent.data, votes) match {
               case FailoverResult(failover, _) if failover =>
-                val highestNumber = Seq(data.progress.highestPromised, data.progress.highestCommitted.number).max
-                val maxCommittedSlot = data.progress.highestCommitted.logIndex
+                val highestNumber = Seq(agent.data.progress.highestPromised, agent.data.progress.highestCommitted.number).max
+                val maxCommittedSlot = agent.data.progress.highestCommitted.logIndex
                 // TODO issue #13 here we should look at the max of all votes
-                val maxAcceptedSlot = highestAcceptedIndex
+                val maxAcceptedSlot = highestAcceptedIndex(io)
                 // create prepares for the known uncommitted slots else a refresh prepare for the next higher slot than committed
-                val prepares = recoverPrepares(nodeUniqueId, highestNumber, maxCommittedSlot, maxAcceptedSlot)
+                val prepares = recoverPrepares(agent.nodeUniqueId, highestNumber, maxCommittedSlot, maxAcceptedSlot)
                 // make a promise to self not to accept higher numbered messages and journal that
                 prepares.headOption match {
                   case Some(p) =>
@@ -72,40 +57,42 @@ trait FollowerTimeoutHandler[ClientRef] extends PaxosLenses[ClientRef] {
                     // accept our own promise and load from the journal any values previous accepted in those slots
                     val prepareSelfVotes: SortedMap[Identifier, Map[Int, PrepareResponse]] =
                       (prepares map { prepare =>
-                        val selfVote = Map(nodeUniqueId -> PrepareAck(prepare.id, nodeUniqueId, data.progress, highestAcceptedIndex, data.leaderHeartbeat, journal.accepted(prepare.id.logIndex)))
+                        val selfVote = Map(agent.nodeUniqueId -> PrepareAck(prepare.id, agent.nodeUniqueId, agent.data.progress, highestAcceptedIndex(io), agent.data.leaderHeartbeat, io.journal.accepted(prepare.id.logIndex)))
                         prepare.id -> selfVote
                       })(scala.collection.breakOut)
 
                     // the new leader epoch is the promise it made to itself
                     val epoch: Option[BallotNumber] = Some(selfPromise)
-                    plog.info("Node {} Follower broadcast {} prepare messages with {} transitioning Recoverer max slot index {}.", nodeUniqueId, prepares.size, selfPromise, maxAcceptedSlot)
+                    io.plog.info("Node {} Follower broadcast {} prepare messages with {} transitioning Recoverer max slot index {}.", agent.nodeUniqueId, prepares.size, selfPromise, maxAcceptedSlot)
                     // make a promise to self not to accept higher numbered messages and journal that
-                    LowPrepareResponseResult(Recoverer, highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens.set(data, (selfPromise, randomTimeout, epoch, prepareSelfVotes, SortedMap.empty)), prepares)
+                    val newData = highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens.set(agent.data, (selfPromise, io.randomTimeout, epoch, prepareSelfVotes, SortedMap.empty))
+                    io.journal.save(newData.progress)
+                    prepares.foreach(io.send(_))
+                    agent.copy(role = Recoverer,
+                      data = newData)
                   case None =>
-                    plog.error("this code should be unreachable")
-                    LowPrepareResponseResult(Follower, data)
+                    io.plog.error("this code should be unreachable")
+                    agent.copy(role = Follower, data = agent.data)
                 }
               case FailoverResult(_, maxHeartbeat) =>
                 // other nodes are showing a leader behind a partial network partition so we backdown.
                 // we update the local known heartbeat in case that leader dies causing a new scenario were only this node can form a majority.
-                LowPrepareResponseResult(Follower, data.copy(prepareResponses = SortedMap.empty, leaderHeartbeat = maxHeartbeat)) // TODO lens
+                agent.copy(role = Follower, data = agent.data.copy(prepareResponses = SortedMap.empty, leaderHeartbeat = maxHeartbeat)) // TODO lens
               case x => throw new AssertionError(s"unreachable code $x")
             }
           } else {
             // need to wait until we hear from a majority
-            LowPrepareResponseResult(Follower, data.copy(prepareResponses = TreeMap(Map(minPrepare.id -> votes).toArray: _*))) // TODO lens
+            agent.copy(role = Follower, data = agent.data.copy(prepareResponses = TreeMap(Map(io.minPrepare.id -> votes).toArray: _*))) // TODO lens
           }
         case x =>
-          plog.debug("Node {} {} is no longer awaiting responses to {} so ignoring {}", nodeUniqueId, stateName, vote.requestId, x)
-          LowPrepareResponseResult(Follower, data)
+          io.plog.debug("Node {} {} is no longer awaiting responses to {} so ignoring {}", agent.nodeUniqueId, agent.role, vote.requestId, x)
+          agent.copy(role = Follower)
       }
     }
   }
 }
 
 case class FailoverResult(failover: Boolean, maxHeartbeat: Long)
-
-case class LowPrepareResponseResult[ClientRef](role: PaxosRole, data: PaxosData[ClientRef], highPrepares: Seq[Prepare] = Seq.empty)
 
 object FollowerTimeoutHandler {
   /**

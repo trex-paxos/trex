@@ -4,7 +4,6 @@ package com.github.simbo1905.trex.internals
 import java.io.{Closeable, File}
 
 import akka.util.ByteString
-import com.github.simbo1905.trex._
 import com.github.simbo1905.trex.library._
 import org.mapdb.{DB, DBMaker}
 

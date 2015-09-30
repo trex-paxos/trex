@@ -3,7 +3,7 @@ package com.github.simbo1905.trex.internals
 import akka.actor.ActorLogging
 import com.github.simbo1905.trex.library.PaxosLogging
 
-trait PaxosLoggingAdapter extends PaxosLogging {
+trait AkkaLoggingAdapter extends PaxosLogging {
   this: ActorLogging =>
 
   override def error(msg: String): Unit = log.error(msg)

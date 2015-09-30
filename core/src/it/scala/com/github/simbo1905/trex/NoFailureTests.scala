@@ -23,17 +23,23 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
     TestKit.shutdownActorSystem(system)
   }
 
-  def checkNodes(delivered: Seq[ArrayBuffer[CommandValue]], clusterSize: Int): Unit = {
-    0 until clusterSize foreach { i =>
-      // NO_OPERATION are not delivered so should only have single value of 1
-      delivered(i).size should be(1)
+  // counts the number of delivered client bytes matches the cluster size
+  def check(cluster: ClusterHarness): Boolean = {
+
+    val delivered: Seq[ArrayBuffer[CommandValue]] = cluster.delivered.values.toSeq
+
+    val count = (0 until cluster.size).foldLeft(0){ (count, i) =>
       delivered(i).headOption match {
         case Some(c: ClientRequestCommandValue) =>
-          c.bytes.length should be(1)
-          c.bytes(0) should be(1.toByte)
-        case x => fail(x.toString)
+          c.bytes(0) match {
+            case 1 => i + 1
+            case _ => i
+          }
+        case _ => i
       }
     }
+
+    count == cluster.size
   }
 
   def runWithConfig(cfg: Config, name: String, clusterSize: Int): Unit = {
@@ -42,24 +48,22 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
     // given a test cluster harness sized to three nodes
     val ref = TestActorRef(new ClusterHarness(clusterSize, cfg),name)
 
-    // when we sent it the application value of 1.toByte
+    // when we sent it the application value of 1.toByte after 0.4s for the cluster to stabilize
     val expectedMsgId = 123456789L
     system.scheduler.scheduleOnce(400 millis, ref, ClientRequestCommandValue(expectedMsgId, Array[Byte](1)))
 
-    // it commits and sends by the response of -1.toByte
+    // it commits and sends by the response of -1.toByte else replies that it has lost the leadership
     expectMsgPF(12 second) {
       case bytes: Array[Byte] if bytes(0) == -1 => // okay first leader committed
       case ex: NoLongerLeaderException if ex.msgId == expectedMsgId => // also okay first leader lost leadership
       case x => fail(x.toString)
     }
 
-    // dig out the values which were committed
-    val delivered: Seq[ArrayBuffer[CommandValue]] = ref.underlyingActor.delivered.values.toSeq
+    // await all the nodes having something deliver the one byte sent by the client
+    awaitCond(check(ref.underlyingActor), 6 seconds, 100 millis)
 
     // kill off that cluster
     ref ! ClusterHarness.Halt
-
-    checkNodes(delivered, clusterSize)
   }
 
   object `A three node cluster` {

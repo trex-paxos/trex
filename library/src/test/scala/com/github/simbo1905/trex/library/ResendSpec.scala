@@ -1,52 +1,41 @@
-package com.github.simbo1905.trex.internals
+package com.github.simbo1905.trex.library
 
-import akka.actor.ActorRef
-import com.github.simbo1905.trex.library._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, WordSpecLike}
 
-import scala.collection.immutable.{TreeMap, SortedMap}
+import scala.collection.immutable.{SortedMap, TreeMap}
 
-class TestResendAcceptsHandler extends ResendAcceptsHandler[ActorRef] {
-  override def highestNumberProgressed(data: PaxosData[ActorRef]): BallotNumber = ???
-
-  override def plog = NoopPaxosLogging
-
-  override def nodeUniqueId: Int = 1
-
-  override def randomTimeout: Long = 0L
-
-  override def journal: Journal = ???
-
-  def broadcast(msg: Any): Unit = ???
+class TestResendHandler extends ResendHandler[TestClient] {
+  override def highestNumberProgressed(data: PaxosData[TestClient]): BallotNumber = throw new AssertionError("deliberately not implemented")
 }
 
 class ResendAcceptsSpec extends WordSpecLike with Matchers with MockFactory {
-  import ResendAcceptsSpec._
+  //import ResendAcceptsSpec._
+  import TestHelpers._
   "ResendAcceptsHandler" should {
     "find the timed-out accepts in" in {
-      val timedout = ResendAcceptsHandler.timedOutResponse(100L, emptyAcceptResponses)
+      val timedout = ResendHandler.timedOutResponse(100L, emptyAcceptResponses)
       timedout shouldBe timedOutAt100AcceptResponses
     }
     "detect highest own promise" in {
-      val highest = ResendAcceptsHandler.highestPromise(BallotNumber(4, 4), emptyAcceptResponses)
+      val highest = ResendHandler.highestPromise(BallotNumber(4, 4), emptyAcceptResponses)
       highest shouldBe BallotNumber(4, 4)
     }
     "detect others highest promise" in {
       val highPromise = emptyAcceptResponses +
         (a99.id -> AcceptResponsesAndTimeout(50L, a99, Map(0 -> AcceptNack(a99.id, 0, progressWith(BallotNumber(99, 99), zeroProgress.highestPromised)))))
-      val highest = ResendAcceptsHandler.highestPromise(BallotNumber(1, 1), highPromise)
+      val highest = ResendHandler.highestPromise(BallotNumber(1, 1), highPromise)
       highest shouldBe BallotNumber(99, 99)
     }
     "detect others highest committed" in {
       val highPromise = emptyAcceptResponses +
         (a99.id -> AcceptResponsesAndTimeout(50L, a99, Map(0 -> AcceptNack(a99.id, 0, progressWith(zeroProgress.highestPromised, BallotNumber(99, 99))))))
-      val highest = ResendAcceptsHandler.highestPromise(BallotNumber(1, 1), highPromise)
+      val highest = ResendHandler.highestPromise(BallotNumber(1, 1), highPromise)
       highest shouldBe BallotNumber(99, 99)
     }
     "refresh accepts" in {
       val newNumber = BallotNumber(4, 4)
-      val refreshed = ResendAcceptsHandler.refreshAccepts(newNumber, Seq(a98, a99, a100))
+      val refreshed = ResendHandler.refreshAccepts(newNumber, Seq(a98, a99, a100))
       val identifier98: Identifier = Identifier(1, newNumber, 98L)
       val identifier99: Identifier = Identifier(2, newNumber, 99L)
       val identifier100: Identifier = Identifier(3, newNumber, 100L)
@@ -54,30 +43,31 @@ class ResendAcceptsSpec extends WordSpecLike with Matchers with MockFactory {
     }
     "sets a new timeout per accept on resend with same epoch" in {
       // given
-      val handler = new TestResendAcceptsHandler {
-        override def randomTimeout = 121L
-      }
+      val handler = new TestResendHandler
       // when
-      val AcceptsAndData(accepts,data) = handler.computeResendAccepts(Leader, AllStateSpec.initialData.copy(acceptResponses = emptyAcceptResponses), 100L)
+      val AcceptsAndData(accepts,data) = handler.computeResendAccepts(new TestIO(new UndefinedJournal){
+        override def randomTimeout: Long = 121L
+      }, PaxosAgent[TestClient](99, Leader, initialData.copy(acceptResponses = emptyAcceptResponses)), 100L)
       // then
       data.timeout shouldBe 121L
       accepts.size shouldBe 2
-      data.acceptResponses.values.map(_.timeout) shouldBe Seq(121L,121L,120L)
+      data.acceptResponses.values.map(_.timeout) shouldBe Seq(121L,121L,150L)
     }
     "goes to a one higher epoch on detecting higher promise in responses" in {
       // given
-      val handler = new TestResendAcceptsHandler {
-        override def randomTimeout: Long = 121L
-      }
+      val handler = new TestResendHandler
       val higherPromise = emptyAcceptResponses +
         (a99.id -> AcceptResponsesAndTimeout(50L, a99, Map(0 -> AcceptNack(a99.id, 0, progressWith(zeroProgress.highestPromised, BallotNumber(99, 99))))))
-      val newEpoch = BallotNumber(100,1)
+      val newEpoch = BallotNumber(100,100)
       // when
-      val AcceptsAndData(accepts,data) = handler.computeResendAccepts(Leader, AllStateSpec.initialData.copy(acceptResponses = higherPromise), 100L)
+      val AcceptsAndData(accepts,data) = handler.computeResendAccepts(new TestIO(new UndefinedJournal){
+        override def randomTimeout: Long = 121L
+      }
+        , PaxosAgent[TestClient](100, Leader, initialData.copy(acceptResponses = higherPromise)), 100L)
       // then it move to the 1-higher epoch
       data.epoch match {
         case Some(newEpoch) => // success
-        case x => fail(s"$x is not expected BallotNumber(100,100)")
+        case x => fail(s"$x is not expected $newEpoch")
       }
       // has two messages to resend
       accepts.size shouldBe 2
@@ -85,7 +75,7 @@ class ResendAcceptsSpec extends WordSpecLike with Matchers with MockFactory {
       accepts.map(_.id.number).foreach {
         _ match {
           case `newEpoch` => // success
-          case x => fail(s"$x is not expected BallotNumber(100,100)")
+          case x => fail(s"$x is not expected $newEpoch")
         }
       }
       // top level guard timeout is set
@@ -97,33 +87,37 @@ class ResendAcceptsSpec extends WordSpecLike with Matchers with MockFactory {
     }
     "sets a new timeout per accept on resend new epoch" in {
       // given
-      val handler = new TestResendAcceptsHandler {
-        override def randomTimeout = 121L
-      }
+      val handler = new TestResendHandler
       val higherPromise = emptyAcceptResponses +
         (a99.id -> AcceptResponsesAndTimeout(50L, a99, Map(0 -> AcceptNack(a99.id, 0, progressWith(zeroProgress.highestPromised, BallotNumber(99, 99))))))
       // when
-      val AcceptsAndData(accepts,data) = handler.computeResendAccepts(Leader, AllStateSpec.initialData.copy(acceptResponses = higherPromise), 100L)
+      val AcceptsAndData(accepts,data) = handler.computeResendAccepts(new TestIO(new UndefinedJournal){
+        override def randomTimeout: Long = 121L
+      }, PaxosAgent[TestClient](99, Leader, initialData.copy(acceptResponses = higherPromise)), 100L)
       // then
       data.timeout shouldBe 121L
       accepts.size shouldBe 2
-      data.acceptResponses.values.map(_.timeout) shouldBe Seq(121L,121L,120L)
+      data.acceptResponses.values.map(_.timeout) shouldBe Seq(121L,121L,150L)
     }
     "journalling and sending happens in the correct order" in {
       // given a journal which records saving and accepting
-      val tempJournal = AllStateSpec.tempRecordTimesFileJournal
+      var saveJournalTime = 0L
+      var acceptJournalTime = 0L
+      val tempJournal = new UndefinedJournal {
+        override def save(progress: Progress): Unit = saveJournalTime = System.nanoTime()
+
+        override def accept(a: Accept*): Unit = acceptJournalTime = System.nanoTime()
+      }
       // and a handler that records broadcase time
       var sendTime = 0L
-      val handler = new TestResendAcceptsHandler {
-        override def randomTimeout = 121L
-        override def journal: Journal = tempJournal
-        override def broadcast(msg: Any): Unit = sendTime = System.nanoTime()
-      }
+      val handler = new TestResendHandler
       // when we get it to do work
-      handler.handleResendAccepts(Leader, AllStateSpec.initialData.copy(acceptResponses = emptyAcceptResponses), 100L)
-      val journalledWork = tempJournal.actionsWithTimestamp.toMap
-      val saveJournalTime = journalledWork.getOrElse("save",fail).time
-      val acceptJournalTime = journalledWork.getOrElse("accept",fail).time
+
+      handler.handleResendAccepts(new TestIO(tempJournal){
+        override def randomTimeout: Long = 121L
+
+        override def send(msg: PaxosMessage): Unit = sendTime = System.nanoTime()
+      }, PaxosAgent[TestClient](99, Leader, initialData.copy(acceptResponses = emptyAcceptResponses)), 100L)
       // then we saved, accepted and sent
       assert(saveJournalTime > 0 && acceptJournalTime > 0 && sendTime > 0)
       // in the correct order had we done a full round of paxos which is promise, accept then send last
@@ -148,14 +142,9 @@ object ResendAcceptsSpec {
     a100.id -> AcceptResponsesAndTimeout(120L, a100, Map.empty)
   )
 
-  val timedOutAt100AcceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(
-    a98.id -> AcceptResponsesAndTimeout(100L, a98, Map.empty),
-    a99.id -> AcceptResponsesAndTimeout(50L, a99, Map.empty)
-  )
 
-  val zeroProgress = Progress(BallotNumber(0,0), Identifier(0, BallotNumber(0,0), 0L))
 
-  def progressWith(promise: BallotNumber, committed: BallotNumber) = zeroProgress.copy(highestPromised = promise,
-    highestCommitted = zeroProgress.highestCommitted.copy(number = committed))
+
+
 
 }

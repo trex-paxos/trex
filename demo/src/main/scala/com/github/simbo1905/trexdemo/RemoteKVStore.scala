@@ -8,8 +8,7 @@ import org.mapdb.{DB, DBMaker}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.control.NonFatal
-import scala.util.{Try, Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 class MethodCallInvoker(target: Any) extends Actor with ActorLogging {
   override def receive: Receive = {

@@ -2,31 +2,21 @@ package com.github.simbo1905.trex.library
 
 case class Retransmission(newProgress: Progress, accepts: Seq[Accept], committed: Seq[CommandValue])
 
-trait RetransmitHandler[ClientRef] {
+trait RetransmitHandler[ClientRef] extends PaxosLenses[ClientRef] {
 
   import RetransmitHandler._
 
-  def journal: Journal
-
-  def nodeUniqueId: Int
-
-  def deliver(value: CommandValue): Any
-
-  def plog: PaxosLogging
-
-  def send(actor: ClientRef, msg: Any): Unit
-
-  def handleRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData[ClientRef]): Progress = {
+  def handleRetransmitResponse(io:PaxosIO[ClientRef], agent: PaxosAgent[ClientRef], response: RetransmitResponse): PaxosAgent[ClientRef] = {
     // pure functional computation
-    val retransmission = processRetransmitResponse(response, nodeData)
+    val retransmission = processRetransmitResponse(io, agent, response)
 
     // crash safety relies upon the following side effects happening in the correct order
-    retransmission.committed.filter(_ != NoOperationCommandValue).foreach(deliver)
+    retransmission.committed.filter(_ != NoOperationCommandValue).foreach(io.deliver)
 
-    journal.save(retransmission.newProgress)
-    journal.accept(retransmission.accepts: _*)
+    io.journal.save(retransmission.newProgress)
+    io.journal.accept(retransmission.accepts: _*)
 
-    retransmission.newProgress
+    agent.copy(data = progressLens.set(agent.data, retransmission.newProgress))
   }
 
   /**
@@ -35,9 +25,9 @@ trait RetransmitHandler[ClientRef] {
    * halt the progress of the receiving node.  
    * @return
    */
-  def processRetransmitResponse(response: RetransmitResponse, nodeData: PaxosData[ClientRef]): Retransmission = {
-    val highestCommitted = nodeData.progress.highestCommitted
-    val highestPromised = nodeData.progress.highestPromised
+  def processRetransmitResponse(io:PaxosIO[ClientRef], agent: PaxosAgent[ClientRef], response: RetransmitResponse): Retransmission = {
+    val highestCommitted = agent.data.progress.highestCommitted
+    val highestPromised = agent.data.progress.highestPromised
 
     // drop all the committed values which are not above our current highest committed log index
     // commit : note sender must ensure sequences are ordered by log index
@@ -54,29 +44,31 @@ trait RetransmitHandler[ClientRef] {
     val acceptState = acceptableAndPromiseNumber(highestPromised, uncommittable)
 
     // update our progress with new highest commit index and new promise
-    val newProgress = Progress.highestPromisedHighestCommitted.set(nodeData.progress, (acceptState.highest, commitState.highestCommitted))
+    val newProgress = Progress.highestPromisedHighestCommitted.set(agent.data.progress, (acceptState.highest, commitState.highestCommitted))
 
-    plog.info("Node " + nodeUniqueId + " RetransmitResponse committed {} of {} and accepted {} of {}", committedCount, aboveCommitted.size, acceptState.acceptable.size, response.uncommitted.size)
+    io.plog.info("Node " + agent.nodeUniqueId + " RetransmitResponse committed {} of {} and accepted {} of {}", committedCount, aboveCommitted.size, acceptState.acceptable.size, response.uncommitted.size)
 
     // return new progress, the accepts that we should journal so that we may retransmit on request, and the committed values
     Retransmission(newProgress, (aboveCommitted ++ acceptState.acceptable).distinct, commitState.committed.map(_.value))
   }
 
-  def handleRetransmitRequest(sender: ClientRef, request: RetransmitRequest, nodeData: PaxosData[ClientRef]): Unit = {
+  def handleRetransmitRequest(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef], request: RetransmitRequest): PaxosAgent[ClientRef] = {
     // extract who to respond to, where they are requesting from and where we are committed up to
     val RetransmitRequest(to, _, requestedLogIndex) = request
-    val HighestCommittedIndex(committedLogIndex) = nodeData
+    val HighestCommittedIndex(committedLogIndex) = agent.data
 
     // send the response based on what we have in our journal, access to the journal, and where they have committed
-    val responseData = processRetransmitRequest(journal.bounds, committedLogIndex, journal.accepted _, requestedLogIndex) map {
+    val responseData = processRetransmitRequest(io.journal.bounds, committedLogIndex, io.journal.accepted _, requestedLogIndex) map {
       case ResponseState(committed, uncommitted) =>
-        RetransmitResponse(nodeUniqueId, to, committed, uncommitted)
+        RetransmitResponse(agent.nodeUniqueId, to, committed, uncommitted)
     }
 
     responseData foreach { r =>
-      plog.info(s"Node $nodeUniqueId retransmission response to node {} for logIndex {} with {} committed and {} proposed entries", r.from, request.logIndex, r.committed.size, r.uncommitted.size)
-      send(sender, r)
+      io.plog.info(s"Node ${agent.nodeUniqueId} retransmission response to node {} for logIndex {} with {} committed and {} proposed entries", r.from, request.logIndex, r.committed.size, r.uncommitted.size)
+      io.send(r)
     }
+
+    agent
   }
 }
 

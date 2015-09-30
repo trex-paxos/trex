@@ -1,20 +1,8 @@
-package com.github.simbo1905.trex.internals
+package com.github.simbo1905.trex.library
 
-import akka.actor.ActorRef
-import com.github.simbo1905.trex.library._
-import org.scalatest.{OptionValues, Matchers, WordSpecLike}
+import org.scalatest.{Matchers, OptionValues, WordSpecLike}
 
-class TestableCommitHandler extends CommitHandler[ActorRef] with OptionValues {
-  override def plog = NoopPaxosLogging
-
-  override def nodeUniqueId: Int = 0
-
-  override def trace(state: PaxosRole, data: PaxosData[ActorRef], payload: CommandValue): Unit = {}
-
-  override def deliver(value: CommandValue): Any = {}
-
-  override def journal: Journal = ???
-}
+class TestableCommitHandler extends CommitHandler[TestClient] with OptionValues
 
 object CommitHandlerSpec {
   val v1 = ClientRequestCommandValue(0, Array[Byte](0))
@@ -45,8 +33,8 @@ object CommitHandlerSpec {
 }
 
 class CommitHandlerSpec extends WordSpecLike with Matchers with OptionValues {
-  import RetransmitSpec._
   import CommitHandlerSpec._
+  import TestHelpers._
   "CommitHandler" should {
     "do nothing if have committed up to the specified log index" in {
       CommitHandler.committableValues(accepts98thru100.lastOption.value.id.number,
@@ -72,15 +60,14 @@ class CommitHandlerSpec extends WordSpecLike with Matchers with OptionValues {
         override def save(progress: Progress): Unit = ()
         override def accepted(logIndex: Long): Option[Accept] = journaled11thru14(logIndex)
       }
-      val handler = new TestableCommitHandler {
-        override def journal: Journal = stubJournal
-        override def deliver(value: CommandValue): Any = value.bytes
-      }
+      val handler = new TestableCommitHandler
       // and we promised to a12 and have only committed up to a11
       val oldProgress = Progress(a12.id.number, a11.id)
       // when we commit to a14
-      val (newProgress, results) = handler.commit(Follower,
-        AllStateSpec.initialData.copy(progress = oldProgress),
+      val (newProgress, results) = handler.commit(new TestIO(stubJournal){
+        override def deliver(value: CommandValue): Any = value.bytes
+      }, Follower,
+        initialData.copy(progress = oldProgress),
         accepts11thru14.lastOption.value.id,
         oldProgress)
       // then we will have committed

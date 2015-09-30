@@ -1,6 +1,4 @@
-package com.github.simbo1905.trex.internals
-
-import com.github.simbo1905.trex.library.PaxosLogging
+package com.github.simbo1905.trex.library
 
 object NoopPaxosLogging extends PaxosLogging {
   override def info(msg: String): Unit = {}

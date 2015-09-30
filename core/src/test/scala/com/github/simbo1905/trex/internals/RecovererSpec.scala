@@ -1,7 +1,7 @@
 package com.github.simbo1905.trex.internals
 
 import akka.actor.{ActorRef, ActorSystem}
-import akka.testkit.{DefaultTimeout, ImplicitSender, TestFSMRef, TestKit}
+import akka.testkit.{DefaultTimeout, ImplicitSender, TestActorRef, TestKit}
 import com.github.simbo1905.trex.library._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfter, Matchers, OptionValues, WordSpecLike}
@@ -15,7 +15,7 @@ import scala.language.postfixOps
 class RecovererSpec
   extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.config))
   with DefaultTimeout with WordSpecLike with Matchers with MockFactory with ImplicitSender
-  with BeforeAndAfter with AllStateSpec with LeaderLikeSpec with NotLeaderSpec with OptionValues {
+  with BeforeAndAfter with AllStateSpec with LeaderLikeSpec with NotLeaderSpec with OptionValues with PaxosLenses[ActorRef] {
 
   import AllStateSpec._
   import Ordering._
@@ -26,12 +26,6 @@ class RecovererSpec
   val otherHigherPrepare = Prepare(Identifier(2, BallotNumber(lowValue + 1, 2), 1L))
 
   "Recoverer" should {
-    "handles retransmission responses" in {
-      retransmitRequestInvokesHandler(Recoverer)
-    }
-    "handles retransmission request" in {
-      retransmitResponseInvokesHandler(Recoverer)
-    }
     "respond to client data by saying that you are not the leader" in {
       respondsToClientDataBySayingNotTheLeader(Recoverer)
     }
@@ -94,7 +88,7 @@ class RecovererSpec
     // it boardcasts a no-op
     expectMsg(100 millisecond, accept)
     // and becomes leader
-    assert(fsm.stateName == Leader)
+    assert(fsm.underlyingActor.role == Leader)
 
     // when a majority accept response with an ack from node1
     fsm ! AcceptAck(prepareId, 1, initialData.progress)
@@ -103,11 +97,11 @@ class RecovererSpec
       case Commit(prepareId, _) => Unit
     }
     // and it has the epoch
-    assert(fsm.stateData.epoch == Some(prepareId.number))
+    assert(fsm.underlyingActor.data.epoch == Some(prepareId.number))
     // and it has cleared the recover votes
-    assert(fsm.stateData.prepareResponses.isEmpty)
+    assert(fsm.underlyingActor.data.prepareResponses.isEmpty)
     // and sets a fresh timeout
-    fsm.stateData.timeout shouldBe 1234L
+    fsm.underlyingActor.data.timeout shouldBe 1234L
     // and send happens after save
     assert(saveTime > 0L && sendTime > 0L && saveTime < sendTime)
   }
@@ -122,7 +116,7 @@ class RecovererSpec
       case a: PrepareAck => // good
     }
     // and backs down to a follower as it cannot accept client values under its own epoch it cannot journal them so cannot commit so cannot lead
-    assert(fsm.stateName == Follower)
+    assert(fsm.underlyingActor.role == Follower)
   }
 
   "promote to Leader and ack its own accept if it has not made a higher promise" in {
@@ -135,9 +129,9 @@ class RecovererSpec
     // it boardcasts a no-op
     expectMsg(100 millisecond, accept)
     // and becomes leader
-    assert(fsm.stateName == Leader)
+    assert(fsm.underlyingActor.role == Leader)
     // and has acked its own accept
-    fsm.stateData.acceptResponses match {
+    fsm.underlyingActor.data.acceptResponses match {
       case map if map.isEmpty =>
         fail
       case map =>
@@ -177,13 +171,13 @@ class RecovererSpec
       case Commit(prepareId, _) => Unit
     }
     // and becomes leader
-    assert(fsm.stateName == Leader)
+    assert(fsm.underlyingActor.role == Leader)
     // and it has the epoch
-    assert(fsm.stateData.epoch == Some(prepareId.number))
+    assert(fsm.underlyingActor.data.epoch == Some(prepareId.number))
     // and it has cleared the recover votes
-    assert(fsm.stateData.prepareResponses.isEmpty)
+    assert(fsm.underlyingActor.data.prepareResponses.isEmpty)
     // and sets a fresh timeout
-    fsm.stateData.timeout shouldBe 1234L
+    fsm.underlyingActor.data.timeout shouldBe 1234L
     // and it saves before it sends
     assert(saveTime != 0L && sendTime != 0L && saveTime < sendTime)
   }
@@ -199,7 +193,7 @@ class RecovererSpec
     // it boardcasts the payload from the promise under its higher epoch number
     expectMsg(100 millisecond, Accept(prepareId, ClientRequestCommandValue(0, expectedBytes)))
     // and becomes leader
-    assert(fsm.stateName == Leader)
+    assert(fsm.underlyingActor.role == Leader)
     // when a majority accept response with an ack from node1
     fsm ! AcceptAck(prepareId, 1, initialData.progress)
     // it commits the accept
@@ -208,14 +202,16 @@ class RecovererSpec
       case Commit(prepareId, _) => Unit
     }
     // and it has the epoch
-    assert(fsm.stateData.epoch == Some(prepareId.number))
+    assert(fsm.underlyingActor.data.epoch == Some(prepareId.number))
     // and it has cleared the recover votes
-    assert(fsm.stateData.prepareResponses.isEmpty)
+    assert(fsm.underlyingActor.data.prepareResponses.isEmpty)
     // and sets a fresh timeout
-    fsm.stateData.timeout shouldBe 1234L
+    fsm.underlyingActor.data.timeout shouldBe 1234L
   }
 
   "fix a high value promote to Leader then commits if in a five node cluster gets a majority with two acks" in {
+    saveTime = 0L
+    sendTime = 0L
     val timenow = 999L
     // given a recoverer with no responses
     val (fsm, prepareId) = recovererNoResponsesInClusterOfSize(5, timenow)
@@ -240,15 +236,15 @@ class RecovererSpec
       case Commit(prepareId, _) => Unit
     }
     // and has become leader
-    assert(fsm.stateName == Leader)
+    assert(fsm.underlyingActor.role == Leader)
     // and it has the same epoch
-    assert(fsm.stateData.epoch == Some(prepareId.number))
+    assert(fsm.underlyingActor.data.epoch == Some(prepareId.number))
     // and it has cleared the recover votes
-    assert(fsm.stateData.prepareResponses.isEmpty)
+    assert(fsm.underlyingActor.data.prepareResponses.isEmpty)
     // and it has cleared the accept votes its own accept
-    assert(fsm.stateData.acceptResponses.isEmpty)
+    assert(fsm.underlyingActor.data.acceptResponses.isEmpty)
     // and sets a fresh timeout
-    fsm.stateData.timeout shouldBe 1234L
+    fsm.underlyingActor.data.timeout shouldBe 1234L
     // and send happens after save
     assert(saveTime > 0L && sendTime > 0L && saveTime < sendTime)
 
@@ -268,6 +264,8 @@ class RecovererSpec
   }
 
   "issue new prepares if it learns from the majority that other nodes have higher accepted values" in {
+    saveTime = 0L
+    sendTime = 0L
     // given a recoverer with self vote
     val (fsm, prepareId) = recovererNoResponsesInClusterOfSize(3)
     val accept = Accept(prepareId, NoOperationCommandValue)
@@ -284,9 +282,9 @@ class RecovererSpec
     // and sends the accept for the majority response
     expectMsg(100 millisecond, Accept(prepareId, NoOperationCommandValue))
     // it says as follower
-    assert(fsm.stateName == Recoverer)
+    assert(fsm.underlyingActor.role == Recoverer)
     // and makes self promises to the new prepare
-    fsm.stateData.prepareResponses match {
+    fsm.underlyingActor.data.prepareResponses match {
       case map if map.isEmpty =>
         fail
       case map =>
@@ -296,7 +294,7 @@ class RecovererSpec
         assert(keys.contains(identifier3))
     }
     // and accepts its own values
-    fsm.stateData.acceptResponses match {
+    fsm.underlyingActor.data.acceptResponses match {
       case accepts if accepts.isEmpty =>
         fail
       case accepts =>
@@ -315,9 +313,10 @@ class RecovererSpec
     fsm ! PrepareNack(prepareId, 1, initialData.progress, 0, 0)
     fsm ! PrepareNack(prepareId, 2, initialData.progress, 0, 0)
     // it returns to follower
-    fsm.stateName should be(Follower)
+    fsm.underlyingActor.role should be(Follower)
     // with cleared state
-    fsm.stateData.prepareResponses.size should be(0)
+    fsm.underlyingActor.data.prepareResponses.size should be(0)
+    fsm.underlyingActor.data.epoch shouldBe None
     // and sends no message
     expectNoMsg(25 millisecond)
   }
@@ -329,7 +328,7 @@ class RecovererSpec
     val ack1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
     fsm ! ack1
     // when our node gets a timeout
-    fsm ! PaxosActor.CheckTimeout
+    fsm ! CheckTimeout
     // it reboardcasts the accept message
     expectMsg(100 millisecond, recoverHighPrepare)
   }
@@ -355,7 +354,7 @@ class RecovererSpec
       Seq((recoverHighPrepare.id -> Map(0 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None))))
 
     val data = initialData.copy(clusterSize = numberOfNodes, epoch = Some(recoverHighPrepare.id.number), prepareResponses = prepareSelfVotes, acceptResponses = SortedMap.empty)
-    val fsm = TestFSMRef(new TestPaxosActor(Configuration(config, numberOfNodes), 0, self, new TestAcceptMapJournal {
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, numberOfNodes), 0, self, new TestAcceptMapJournal {
       override def save(p: Progress): Unit = {
         saveTime = System.nanoTime()
         super.save(p)
@@ -372,12 +371,12 @@ class RecovererSpec
 
       override def clock() = timenow
 
-      override def send(actor: ActorRef, msg: Any): Unit = {
+      override def broadcast(msg: PaxosMessage): Unit = {
         sendTime = System.nanoTime()
-        super.send(actor, msg)
+        super.broadcast(msg)
       }
     })
-    fsm.setState(Recoverer, data)
+    fsm.underlyingActor.setAgent(Recoverer, data)
     (fsm, recoverHighPrepare.id)
   }
 }

@@ -19,7 +19,6 @@ import scala.compat.Platform
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Try
-import scala.util.control.NonFatal
 
 // TODO do we really need a custom extension can we not use SerializationExtension directly
 class Trex(system: ExtendedActorSystem) extends Extension {
@@ -190,7 +189,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
   def now() = Platform.currentTime // override for tests
 
   override def receive: Receive = {
-    case PaxosActor.CheckTimeout =>
+    case CheckTimeout =>
       val ts = now()
       val overdue = requestByTimeoutById.takeWhile { case (timeout, _) => ts > timeout }
       if (overdue.nonEmpty) {
@@ -271,7 +270,7 @@ class StaticClusterDriver(timeout: Timeout, cluster: Cluster, maxAttempts: Int) 
   import scala.concurrent.ExecutionContext.Implicits.global
 
   // TODO inject these timings from config
-  context.system.scheduler.schedule(Duration(5, MILLISECONDS), Duration(1000, MILLISECONDS), self, PaxosActor.CheckTimeout)
+  context.system.scheduler.schedule(Duration(5, MILLISECONDS), Duration(1000, MILLISECONDS), self, CheckTimeout)
 
   val selectionUrls: Map[Int, String] = (cluster.nodes.indices zip Cluster.selectionUrls(cluster).map(_._2)).toMap
 
