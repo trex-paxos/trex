@@ -22,8 +22,10 @@
           <h2 id="project_tagline">An embeddable multi-Paxos transaction log replication engine for the JVM</h2>
 
             <section id="downloads">
-              <a class="zip_download_link" href="https://github.com/simbo1905/trex/zipball/master">Download this project as a .zip file</a>
-              <a class="tar_download_link" href="https://github.com/simbo1905/trex/tarball/master">Download this project as a tar.gz file</a>
+              <a class="zip_download_link" href="https://github.com/simbo1905/trex/zipball/master">
+                Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/simbo1905/trex/tarball/master">
+                Download this project as a tar.gz file</a>
             </section>
         </header>
     </div>
@@ -34,13 +36,24 @@
 <a href="https://travis-ci.org/trex-paxos/trex"><img src="https://camo.githubusercontent.com/58cca3aaf19b4bbd6a2b9328cbd9e938f3f03a1d/68747470733a2f2f7472617669732d63692e6f72672f747265782d7061786f732f747265782e7376673f6272616e63683d6d6173746572" alt="Build Status" data-canonical-src="https://travis-ci.org/trex-paxos/trex.svg?branch=master" style="max-width:100%;"></a>
 <a href="https://www.codacy.com/app/simbo1905remixed/trex/dashboard"> <img src="https://camo.githubusercontent.com/b4ecc5a04dd7855b68c5622b47ecf7084c8290f3/68747470733a2f2f7777772e636f646163792e636f6d2f70726f6a6563742f62616467652f3733623334356435613463373461346439643435383539366536346665323132" alt="Codacy Badge" data-canonical-src="https://www.codacy.com/project/badge/73b345d5a4c74a4d9d458596e64fe212" style="max-width:100%;"></a>
 
-<p>Below is a rough sketch of an article to introduce the demo app. WARNING: This page is a work in progress and may be significantly out-of-date compared to the current sourcecode.</p>
+<p>Below is a rough sketch of an article to introduce the demo app. WARNING: 
+This page is a work in progress and may be significantly out-of-date compared to the current sourcecode.</p>
 
 
 <h3>
-<a id="trex-the-paxos-engine" class="anchor" href="#trex-the-paxos-engine" aria-hidden="true"><span class="octicon octicon-link"></span></a>TRex The Paxos Engine</h3>
+<a id="trex-the-paxos-engine" class="anchor" href="#trex-the-paxos-engine" aria-hidden="true">
+  <span class="octicon octicon-link"></span></a>TRex The Paxos Engine</h3>
 
-<p>Previous <a href="https://simbo1905.wordpress.com/2014/10/28/transaction-log-replication-with-paxos/">posts</a> described how the Paxos algorithm can be applied to binary log replication. This post introduces a Paxos state machine replication engine called TRex. TRex is implemented in Scala using Akka FSM. It can be used to reliably replicate messages, commands or method invocations to create a strongly consistent and fault tolerate cluster with automatic leader failover. The demo code for TRex shows how to wrap an object so that it is replicated across a Paxos cluster. You can fork the code over at <a href="https://github.com/simbo1905/trex">GitHub</a>.</p>
+<p>Previous <a href="https://simbo1905.wordpress.com/2014/10/28/transaction-log-replication-with-paxos/">posts</a> 
+described how the Paxos algorithm can be applied to binary log replication. This post introduces an embeddable Paxos state 
+machine replication engine called TRex. At the heart of TRex is a 
+library that has no 3rd party dependencies, other than Scala, which implements the Paxos algorithm as defined by 
+the paper <a href="http://research.microsoft.com/en-us/um/people/lamport/pubs/paxos-simple.pdf">Paxos Made Simple</a>. 
+The library is used by an embeddable consensus server which provides UDP messaging and a durable message store.
+The embeddable server comes with a client driver which is cluster aware. The combined solution can be used to build a 
+strongly consistent and fault tolerate service by reliably replicate messages, commands or method invocations 
+across a cluster of nodes with automatic failover. The demo code for TRex shows how to wrap a simple application 
+object so that it is replicated across a cluster of nodes. You can fork the code over at <a href="https://github.com/simbo1905/trex">GitHub</a>.</p>
 
 <p>This post will provide a walk-through of the demo application. A detailed description of how multi-Paxos is implemented in TRex is given in a previous post. TRex also comes with extensive unit tests that are an executable specification of its implementation of the multi-Paxos consensus algorithm. </p>
 
