@@ -15,11 +15,11 @@ import scala.collection.immutable.SortedMap
  * @param acceptResponses Tracking of responses to accept messages when Recoverer or Leader. Each key is an identifier of the command we want to commit. Each value is a map of the ack/nacks of each cluster node with a timeout.
  * @param clientCommands The client work outstanding with the leader. The map key is the accept identifier and the value is a tuple of the client command and the client ref.
  */
-case class PaxosData[+ClientRef](progress: Progress,
+case class PaxosData[+RemoteRef](progress: Progress,
                      leaderHeartbeat: Long,
                      timeout: Long,
                      clusterSize: Int,
                      prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]] = SortedMap.empty[Identifier, Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering),
                      epoch: Option[BallotNumber] = None,
                      acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering),
-                     clientCommands: Map[Identifier, (CommandValue, ClientRef)] = Map.empty)
+                     clientCommands: Map[Identifier, (CommandValue, RemoteRef)] = Map.empty)

@@ -4,7 +4,7 @@ import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 
-class CoreSpec extends WordSpecLike with Matchers with PaxosLenses[TestClient] {
+class CoreTests extends WordSpecLike with Matchers with PaxosLenses[DummyRemoteRef] {
   "Paxos Numbers" should {
     "have working equalities" in {
       assert(BallotNumber(2, 2) > BallotNumber(1, 2))
@@ -36,7 +36,7 @@ class CoreSpec extends WordSpecLike with Matchers with PaxosLenses[TestClient] {
 
     import Ordering._
 
-    val nodeData = PaxosData(progress, 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, TestClient)])
+    val nodeData = PaxosData(progress, 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, DummyRemoteRef)])
     val id = Identifier(0, BallotNumber(1, 2), 3L)
 
     "set prepare responses" in {
@@ -66,7 +66,7 @@ class CoreSpec extends WordSpecLike with Matchers with PaxosLenses[TestClient] {
 
     "set client commands" in {
       {
-        val newData = clientCommandsLens.set(nodeData, Map.empty[Identifier, (CommandValue, TestClient)])
+        val newData = clientCommandsLens.set(nodeData, Map.empty[Identifier, (CommandValue, DummyRemoteRef)])
         assert(newData == nodeData)
       }
       {
@@ -75,10 +75,10 @@ class CoreSpec extends WordSpecLike with Matchers with PaxosLenses[TestClient] {
 
           override def bytes: Array[Byte] = Array()
         }
-        val clientRef = new TestClient
-        val clientCommands = Map(id ->(commandValue, clientRef))
+        val remoteRef = new DummyRemoteRef
+        val clientCommands = Map(id ->(commandValue, remoteRef))
         val newData = clientCommandsLens.set(nodeData, clientCommands)
-        assert(newData.clientCommands(id) == (commandValue -> clientRef))
+        assert(newData.clientCommands(id) == (commandValue -> remoteRef))
       }
     }
 
@@ -87,7 +87,7 @@ class CoreSpec extends WordSpecLike with Matchers with PaxosLenses[TestClient] {
         val newData = leaderLens.set(nodeData, (
           SortedMap.empty[Identifier, Map[Int, PrepareResponse]],
           SortedMap.empty[Identifier, AcceptResponsesAndTimeout],
-          Map.empty[Identifier, (CommandValue, TestClient)])
+          Map.empty[Identifier, (CommandValue, DummyRemoteRef)])
         )
         assert(newData == nodeData)
       }
@@ -100,12 +100,12 @@ class CoreSpec extends WordSpecLike with Matchers with PaxosLenses[TestClient] {
 
           override def bytes: Array[Byte] = Array()
         }
-        val clientRef = new TestClient
-        val clientCommands = Map(id ->(commandValue, clientRef))
+        val remoteRef = new DummyRemoteRef
+        val clientCommands = Map(id ->(commandValue, remoteRef))
         val newData = leaderLens.set(nodeData, (prepareResponses, acceptResponses, clientCommands))
         assert(newData.prepareResponses(id) == Map.empty)
         assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, a1, Map.empty))
-        assert(newData.clientCommands(id) == (commandValue -> clientRef))
+        assert(newData.clientCommands(id) == (commandValue -> remoteRef))
       }
     }
   }
@@ -128,14 +128,14 @@ class CoreSpec extends WordSpecLike with Matchers with PaxosLenses[TestClient] {
         prepareResponses = TreeMap(id -> Map.empty),
         epoch = Some(number),
         acceptResponses = TreeMap(id -> AcceptResponsesAndTimeout(0, accept, Map.empty)),
-        clientCommands = Map(id ->(NoOperationCommandValue, new TestClient))
+        clientCommands = Map(id ->(NoOperationCommandValue, new DummyRemoteRef))
       )
-      val handler = new PaxosLenses[TestClient] with BackdownData[TestClient]
+      val handler = new PaxosLenses[DummyRemoteRef] with BackdownData[DummyRemoteRef]
       var sentNoLongerLeader = false
       val io = new TestIO(new UndefinedJournal) {
         override def randomTimeout: Long = 99L
 
-        override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, TestClient)]): Unit = sentNoLongerLeader = true
+        override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, DummyRemoteRef)]): Unit = sentNoLongerLeader = true
       }
       // when we backdown
       val followerData = handler.backdownData(io, leaderData)

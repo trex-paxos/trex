@@ -8,11 +8,11 @@ package com.github.simbo1905.trex.library
  */
 case class AcceptResponsesAndTimeout(timeout: Long, accept: Accept, responses: Map[Int, AcceptResponse])
 
-trait AcceptResponsesHandler[ClientRef] extends PaxosLenses[ClientRef] with BackdownData[ClientRef] {
+trait AcceptResponsesHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownData[RemoteRef] {
 
-  def commit(io: PaxosIO[ClientRef], state: PaxosRole, data: PaxosData[ClientRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)])
+  def commit(io: PaxosIO[RemoteRef], state: PaxosRole, data: PaxosData[RemoteRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)])
 
-  def handleAcceptResponse(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef], vote: AcceptResponse): PaxosAgent[ClientRef] = {
+  def handleAcceptResponse(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], vote: AcceptResponse): PaxosAgent[RemoteRef] = {
 
     val highestCommitted = agent.data.progress.highestCommitted.logIndex
     val highestCommittedOther = vote.progress.highestCommitted.logIndex
@@ -46,7 +46,8 @@ trait AcceptResponsesHandler[ClientRef] extends PaxosLenses[ClientRef] with Back
                   io.plog.error(s"Node ${agent.nodeUniqueId} ${agent.role} invariant violation: ${agent.role} has committable work which is not contiguous with progress implying we have not issued Prepare/Accept messages for the correct range of slots. Returning to follower.")
                   PaxosAgent(agent.nodeUniqueId, Follower, backdownData(io, agent.data))
                 case _ =>
-                  val (newProgress, results) = commit(io, agent.role, agent.data, committable.last._1, votesData.progress)
+                  val (lastId, _) = committable.lastOption.getOrElse(throw new AssertionError("unreachable code as we match on headOption above"))
+                  val (newProgress, results) = commit(io, agent.role, agent.data, lastId, votesData.progress)
 
                   io.journal.save(newProgress)
 
@@ -57,7 +58,7 @@ trait AcceptResponsesHandler[ClientRef] extends PaxosLenses[ClientRef] with Back
 
                     // FIXME do the tests check that we clear out the responses which match the work we have committed?
                     val (responds, remainders) = agent.data.clientCommands.partition {
-                      idCmdRef: (Identifier, (CommandValue, ClientRef)) =>
+                      idCmdRef: (Identifier, (CommandValue, RemoteRef)) =>
                         val (id, (_, _)) = idCmdRef
                         committedIds.contains(id)
                     }

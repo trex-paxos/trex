@@ -2,17 +2,26 @@ package com.github.simbo1905.trex.library
 
 import org.scalatest.{Matchers, OptionValues, WordSpecLike}
 
+import scala.collection.immutable.SortedMap
 import scala.collection.mutable.ArrayBuffer
+
+import Ordering._
 
 case class TimeAndMessage(message: Any, time: Long)
 
-class TestPrepareResponseHandlerNoRetransmission extends PrepareResponseHandler[TestClient] with BackdownData[TestClient] {
-  override def requestRetransmissionIfBehind(io: PaxosIO[TestClient], agent: PaxosAgent[TestClient], from: Int, highestCommitted: Identifier): Unit = {}
+class TestPrepareResponseHandlerNoRetransmission extends PrepareResponseHandler[DummyRemoteRef] with BackdownData[DummyRemoteRef] {
+  override def requestRetransmissionIfBehind(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], from: Int, highestCommitted: Identifier): Unit = {}
 }
 
-class PrepareResponseSpec extends WordSpecLike with Matchers with OptionValues {
+class PrepareResponseTests extends WordSpecLike with Matchers with OptionValues {
 
   import TestHelpers._
+
+  val emptyJournal = new UndefinedJournal {
+    override def accepted(logIndex: Long): Option[Accept] = None
+
+    override def accept(a: Accept*): Unit = {}
+  }
 
   "PrepareResponseHandler" should {
     "ignore a response that it is not awaiting" in {
@@ -32,7 +41,7 @@ class PrepareResponseSpec extends WordSpecLike with Matchers with OptionValues {
         case x => fail(x.toString)
       }
     }
-    "not boardcast messages and backs down if it gets a majority nack" in {
+    "not broadcast messages and backs down if it gets a majority nack" in {
       // given
       val broadcastValues: ArrayBuffer[TimeAndMessage] = ArrayBuffer()
       val handler = new TestPrepareResponseHandlerNoRetransmission
@@ -54,17 +63,12 @@ class PrepareResponseSpec extends WordSpecLike with Matchers with OptionValues {
       // and we sent no messages
       broadcastValues.size shouldBe 0
     }
-    "issues more prepares and self acks if other nodes show higher accepted index" in {
+    "issues another prepare and an accept if majority ack shows higher accepted index" in {
       // given
       val broadcastValues: ArrayBuffer[TimeAndMessage] = ArrayBuffer()
       val handler = new TestPrepareResponseHandlerNoRetransmission
       val otherAcceptedIndex = 2L // recoverHighPrepare.id.logIndex + 1
       val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), otherAcceptedIndex, 13, None)
-      val emptyJournal = new UndefinedJournal {
-        override def accepted(logIndex: Long): Option[Accept] = None
-
-        override def accept(a: Accept*): Unit = {}
-      }
       // when
       val PaxosAgent(_, role, data) = handler.handlePrepareResponse(new TestIO(emptyJournal) {
         override def randomTimeout: Long = 1234L
@@ -79,7 +83,7 @@ class PrepareResponseSpec extends WordSpecLike with Matchers with OptionValues {
         case Recoverer => // good
         case x => fail(x.toString)
       }
-      // and we send on prepare and one accept
+      // and we send one prepare and one accept
       broadcastValues match {
         case ArrayBuffer(TimeAndMessage(p: Prepare, _), TimeAndMessage(a: Accept, _)) =>
           p match {
@@ -101,14 +105,14 @@ class PrepareResponseSpec extends WordSpecLike with Matchers with OptionValues {
         case f => fail(f.toString)
       }
     }
-    "issues more prepares and self nacks if other nodes show higher accepted index and has given higher promise" in {
+    "issues another prepare and an accept if majority ack shows higher accepted index but self nacks if has given higher promise" in {
       // given
       val broadcastValues: ArrayBuffer[TimeAndMessage] = ArrayBuffer()
       val handler = new TestPrepareResponseHandlerNoRetransmission
       val otherAcceptedIndex = 2L // recoverHighPrepare.id.logIndex + 1
       val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), otherAcceptedIndex, 13, None)
-      // when
       val higherPromise = Progress.highestPromisedLens.set(selfAckPrepares.progress, BallotNumber(Int.MaxValue, Int.MaxValue))
+      // when
       val PaxosAgent(_, role, data) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
         override def randomTimeout: Long = 1234L
 
@@ -196,11 +200,11 @@ class PrepareResponseSpec extends WordSpecLike with Matchers with OptionValues {
       }
       assert(saved.value.time < sendTime)
       saved.value.parameter match {
-        case Seq(a: Accept) if a.id.logIndex == 1  => // good
+        case Seq(a: Accept) if a.id.logIndex == 1 => // good
         case f => fail(f.toString)
       }
     }
-    "issues an accept which it does not journal if it has not made a higher promise" in {
+    "issues an accept which it does not journal if it has made a higher promise" in {
       // given a handler
       val broadcastValues: ArrayBuffer[TimeAndMessage] = ArrayBuffer()
       val handler = new TestPrepareResponseHandlerNoRetransmission
@@ -240,6 +244,205 @@ class PrepareResponseSpec extends WordSpecLike with Matchers with OptionValues {
           }
         case f => fail(f.toString)
       }
+      // and the undefined journal would have blown up had we tried to journal that accept that was below our promise.
     }
+    "invokes request retransmission function when sees a committed slot higher than its own" in {
+      // given
+      val sentValues: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val handler = new PrepareResponseHandler[DummyRemoteRef] with BackdownData[DummyRemoteRef]
+      val otherCommittedIndex = 11L
+      val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), otherCommittedIndex)), 12L, 13, None)
+
+      // when
+      val PaxosAgent(_, role, data) = handler.handlePrepareResponse(new TestIO(emptyJournal) {
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          sentValues += msg
+        }
+      }, PaxosAgent(0, Recoverer, selfAckPrepares), vote)
+
+      // then
+      sentValues.headOption.value shouldBe (RetransmitRequest(0, 5, selfAckPrepares.progress.highestCommitted.logIndex))
+    }
+    "chooses the highest value upon a majority ack" in {
+
+      // given a hander to test
+      val handler = new TestPrepareResponseHandlerNoRetransmission
+
+      // and some recognisable accepts to choose from
+
+      val v1 = ClientRequestCommandValue(1, Array[Byte](1))
+      val v2 = ClientRequestCommandValue(2, Array[Byte](2))
+      val v3 = ClientRequestCommandValue(3, Array[Byte](3))
+
+      val id1 = Identifier(1, BallotNumber(1, 1), 1L)
+      val id2 = Identifier(2, BallotNumber(2, 2), 1L)
+      val id3 = Identifier(3, BallotNumber(3, 3), 1L)
+
+      val a1 = Accept(id1, v1)
+      val a2 = Accept(id2, v2)
+      val a3 = Accept(id3, v3)
+
+      // and our own high prepare and high progress
+
+      val recoverHighNumber = BallotNumber(Int.MaxValue, 0)
+      val recoverHighPrepare = Prepare(Identifier(0, recoverHighNumber, 1L))
+      val progress = Progress.highestPromisedLens.set(selfAckPrepares.progress, recoverHighNumber)
+
+      // and two acks one of them with the highest accept
+
+      val prepareResponses = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
+        Seq(
+          (recoverHighPrepare.id -> Map(
+            1 -> PrepareAck(recoverHighPrepare.id, 1, initialData.progress, 0, 0, Some(a1)),
+            3 -> PrepareAck(recoverHighPrepare.id, 3, initialData.progress, 0, 0, Some(a3))
+          ))
+        )
+
+      // and a vote with a different accept
+      val vote = PrepareAck(recoverHighPrepare.id, 2, initialData.progress, 0, 0, Some(a2))
+
+      // and our agent ready to choose the highest accept
+      val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = 5, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress))
+
+      // and a capturing IO
+      val buffer = ArrayBuffer[PaxosMessage]()
+      val io = new TestIO(noopJournal) {
+        override def send(msg: PaxosMessage): Unit = {
+          buffer += msg
+        }
+
+      }
+
+      // when we get the majority
+      handler.handlePrepareResponse(io, agent, vote)
+
+      // then we have chosen the highest value
+      buffer.headOption.value shouldBe Accept(recoverHighPrepare.id, v3)
+    }
+  }
+  "chooses a noop value if free to do so upon a majority ack" in {
+
+    // given a hander to test
+    val handler = new TestPrepareResponseHandlerNoRetransmission
+
+    // and our own high prepare and high progress
+
+    val recoverHighNumber = BallotNumber(Int.MaxValue, 0)
+    val recoverHighPrepare = Prepare(Identifier(0, recoverHighNumber, 1L))
+    val progress = Progress.highestPromisedLens.set(selfAckPrepares.progress, recoverHighNumber)
+
+    // and two acks none having accepted values
+
+    val prepareResponses = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
+      Seq(
+        (recoverHighPrepare.id -> Map(
+          1 -> PrepareAck(recoverHighPrepare.id, 1, initialData.progress, 0, 0, None),
+          3 -> PrepareAck(recoverHighPrepare.id, 3, initialData.progress, 0, 0, None)
+        ))
+      )
+
+    // and a third vote also without an accepted value
+    val vote = PrepareAck(recoverHighPrepare.id, 2, initialData.progress, 0, 0, None)
+
+    // and our agent ready to choose the highest accept
+    val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = 5, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress))
+
+    // and a capturing IO
+    val buffer = ArrayBuffer[PaxosMessage]()
+    val io = new TestIO(noopJournal) {
+      override def send(msg: PaxosMessage): Unit = {
+        buffer += msg
+      }
+    }
+
+    // when we get the majority
+    handler.handlePrepareResponse(io, agent, vote)
+
+    // then we have chosen the highest value
+    buffer.headOption.value shouldBe Accept(recoverHighPrepare.id, NoOperationCommandValue)
+  }
+  "backsdown if we have an even number of nodes and a split vote" in {
+    // given a handler that records when backdown has been called
+    var backdownInvoked = false
+    val handler = new TestPrepareResponseHandlerNoRetransmission {
+      override def backdownData(io: PaxosIO[DummyRemoteRef], data: PaxosData[DummyRemoteRef]): PaxosData[DummyRemoteRef] = {
+        backdownInvoked = true
+        data
+      }
+    }
+
+    // and our own high prepare and high progress
+
+    val recoverHighNumber = BallotNumber(Int.MaxValue, 0)
+    val recoverHighPrepare = Prepare(Identifier(0, recoverHighNumber, 1L))
+    val progress = Progress.highestPromisedLens.set(selfAckPrepares.progress, recoverHighNumber)
+
+    // and two acks and one nack
+
+    val prepareResponses = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
+      Seq(
+        (recoverHighPrepare.id -> Map(
+          1 -> PrepareAck(recoverHighPrepare.id, 1, initialData.progress, 0, 0, None),
+          2 -> PrepareNack(recoverHighPrepare.id, 2, initialData.progress, 0, 0),
+          3 -> PrepareAck(recoverHighPrepare.id, 3, initialData.progress, 0, 0, None)
+        ))
+      )
+
+    // and the forth vote is a nack
+    val vote = PrepareNack(recoverHighPrepare.id, 4, initialData.progress, 0, 0)
+
+    // and our agent ready to choose back down on a split vote as cluster size is 4
+    val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = 4, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress))
+
+    // and a do nothing IO
+    val io = new TestIO(noopJournal) {
+      override def plog: PaxosLogging = NoopPaxosLogging
+    }
+
+    // when we get the majority
+    val PaxosAgent(_, role, _) = handler.handlePrepareResponse(io, agent, vote)
+
+    // then
+    role shouldBe Follower
+    backdownInvoked shouldBe true
+  }
+  "records a vote if it does not have a majority response" in {
+
+    // given a handler to test
+    val handler = new TestPrepareResponseHandlerNoRetransmission
+
+    // and our own high prepare and high progress
+
+    val recoverHighNumber = BallotNumber(Int.MaxValue, 0)
+    val recoverHighPrepare = Prepare(Identifier(0, recoverHighNumber, 1L))
+    val progress = Progress.highestPromisedLens.set(selfAckPrepares.progress, recoverHighNumber)
+
+    // a self ack
+
+    val prepareResponses = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
+      Seq(
+        (recoverHighPrepare.id -> Map(
+          1 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None)
+        ))
+      )
+
+    // and then a nack so no majority and no split vote
+    val vote = PrepareNack(recoverHighPrepare.id, 2, initialData.progress, 0, 0)
+
+    // and our agent ready to choose the highest accept
+    val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = 5, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress))
+
+    // when we get the majority
+    val PaxosAgent(_, role, data) = handler.handlePrepareResponse(undefinedIO, agent, vote)
+
+    // then we have simply recorded the vote
+    role shouldBe Recoverer
+    data.prepareResponses.size shouldBe 1
+    data.prepareResponses.headOption.value shouldBe (recoverHighPrepare.id -> Map(
+      1 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None),
+      2 -> PrepareNack(recoverHighPrepare.id, 2, initialData.progress, 0, 0)
+    ))
   }
 }

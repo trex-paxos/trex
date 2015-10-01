@@ -5,12 +5,11 @@ import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 
-class TestResendHandler extends ResendHandler[TestClient] {
-  override def highestNumberProgressed(data: PaxosData[TestClient]): BallotNumber = throw new AssertionError("deliberately not implemented")
+class TestResendHandler extends ResendHandler[DummyRemoteRef] {
+  override def highestNumberProgressed(data: PaxosData[DummyRemoteRef]): BallotNumber = throw new AssertionError("deliberately not implemented")
 }
 
-class ResendAcceptsSpec extends WordSpecLike with Matchers with MockFactory {
-  //import ResendAcceptsSpec._
+class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
   import TestHelpers._
   "ResendAcceptsHandler" should {
     "find the timed-out accepts in" in {
@@ -47,7 +46,7 @@ class ResendAcceptsSpec extends WordSpecLike with Matchers with MockFactory {
       // when
       val AcceptsAndData(accepts,data) = handler.computeResendAccepts(new TestIO(new UndefinedJournal){
         override def randomTimeout: Long = 121L
-      }, PaxosAgent[TestClient](99, Leader, initialData.copy(acceptResponses = emptyAcceptResponses)), 100L)
+      }, PaxosAgent[DummyRemoteRef](99, Leader, initialData.copy(acceptResponses = emptyAcceptResponses)), 100L)
       // then
       data.timeout shouldBe 121L
       accepts.size shouldBe 2
@@ -63,7 +62,7 @@ class ResendAcceptsSpec extends WordSpecLike with Matchers with MockFactory {
       val AcceptsAndData(accepts,data) = handler.computeResendAccepts(new TestIO(new UndefinedJournal){
         override def randomTimeout: Long = 121L
       }
-        , PaxosAgent[TestClient](100, Leader, initialData.copy(acceptResponses = higherPromise)), 100L)
+        , PaxosAgent[DummyRemoteRef](100, Leader, initialData.copy(acceptResponses = higherPromise)), 100L)
       // then it move to the 1-higher epoch
       data.epoch match {
         case Some(newEpoch) => // success
@@ -93,7 +92,7 @@ class ResendAcceptsSpec extends WordSpecLike with Matchers with MockFactory {
       // when
       val AcceptsAndData(accepts,data) = handler.computeResendAccepts(new TestIO(new UndefinedJournal){
         override def randomTimeout: Long = 121L
-      }, PaxosAgent[TestClient](99, Leader, initialData.copy(acceptResponses = higherPromise)), 100L)
+      }, PaxosAgent[DummyRemoteRef](99, Leader, initialData.copy(acceptResponses = higherPromise)), 100L)
       // then
       data.timeout shouldBe 121L
       accepts.size shouldBe 2
@@ -117,7 +116,7 @@ class ResendAcceptsSpec extends WordSpecLike with Matchers with MockFactory {
         override def randomTimeout: Long = 121L
 
         override def send(msg: PaxosMessage): Unit = sendTime = System.nanoTime()
-      }, PaxosAgent[TestClient](99, Leader, initialData.copy(acceptResponses = emptyAcceptResponses)), 100L)
+      }, PaxosAgent[DummyRemoteRef](99, Leader, initialData.copy(acceptResponses = emptyAcceptResponses)), 100L)
       // then we saved, accepted and sent
       assert(saveJournalTime > 0 && acceptJournalTime > 0 && sendTime > 0)
       // in the correct order had we done a full round of paxos which is promise, accept then send last
@@ -126,7 +125,7 @@ class ResendAcceptsSpec extends WordSpecLike with Matchers with MockFactory {
   }
 }
 
-object ResendAcceptsSpec {
+object ResendAcceptsTests {
   import Ordering._
   val identifier98: Identifier = Identifier(1, BallotNumber(1, 1), 98L)
   val identifier99: Identifier = Identifier(2, BallotNumber(2, 2), 99L)

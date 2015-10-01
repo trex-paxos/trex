@@ -1,10 +1,10 @@
 package com.github.simbo1905.trex.library
 
-trait ReturnToFollowerHandler[ClientRef] extends PaxosLenses[ClientRef] with BackdownData[ClientRef] {
+trait ReturnToFollowerHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownData[RemoteRef] {
 
-  def commit(io: PaxosIO[ClientRef], state: PaxosRole, data: PaxosData[ClientRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)])
+  def commit(io: PaxosIO[RemoteRef], state: PaxosRole, data: PaxosData[RemoteRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)])
 
-  def handleReturnToFollowerOnHigherCommit(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef], c: Commit): PaxosAgent[ClientRef] = {
+  def handleReturnToFollowerOnHigherCommit(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], c: Commit): PaxosAgent[RemoteRef] = {
     io.plog.info("Node {} {} has seen a higher commit {} from node {} so will backdown to be Follower", agent.nodeUniqueId, agent.role, c, c.identifier.from)
 
     val higherSlotCommit = c.identifier.logIndex > agent.data.progress.highestCommitted.logIndex

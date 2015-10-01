@@ -176,7 +176,7 @@ class PickleTests extends WordSpecLike with Matchers {
 
     }
 
-    "roundrip empty RetransmitResponse" in {
+    "roundtrip empty RetransmitResponse" in {
       val a = Accept(Identifier(1, BallotNumber(2, 3), 4L), ClientRequestCommandValue(0, bytes1))
 
       {
@@ -184,6 +184,7 @@ class PickleTests extends WordSpecLike with Matchers {
         val b = Pickle.pack(r)
         Pickle.unpack(b) match {
           case RetransmitResponse(10, 11, s1, s2) if s1.isEmpty && s2.isEmpty =>
+          case f => fail(f.toString)
         }
       }
       {
@@ -192,6 +193,7 @@ class PickleTests extends WordSpecLike with Matchers {
         Pickle.unpack(b) match {
           case RetransmitResponse(10, 11, s1, s2) if s1.size == 1 && s2.isEmpty =>
             assertAccept(s1.head, a)
+          case f => fail(f.toString)
         }
       }
       {
@@ -200,6 +202,7 @@ class PickleTests extends WordSpecLike with Matchers {
         Pickle.unpack(b) match {
           case RetransmitResponse(10, 11, s1, s2) if s1.isEmpty && s2.size == 1 =>
             assertAccept(s2.head, a)
+          case f => fail(f.toString)
         }
       }
     }

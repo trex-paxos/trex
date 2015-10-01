@@ -4,20 +4,20 @@ import com.github.simbo1905.trex.library.Ordering._
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 
-trait FollowerTimeoutHandler[ClientRef] extends PaxosLenses[ClientRef] with BackdownData[ClientRef] {
-  def highestAcceptedIndex(io: PaxosIO[ClientRef]): Long = io.journal.bounds.max
+trait FollowerTimeoutHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownData[RemoteRef] {
+  def highestAcceptedIndex(io: PaxosIO[RemoteRef]): Long = io.journal.bounds.max
 
-  def computeFailover(log: PaxosLogging, nodeUniqueId: Int, data: PaxosData[ClientRef], votes: Map[Int, PrepareResponse]): FailoverResult = FollowerTimeoutHandler.computeFailover(log, nodeUniqueId, data, votes)
+  def computeFailover(log: PaxosLogging, nodeUniqueId: Int, data: PaxosData[RemoteRef], votes: Map[Int, PrepareResponse]): FailoverResult = FollowerTimeoutHandler.computeFailover(log, nodeUniqueId, data, votes)
 
   def recoverPrepares(nodeUniqueId: Int, highest: BallotNumber, highestCommittedIndex: Long, highestAcceptedIndex: Long) = FollowerTimeoutHandler.recoverPrepares(nodeUniqueId, highest, highestCommittedIndex, highestAcceptedIndex)
 
-  def handleResendLowPrepares(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef]): PaxosAgent[ClientRef] = {
+  def handleResendLowPrepares(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef]): PaxosAgent[RemoteRef] = {
     io.plog.debug("Node {} {} timed-out having already issued a low. rebroadcasting", agent.nodeUniqueId, agent.role)
     io.send(io.minPrepare)
     agent.copy(data = timeoutLens.set(agent.data, io.randomTimeout))
   }
 
-  def handleFollowerTimeout(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef]): PaxosAgent[ClientRef] = {
+  def handleFollowerTimeout(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef]): PaxosAgent[RemoteRef] = {
     io.plog.info("Node {} {} timed-out progress: {}", agent.nodeUniqueId, agent.role, agent.data.progress)
     // nack our own prepare
     val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
@@ -26,7 +26,7 @@ trait FollowerTimeoutHandler[ClientRef] extends PaxosLenses[ClientRef] with Back
     PaxosAgent(agent.nodeUniqueId, Follower, timeoutPrepareResponsesLens.set(agent.data, (io.randomTimeout, prepareSelfVotes)))
   }
 
-  def handleLowPrepareResponse(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef], vote: PrepareResponse): PaxosAgent[ClientRef] = {
+  def handleLowPrepareResponse(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], vote: PrepareResponse): PaxosAgent[RemoteRef] = {
     val selfHighestSlot = agent.data.progress.highestCommitted.logIndex
     val otherHighestSlot = vote.progress.highestCommitted.logIndex
     if (otherHighestSlot > selfHighestSlot) {
@@ -110,7 +110,7 @@ object FollowerTimeoutHandler {
     if (prepares.nonEmpty) prepares else Seq(Prepare(Identifier(nodeUniqueId, higherNumber, highestCommittedIndex + 1)))
   }
 
-  def computeFailover[ClientRef](log: PaxosLogging, nodeUniqueId: Int, data: PaxosData[ClientRef], votes: Map[Int, PrepareResponse]): FailoverResult = {
+  def computeFailover[RemoteRef](log: PaxosLogging, nodeUniqueId: Int, data: PaxosData[RemoteRef], votes: Map[Int, PrepareResponse]): FailoverResult = {
 
     val largerHeartbeats: Iterable[Long] = votes.values flatMap {
       case PrepareNack(_, _, _, _, evidenceHeartbeat) if evidenceHeartbeat > data.leaderHeartbeat =>

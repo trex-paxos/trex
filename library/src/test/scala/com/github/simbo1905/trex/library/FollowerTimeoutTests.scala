@@ -5,7 +5,7 @@ import org.scalatest.{Matchers, OptionValues, WordSpecLike}
 import scala.collection.immutable.TreeMap
 import TestHelpers._
 
-object TestFollowerTimeoutHandler extends PaxosLenses[TestClient] {
+object TestFollowerTimeoutHandler extends PaxosLenses[DummyRemoteRef] {
 
   import Ordering._
 
@@ -16,11 +16,11 @@ object TestFollowerTimeoutHandler extends PaxosLenses[TestClient] {
   val initialDataWithTimeoutAndPrepareResponses = timeoutPrepareResponsesLens.set(initialData, (99L, TreeMap(minPrepare.id -> Map(0 -> selfNack))))
 }
 
-class TestFollowerTimeoutHandler extends FollowerTimeoutHandler[TestClient] with BackdownData[TestClient] {
-  override def highestAcceptedIndex(io: PaxosIO[TestClient]): Long = 0L
+class TestFollowerTimeoutHandler extends FollowerTimeoutHandler[DummyRemoteRef] with BackdownData[DummyRemoteRef] {
+  override def highestAcceptedIndex(io: PaxosIO[DummyRemoteRef]): Long = 0L
 }
 
-class FollowerTimeoutSpec extends WordSpecLike with Matchers with OptionValues {
+class FollowerTimeoutTests extends WordSpecLike with Matchers with OptionValues {
 
   import TestFollowerTimeoutHandler._
 
@@ -29,14 +29,14 @@ class FollowerTimeoutSpec extends WordSpecLike with Matchers with OptionValues {
       // given a handler which records what it broadcasts
       var sentMsg: Option[Any] = None
       val handler = new TestFollowerTimeoutHandler
-      val agent: PaxosAgent[TestClient] = PaxosAgent(99, Follower, initialData)
+      val agent: PaxosAgent[DummyRemoteRef] = PaxosAgent(99, Follower, initialData)
       // when timeout on minPrepare logic is invoked
       handler.handleFollowerTimeout(new TestIO(new UndefinedJournal){
         override def send(msg: PaxosMessage): Unit = sentMsg = Option(msg)
         override def randomTimeout: Long = 12345L
         override def minPrepare: Prepare = TestFollowerTimeoutHandler.minPrepare
       }, agent) match {
-        case PaxosAgent(99, Follower,data: PaxosData[TestClient]) =>
+        case PaxosAgent(99, Follower,data: PaxosData[DummyRemoteRef]) =>
           // it should set a fresh timeout
           data.timeout shouldBe 12345L
           // and have nacked its own minPrepare

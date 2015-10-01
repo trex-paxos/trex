@@ -3,7 +3,7 @@ package com.github.simbo1905.trex.library
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{OptionValues, Spec}
 
-class TestHighAcceptHandler extends HighAcceptHandler[TestClient]
+class TestHighAcceptHandler extends HighAcceptHandler[DummyRemoteRef]
 
 class HighAcceptHandlerTests extends Spec with MockFactory with OptionValues {
 

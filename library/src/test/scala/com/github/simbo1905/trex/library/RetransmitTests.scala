@@ -4,9 +4,9 @@ import com.github.simbo1905.trex.library.RetransmitHandler.{AcceptState, CommitS
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{OptionValues, Matchers, WordSpecLike}
 
-class TestRetransmitHandler extends RetransmitHandler[TestClient]
+class TestRetransmitHandler extends RetransmitHandler[DummyRemoteRef]
 
-class RetransmitSpec extends WordSpecLike
+class RetransmitTests extends WordSpecLike
 with Matchers
 with MockFactory
 with OptionValues {
@@ -92,7 +92,7 @@ with OptionValues {
       // and a retransmit handler which records what was delivered when
       var deliveredWithTs: Seq[(Long, CommandValue)] = Seq.empty
       val handler = new TestRetransmitHandler {
-        override def processRetransmitResponse(io: PaxosIO[TestClient], agent: PaxosAgent[TestClient], response: RetransmitResponse): Retransmission =
+        override def processRetransmitResponse(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], response: RetransmitResponse): Retransmission =
           Retransmission(progress, accepts98thru100, accepts98thru100.map(_.value))
 
       }
@@ -103,7 +103,7 @@ with OptionValues {
         }
 
         override def journal: Journal = stubJournal
-      }, PaxosAgent[TestClient](99, Follower, initialData), RetransmitResponse(1, 0, accepts98thru100, Seq.empty))
+      }, PaxosAgent[DummyRemoteRef](99, Follower, initialData), RetransmitResponse(1, 0, accepts98thru100, Seq.empty))
       // then we deliver before we save
       deliveredWithTs.headOption.getOrElse(fail("empty delivered list")) match {
         case (ts, _) =>
@@ -121,7 +121,7 @@ with OptionValues {
       // when
       val CommitState(highestCommitted, committed) = RetransmitHandler.contiguousCommittableCommands(identifier97, accepts98thru100)
       // then
-      assert(highestCommitted == accepts98thru100.last.id && committed.size == 3)
+      assert(highestCommitted == accepts98thru100.lastOption.value.id && committed.size == 3)
     }
 
     "not commit any values when log index of first accept isn't current log index + 1" in {
@@ -142,16 +142,16 @@ with OptionValues {
     }
 
     "accept and compute promise for messages above or equal to current promise" in {
-      val currentPromise = accepts98thru100.head.id.number
+      val currentPromise = accepts98thru100.headOption.value.id.number
       val AcceptState(highest, acceptable) = RetransmitHandler.acceptableAndPromiseNumber(currentPromise, accepts98thru100)
-      highest should be(accepts98thru100.last.id.number)
+      highest should be(accepts98thru100.lastOption.value.id.number)
       acceptable should be(accepts98thru100)
     }
 
     "not accept messages below current promise" in {
-      val currentPromise = accepts98thru100.last.id.number
+      val currentPromise = accepts98thru100.lastOption.value.id.number
       val AcceptState(highest, acceptable) = RetransmitHandler.acceptableAndPromiseNumber(currentPromise, accepts98thru100)
-      highest should be(accepts98thru100.last.id.number)
+      highest should be(accepts98thru100.lastOption.value.id.number)
       acceptable should be(Seq(accepts98thru100.last))
     }
 

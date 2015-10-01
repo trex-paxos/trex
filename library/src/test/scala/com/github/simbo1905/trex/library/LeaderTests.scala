@@ -74,12 +74,12 @@ class LeaderTests extends Spec {
     def `should deal with timed-out prepares before timed-out accepts` {
       var handleResendAcceptsInvoked = false
       var handleResendPreparesInvoked = false
-      val paxosAlgorithm = new PaxosAlgorithm[TestClient] {
-        override def handleResendAccepts(io: PaxosIO[TestClient], agent: PaxosAgent[TestClient], time: Long): PaxosAgent[TestClient] = {
+      val paxosAlgorithm = new PaxosAlgorithm[DummyRemoteRef] {
+        override def handleResendAccepts(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], time: Long): PaxosAgent[DummyRemoteRef] = {
           handleResendAcceptsInvoked = true
           agent
         }
-        override def handleResendPrepares(io: PaxosIO[TestClient], agent: PaxosAgent[TestClient], time: Long): PaxosAgent[TestClient] = {
+        override def handleResendPrepares(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], time: Long): PaxosAgent[DummyRemoteRef] = {
           handleResendPreparesInvoked = true
           agent
         }

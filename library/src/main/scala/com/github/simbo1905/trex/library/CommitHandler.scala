@@ -4,7 +4,7 @@ import scala.collection.immutable.SortedMap
 
 import Ordering._
 
-trait CommitHandler[ClientRef] extends PaxosLenses[ClientRef] {
+trait CommitHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
 
   import CommitHandler._
 
@@ -16,7 +16,7 @@ trait CommitHandler[ClientRef] extends PaxosLenses[ClientRef] {
    * @param progress The current high watermarks of this node. // FIXME this is duplicated in data?
    * @return A tuple of the new progress and a seq of the identifiers and the response to the deliver operation.
    */
-  def commit(io: PaxosIO[ClientRef], state: PaxosRole, data: PaxosData[ClientRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) = {
+  def commit(io: PaxosIO[RemoteRef], state: PaxosRole, data: PaxosData[RemoteRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) = {
     val Identifier(_, number, commitIndex) = identifier
     val Progress(_, highestCommitted) = progress
 
@@ -45,7 +45,7 @@ trait CommitHandler[ClientRef] extends PaxosLenses[ClientRef] {
     }
   }
 
-  def handleCommit(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef], c: Commit): PaxosAgent[ClientRef] = {
+  def handleCommit(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], c: Commit): PaxosAgent[RemoteRef] = {
     val heartbeat = c.heartbeat
     val oldData = agent.data
     val i = c.identifier

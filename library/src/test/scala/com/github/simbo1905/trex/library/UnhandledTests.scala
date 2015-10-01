@@ -2,7 +2,7 @@ package com.github.simbo1905.trex.library
 
 import org.scalatest.WordSpecLike
 
-class UnhandledSpec extends WordSpecLike {
+class UnhandledTests extends WordSpecLike {
 
   import TestHelpers._
 
@@ -31,14 +31,14 @@ class UnhandledSpec extends WordSpecLike {
       // given
       var loggedError: String = ""
 
-      val handler = new UnhandledHandler[TestClient] {
+      val handler = new UnhandledHandler[DummyRemoteRef] {
         override def stderr(message: String): Unit = loggedError = message
       }
 
       val unknown = "~unknown message~"
 
       //andler.handleUnhandled(99, Leader, probe.ref, AllStateSpec.initialData, unknown)
-      handler.handleUnhandled(new TestIO(new UndefinedJournal), PaxosAgent[TestClient](99, Leader, initialData), unknown)
+      handler.handleUnhandled(new TestIO(new UndefinedJournal), PaxosAgent[DummyRemoteRef](99, Leader, initialData), unknown)
 
       assert(loggedError.contains("99") && loggedError.contains("Leader") && loggedError.contains(unknown))
     }

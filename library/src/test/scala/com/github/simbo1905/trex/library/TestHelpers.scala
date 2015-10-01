@@ -4,9 +4,9 @@ import com.github.simbo1905.trex.library.Ordering._
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 
-class TestClient
+class DummyRemoteRef
 
-class UndefinedIO extends PaxosIO[TestClient] {
+class UndefinedIO extends PaxosIO[DummyRemoteRef] {
   override def journal: Journal = throw new AssertionError("deliberately not implemented")
 
   override def plog: PaxosLogging = throw new AssertionError("deliberately not implemented")
@@ -21,11 +21,11 @@ class UndefinedIO extends PaxosIO[TestClient] {
 
   override def deliver(value: CommandValue): Any = throw new AssertionError("deliberately not implemented")
 
-  override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, TestClient)]): Unit = throw new AssertionError("deliberately not implemented")
+  override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, DummyRemoteRef)]): Unit = throw new AssertionError("deliberately not implemented")
 
-  override def respond(client: TestClient, data: Any): Unit = throw new AssertionError("deliberately not implemented")
+  override def respond(client: DummyRemoteRef, data: Any): Unit = throw new AssertionError("deliberately not implemented")
 
-  override def sender: TestClient = throw new AssertionError("deliberately not implemented")
+  override def sender: DummyRemoteRef = throw new AssertionError("deliberately not implemented")
 }
 
 class UndefinedPrepareResponse extends PrepareResponse {
@@ -78,8 +78,20 @@ class UndefinedAcceptResponse extends AcceptResponse {
 
 case class TimeAndParameter(time: Long, parameter: Any)
 
-object TestHelpers extends PaxosLenses[TestClient] {
+object TestHelpers extends PaxosLenses[DummyRemoteRef] {
   val undefinedIO = new UndefinedIO
+
+  val noopJournal = new Journal {
+    override def save(progress: Progress): Unit = {}
+
+    override def bounds: JournalBounds = JournalBounds(0L, 0L)
+
+    override def load(): Progress = TestHelpers.initialData.progress
+
+    override def accepted(logIndex: Long): Option[Accept] = None
+
+    override def accept(a: Accept*): Unit = {}
+  }
 
   val negativeClockIO = new UndefinedIO {
     override def clock: Long = Long.MinValue
@@ -89,18 +101,18 @@ object TestHelpers extends PaxosLenses[TestClient] {
     override def clock: Long = Long.MaxValue
   }
 
-  val paxosAlgorithm = new PaxosAlgorithm[TestClient]
+  val paxosAlgorithm = new PaxosAlgorithm[DummyRemoteRef]
 
   val lowValue = Int.MinValue + 1
 
-  val initialData = PaxosData[TestClient](
+  val initialData = PaxosData[DummyRemoteRef](
     progress = Progress(
       highestPromised = BallotNumber(lowValue, lowValue),
       highestCommitted = Identifier(from = 0, number = BallotNumber(lowValue, lowValue), logIndex = 0)
     ),
     leaderHeartbeat = 0,
     timeout = 0,
-    clusterSize = 3, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, TestClient)])
+    clusterSize = 3, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, DummyRemoteRef)])
 
   val undefinedPrepareResponse = new UndefinedPrepareResponse
 
@@ -160,7 +172,7 @@ object TestHelpers extends PaxosLenses[TestClient] {
   val initialDataCommittedSlotOne = PaxosData(
     Progress(
       BallotNumber(lowValue, lowValue), Identifier(0, BallotNumber(lowValue, lowValue), 1)
-    ), 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, TestClient)])
+    ), 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, DummyRemoteRef)])
 
   val a101 = Accept(identifier101, v3)
 

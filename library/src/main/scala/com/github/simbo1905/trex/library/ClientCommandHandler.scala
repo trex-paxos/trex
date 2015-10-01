@@ -3,8 +3,8 @@ package com.github.simbo1905.trex.library
 import scala.collection.immutable.SortedMap
 import Ordering._
 
-trait ClientCommandHandler[ClientRef] extends PaxosLenses[ClientRef] {
-  def handleClientCommand(io: PaxosIO[ClientRef], agent: PaxosAgent[ClientRef], value: CommandValue, client: ClientRef): PaxosAgent[ClientRef] = {
+trait ClientCommandHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
+  def handleClientCommand(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], value: CommandValue, client: RemoteRef): PaxosAgent[RemoteRef] = {
     agent.data.epoch match {
       // the following 'if' check is an invariant of the algorithm we will throw and kill the actor if we have no match
       case Some(epoch) if agent.data.progress.highestPromised <= epoch =>

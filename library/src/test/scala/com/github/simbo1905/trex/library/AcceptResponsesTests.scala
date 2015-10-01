@@ -3,7 +3,7 @@ package com.github.simbo1905.trex.library
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, WordSpecLike}
 
-class AcceptResponsesSpec extends WordSpecLike with Matchers with MockFactory {
+class AcceptResponsesTests extends WordSpecLike with Matchers with MockFactory {
 
   import TestHelpers._
 
@@ -24,7 +24,7 @@ class AcceptResponsesSpec extends WordSpecLike with Matchers with MockFactory {
       var saveTime = 0L
       val vote = AcceptAck(a98.id, 1, progress97)
       val handler = new UndefinedAcceptResponsesHandler {
-        override def commit(io: PaxosIO[TestClient], state: PaxosRole, data: PaxosData[TestClient], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) =
+        override def commit(io: PaxosIO[DummyRemoteRef], state: PaxosRole, data: PaxosData[DummyRemoteRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) =
           (progress98,Seq.empty)
       }
 
@@ -43,8 +43,8 @@ class AcceptResponsesSpec extends WordSpecLike with Matchers with MockFactory {
   }
 }
 
-class UndefinedAcceptResponsesHandler extends AcceptResponsesHandler[TestClient] {
+class UndefinedAcceptResponsesHandler extends AcceptResponsesHandler[DummyRemoteRef] {
 
-  override def commit(io: PaxosIO[TestClient], state: PaxosRole, data: PaxosData[TestClient], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) = throw new AssertionError("deliberately not implemented")
+  override def commit(io: PaxosIO[DummyRemoteRef], state: PaxosRole, data: PaxosData[DummyRemoteRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) = throw new AssertionError("deliberately not implemented")
 
 }

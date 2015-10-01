@@ -2,9 +2,9 @@ package com.github.simbo1905.trex.library
 
 import org.scalatest.{Matchers, OptionValues, WordSpecLike}
 
-class TestableCommitHandler extends CommitHandler[TestClient] with OptionValues
+class TestableCommitHandler extends CommitHandler[DummyRemoteRef] with OptionValues
 
-object CommitHandlerSpec {
+object CommitHandlerTests {
   val v1 = ClientRequestCommandValue(0, Array[Byte](0))
   val v3 = ClientRequestCommandValue(2, Array[Byte](2))
 
@@ -32,8 +32,8 @@ object CommitHandlerSpec {
   
 }
 
-class CommitHandlerSpec extends WordSpecLike with Matchers with OptionValues {
-  import CommitHandlerSpec._
+class CommitHandlerTests extends WordSpecLike with Matchers with OptionValues {
+  import CommitHandlerTests._
   import TestHelpers._
   "CommitHandler" should {
     "do nothing if have committed up to the specified log index" in {

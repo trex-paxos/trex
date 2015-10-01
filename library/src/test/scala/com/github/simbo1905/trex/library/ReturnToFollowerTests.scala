@@ -4,11 +4,11 @@ import org.scalatest.{Matchers, OptionValues, WordSpecLike}
 
 import scala.language.postfixOps
 
-class TestReturnToFollowerHandler extends ReturnToFollowerHandler[TestClient] {
-  def commit(io: PaxosIO[TestClient], state: PaxosRole, data: PaxosData[TestClient], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) = (progress, Seq.empty)
+class TestReturnToFollowerHandler extends ReturnToFollowerHandler[DummyRemoteRef] {
+  def commit(io: PaxosIO[DummyRemoteRef], state: PaxosRole, data: PaxosData[DummyRemoteRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) = (progress, Seq.empty)
 }
 
-class ReturnToFollowerSpec extends WordSpecLike with Matchers with OptionValues {
+class ReturnToFollowerTests extends WordSpecLike with Matchers with OptionValues {
 
   import TestHelpers._
 
@@ -29,15 +29,15 @@ class ReturnToFollowerSpec extends WordSpecLike with Matchers with OptionValues 
 
     "send no longer leader to any clients" in {
       // given a handler that collects client commands
-      var clientCommands: Map[Identifier, (CommandValue, TestClient)] = Map.empty
+      var clientCommands: Map[Identifier, (CommandValue, DummyRemoteRef)] = Map.empty
       val handler = new TestReturnToFollowerHandler
       // and a commit message id higher than the initial data value of 0L
       val id = initialData.progress.highestCommitted.copy(logIndex = 99L, from = 2)
       // and a some client commands
-      val dataWithClient = initialData.copy(clientCommands = Map(initialData.progress.highestCommitted -> (NoOperationCommandValue, new TestClient)))
+      val dataWithClient = initialData.copy(clientCommands = Map(initialData.progress.highestCommitted -> (NoOperationCommandValue, new DummyRemoteRef)))
       // when we handle that message
       handler.handleReturnToFollowerOnHigherCommit(new TestIO(new UndefinedJournal){
-        override def sendNoLongerLeader(cc: Map[Identifier, (CommandValue, TestClient)]): Unit = clientCommands = cc
+        override def sendNoLongerLeader(cc: Map[Identifier, (CommandValue, DummyRemoteRef)]): Unit = clientCommands = cc
       }, PaxosAgent(0, Recoverer, dataWithClient), Commit(id))
       // then the client is sent a NoLongerLeaderException
       clientCommands shouldBe dataWithClient.clientCommands
