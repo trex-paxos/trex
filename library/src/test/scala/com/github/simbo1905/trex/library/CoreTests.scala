@@ -130,7 +130,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses[DummyRemoteR
         acceptResponses = TreeMap(id -> AcceptResponsesAndTimeout(0, accept, Map.empty)),
         clientCommands = Map(id ->(NoOperationCommandValue, new DummyRemoteRef))
       )
-      val handler = new PaxosLenses[DummyRemoteRef] with BackdownData[DummyRemoteRef]
+      val handler = new PaxosLenses[DummyRemoteRef] with BackdownAgent[DummyRemoteRef]
       var sentNoLongerLeader = false
       val io = new TestIO(new UndefinedJournal) {
         override def randomTimeout: Long = 99L
@@ -138,7 +138,9 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses[DummyRemoteR
         override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, DummyRemoteRef)]): Unit = sentNoLongerLeader = true
       }
       // when we backdown
-      val followerData = handler.backdownData(io, leaderData)
+      val PaxosAgent(nuid, role, followerData) = handler.backdownAgent(io, PaxosAgent(0, Leader, leaderData))
+      role shouldBe Follower
+      nuid shouldBe 0
       // then it has a new timeout and the leader data is gone
       followerData.timeout shouldBe 99L
       followerData.prepareResponses.isEmpty shouldBe true

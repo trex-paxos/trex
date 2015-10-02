@@ -16,7 +16,7 @@ object TestFollowerTimeoutHandler extends PaxosLenses[DummyRemoteRef] {
   val initialDataWithTimeoutAndPrepareResponses = timeoutPrepareResponsesLens.set(initialData, (99L, TreeMap(minPrepare.id -> Map(0 -> selfNack))))
 }
 
-class TestFollowerTimeoutHandler extends FollowerTimeoutHandler[DummyRemoteRef] with BackdownData[DummyRemoteRef] {
+class TestFollowerTimeoutHandler extends FollowerTimeoutHandler[DummyRemoteRef] with BackdownAgent[DummyRemoteRef] {
   override def highestAcceptedIndex(io: PaxosIO[DummyRemoteRef]): Long = 0L
 }
 

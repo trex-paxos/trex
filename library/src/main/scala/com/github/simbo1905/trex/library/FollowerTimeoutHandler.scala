@@ -4,7 +4,7 @@ import com.github.simbo1905.trex.library.Ordering._
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 
-trait FollowerTimeoutHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownData[RemoteRef] {
+trait FollowerTimeoutHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownAgent[RemoteRef] {
   def highestAcceptedIndex(io: PaxosIO[RemoteRef]): Long = io.journal.bounds.max
 
   def computeFailover(log: PaxosLogging, nodeUniqueId: Int, data: PaxosData[RemoteRef], votes: Map[Int, PrepareResponse]): FailoverResult = FollowerTimeoutHandler.computeFailover(log, nodeUniqueId, data, votes)
@@ -32,7 +32,7 @@ trait FollowerTimeoutHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
     if (otherHighestSlot > selfHighestSlot) {
       io.plog.debug("Node {} node {} committed slot {} requesting retransmission", agent.nodeUniqueId, vote.from, otherHighestSlot)
       io.send(RetransmitRequest(agent.nodeUniqueId, vote.from, agent.data.progress.highestCommitted.logIndex))
-      agent.copy(role = Follower, data = backdownData(io, agent.data))
+      backdownAgent(io, agent)
     } else {
       agent.data.prepareResponses.get(vote.requestId) match {
         case Some(map) =>

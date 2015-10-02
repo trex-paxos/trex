@@ -1,6 +1,6 @@
 package com.github.simbo1905.trex.library
 
-trait ReturnToFollowerHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownData[RemoteRef] {
+trait ReturnToFollowerHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownAgent[RemoteRef] {
 
   def commit(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], identifier: Identifier): (Progress, Seq[(Identifier, Any)])
 
@@ -19,8 +19,6 @@ trait ReturnToFollowerHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Bac
       agent.data.progress
     }
 
-    val data = progressLens.set(agent.data, progress)
-
-    agent.copy(data = backdownData(io, data), role = Follower)
+    backdownAgent(io, agent.copy(data = progressLens.set(agent.data, progress)))
   }
 }

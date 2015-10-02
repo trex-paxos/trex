@@ -9,7 +9,7 @@ import Ordering._
 
 case class TimeAndMessage(message: Any, time: Long)
 
-class TestPrepareResponseHandlerNoRetransmission extends PrepareResponseHandler[DummyRemoteRef] with BackdownData[DummyRemoteRef] {
+class TestPrepareResponseHandlerNoRetransmission extends PrepareResponseHandler[DummyRemoteRef] with BackdownAgent[DummyRemoteRef] {
   override def requestRetransmissionIfBehind(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], from: Int, highestCommitted: Identifier): Unit = {}
 }
 
@@ -249,7 +249,7 @@ class PrepareResponseTests extends WordSpecLike with Matchers with OptionValues 
     "invokes request retransmission function when sees a committed slot higher than its own" in {
       // given
       val sentValues: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val handler = new PrepareResponseHandler[DummyRemoteRef] with BackdownData[DummyRemoteRef]
+      val handler = new PrepareResponseHandler[DummyRemoteRef] with BackdownAgent[DummyRemoteRef]
       val otherCommittedIndex = 11L
       val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), otherCommittedIndex)), 12L, 13, None)
 
@@ -365,13 +365,7 @@ class PrepareResponseTests extends WordSpecLike with Matchers with OptionValues 
   }
   "backsdown if we have an even number of nodes and a split vote" in {
     // given a handler that records when backdown has been called
-    var backdownInvoked = false
-    val handler = new TestPrepareResponseHandlerNoRetransmission {
-      override def backdownData(io: PaxosIO[DummyRemoteRef], data: PaxosData[DummyRemoteRef]): PaxosData[DummyRemoteRef] = {
-        backdownInvoked = true
-        data
-      }
-    }
+    val handler = new TestPrepareResponseHandlerNoRetransmission
 
     // and our own high prepare and high progress
 
@@ -402,11 +396,13 @@ class PrepareResponseTests extends WordSpecLike with Matchers with OptionValues 
     }
 
     // when we get the majority
-    val PaxosAgent(_, role, _) = handler.handlePrepareResponse(io, agent, vote)
+    val PaxosAgent(_, role, newData) = handler.handlePrepareResponse(io, agent, vote)
 
     // then
     role shouldBe Follower
-    backdownInvoked shouldBe true
+    newData.epoch shouldBe None
+    newData.prepareResponses.isEmpty shouldBe true
+
   }
   "records a vote if it does not have a majority response" in {
 

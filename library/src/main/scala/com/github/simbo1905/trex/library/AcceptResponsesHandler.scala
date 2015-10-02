@@ -8,7 +8,9 @@ package com.github.simbo1905.trex.library
  */
 case class AcceptResponsesAndTimeout(timeout: Long, accept: Accept, responses: Map[Int, AcceptResponse])
 
-trait AcceptResponsesHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownData[RemoteRef] {
+trait AcceptResponsesHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownAgent[RemoteRef] {
+
+  import AcceptResponsesHandler._
 
   def commit(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], identifier: Identifier): (Progress, Seq[(Identifier, Any)])
 
@@ -18,7 +20,7 @@ trait AcceptResponsesHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
     val highestCommittedOther = vote.progress.highestCommitted.logIndex
     highestCommitted < highestCommittedOther match {
       case true =>
-        PaxosAgent(agent.nodeUniqueId, Follower, backdownData(io, agent.data))
+        backdownAgent(io, agent)
       case false =>
         agent.data.acceptResponses.get(vote.requestId) match {
           case Some(AcceptResponsesAndTimeout(_, accept, votes)) =>
@@ -31,7 +33,7 @@ trait AcceptResponsesHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
             lazy val majorityPositiveResponse = positives.size > agent.data.clusterSize / 2
             if (majorityNegativeResponse) {
               io.plog.info("Node {} {} received a majority accept nack so has lost leadership becoming a follower.", agent.nodeUniqueId, agent.role)
-              PaxosAgent(agent.nodeUniqueId, Follower, backdownData(io, agent.data))
+              backdownAgent(io, agent)
             } else if (majorityPositiveResponse) {
               // this slot is fixed record that we are not awaiting any more votes
               val updated = agent.data.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(io.randomTimeout, accept, Map.empty))
@@ -46,12 +48,13 @@ trait AcceptResponsesHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
               // attempt an in-sequence commit
               committable.headOption match {
                 case None =>
-                  PaxosAgent(agent.nodeUniqueId, agent.role, votesData) // gap in committable sequence
+                  agent.copy( data = votesData) // gap in committable sequence
                 case Some((id, _)) if id.logIndex != votesData.progress.highestCommitted.logIndex + 1 =>
                   io.plog.error(s"Node ${agent.nodeUniqueId} ${agent.role} invariant violation: ${agent.role} has committable work which is not contiguous with progress implying we have not issued Prepare/Accept messages for the correct range of slots. Returning to follower.")
-                  PaxosAgent(agent.nodeUniqueId, Follower, backdownData(io, agent.data))
+                  backdownAgent(io, agent)
                 case _ =>
-                  val (lastId, _) = committable.lastOption.getOrElse(throw new AssertionError("unreachable code as we match on headOption above"))
+                  // headOption isn't None so lastOption must be defined
+                  val (lastId, _) = committable.lastOption.getOrElse(unreachable)
                   val (newProgress, results) = commit(io, agent, lastId)
 
                   io.journal.save(newProgress)
@@ -75,9 +78,9 @@ trait AcceptResponsesHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
                         io.respond(client, bytes)
                       }
                     }
-                    PaxosAgent(agent.nodeUniqueId, agent.role, progressLens.set(votesData, newProgress).copy(clientCommands = remainders)) // TODO new lens?
+                    agent.copy( data = progressLens.set(votesData, newProgress).copy(clientCommands = remainders))
                   } else {
-                    PaxosAgent(agent.nodeUniqueId, agent.role, progressLens.set(votesData, newProgress))
+                    agent.copy( data = progressLens.set(votesData, newProgress))
                   }
               }
             } else {
@@ -85,12 +88,16 @@ trait AcceptResponsesHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
               // insufficient votes keep counting
               val updated = agent.data.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(io.randomTimeout, accept, latestVotes))
               io.plog.debug("Node {} {} insufficient votes for {} have {}", agent.nodeUniqueId, agent.role, vote.requestId, updated)
-              PaxosAgent(agent.nodeUniqueId, agent.role, acceptResponsesLens.set(agent.data, updated))
+              agent.copy(data = acceptResponsesLens.set(agent.data, updated))
             }
           case None =>
             io.plog.debug("Node {} {} ignoring response we are not awaiting: {}", agent.nodeUniqueId, agent.role, vote)
-            PaxosAgent(agent.nodeUniqueId, agent.role, agent.data)
+            agent
         }
     }
   }
+}
+
+object AcceptResponsesHandler {
+  def unreachable = throw new AssertionError("this code should be unreachable")
 }
