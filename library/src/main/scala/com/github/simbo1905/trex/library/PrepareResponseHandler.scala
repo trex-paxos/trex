@@ -111,7 +111,8 @@ object PrepareResponseHandler {
           agent.data.prepareResponses
         }
       case None =>
-        agent.data.prepareResponses // FIXME is this okay?
+        // recovery is complete so we can ignore the late response
+        agent.data.prepareResponses
     }
   }
 

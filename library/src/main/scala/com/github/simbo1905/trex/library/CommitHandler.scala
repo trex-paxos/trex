@@ -9,21 +9,20 @@ trait CommitHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
   import CommitHandler._
 
   /**
-   * Attempts to commit up to the log index specified by the slot specified. A committed value is delivered to the application using the deliver callback. Journals and returns a new progress if it is able to commit data previously accepted else returns the unchanged progress. As a leader must change its proposal number if it looses its leadership and must commit in order. This enables the method to cursor through uncommitted slots and commit them in order if they share the same proposal number as the slot being committed.
-   * @param state Current node state
-   * @param data Current node data
+   * Attempts to commit up to the log index specified by the slot specified. A committed value is delivered to the application
+   * @param io The IO.
+   * @param agent The current agent.
    * @param identifier The value to commit specified by its number and slot position.
-   * @param progress The current high watermarks of this node. // FIXME this is duplicated in data?
    * @return A tuple of the new progress and a seq of the identifiers and the response to the deliver operation.
    */
-  def commit(io: PaxosIO[RemoteRef], state: PaxosRole, data: PaxosData[RemoteRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) = {
+  def commit(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], identifier: Identifier): (Progress, Seq[(Identifier, Any)]) = {
     val Identifier(_, number, commitIndex) = identifier
-    val Progress(_, highestCommitted) = progress
+    val Progress(_, highestCommitted) = agent.data.progress
 
     val committable: Seq[Accept] = committableValues(number, highestCommitted, commitIndex, (io.journal.accepted _))
 
     if (committable.isEmpty) {
-      (progress, Seq.empty[(Identifier, Any)])
+      (agent.data.progress, Seq.empty[(Identifier, Any)])
     } else {
       val results = committable map { a =>
         val bytes = a.value match {
@@ -35,12 +34,12 @@ trait CommitHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
 
       committable.lastOption match {
         case Some(newHighestCommitted) =>
-          val newProgress = Progress.highestCommittedLens.set(progress, newHighestCommitted.id)
+          val newProgress = Progress.highestCommittedLens.set(agent.data.progress, newHighestCommitted.id)
           io.journal.save(newProgress)
           (newProgress, results)
         case x =>
           io.plog.error(s"this code should be unreachable but found $x")
-          (progress, Seq.empty[(Identifier, Any)])
+          (agent.data.progress, Seq.empty[(Identifier, Any)])
       }
     }
   }
@@ -61,7 +60,7 @@ trait CommitHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
       agent.copy(data = newData)
     } else {
       // attempt a fast-forward commit up to the named slot
-      val (newProgress, _) = commit(io, agent.role, oldData, i, newData.progress)
+      val (newProgress, _) = commit(io, agent, i)
       val newHighestCommitted = newProgress.highestCommitted.logIndex
       // if we did not commit up to the value in the commit message request retransmission of missing values
       if (newHighestCommitted < i.logIndex) {

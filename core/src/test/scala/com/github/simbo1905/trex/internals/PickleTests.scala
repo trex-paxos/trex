@@ -219,6 +219,7 @@ class PickleTests extends WordSpecLike with Matchers {
           assertAccept(s1(1), a2)
           assertAccept(s2(0), a3)
           assertAccept(s2(1), a4)
+        case f => fail(f.toString)
       }
     }
   }

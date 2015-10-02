@@ -10,7 +10,7 @@ case class AcceptResponsesAndTimeout(timeout: Long, accept: Accept, responses: M
 
 trait AcceptResponsesHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownData[RemoteRef] {
 
-  def commit(io: PaxosIO[RemoteRef], state: PaxosRole, data: PaxosData[RemoteRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)])
+  def commit(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], identifier: Identifier): (Progress, Seq[(Identifier, Any)])
 
   def handleAcceptResponse(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], vote: AcceptResponse): PaxosAgent[RemoteRef] = {
 
@@ -23,11 +23,16 @@ trait AcceptResponsesHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
         agent.data.acceptResponses.get(vote.requestId) match {
           case Some(AcceptResponsesAndTimeout(_, accept, votes)) =>
             val latestVotes = votes + (vote.from -> vote)
-            val (positives, negatives) = latestVotes.toList.partition(_._2.isInstanceOf[AcceptAck])
-            if (negatives.size > agent.data.clusterSize / 2) {
+            val (positives, negatives) = latestVotes.toList.partition {
+              case (_, v: AcceptAck) => true
+              case _ => false
+            }
+            val majorityNegativeResponse = negatives.size > agent.data.clusterSize / 2
+            lazy val majorityPositiveResponse = positives.size > agent.data.clusterSize / 2
+            if (majorityNegativeResponse) {
               io.plog.info("Node {} {} received a majority accept nack so has lost leadership becoming a follower.", agent.nodeUniqueId, agent.role)
               PaxosAgent(agent.nodeUniqueId, Follower, backdownData(io, agent.data))
-            } else if (positives.size > agent.data.clusterSize / 2) {
+            } else if (majorityPositiveResponse) {
               // this slot is fixed record that we are not awaiting any more votes
               val updated = agent.data.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(io.randomTimeout, accept, Map.empty))
 
@@ -47,7 +52,7 @@ trait AcceptResponsesHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
                   PaxosAgent(agent.nodeUniqueId, Follower, backdownData(io, agent.data))
                 case _ =>
                   val (lastId, _) = committable.lastOption.getOrElse(throw new AssertionError("unreachable code as we match on headOption above"))
-                  val (newProgress, results) = commit(io, agent.role, agent.data, lastId, votesData.progress)
+                  val (newProgress, results) = commit(io, agent, lastId)
 
                   io.journal.save(newProgress)
 
@@ -76,6 +81,7 @@ trait AcceptResponsesHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
                   }
               }
             } else {
+              // FIXME split vote in even cluster size must be handled
               // insufficient votes keep counting
               val updated = agent.data.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(io.randomTimeout, accept, latestVotes))
               io.plog.debug("Node {} {} insufficient votes for {} have {}", agent.nodeUniqueId, agent.role, vote.requestId, updated)

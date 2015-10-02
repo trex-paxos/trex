@@ -66,10 +66,10 @@ class CommitHandlerTests extends WordSpecLike with Matchers with OptionValues {
       // when we commit to a14
       val (newProgress, results) = handler.commit(new TestIO(stubJournal){
         override def deliver(value: CommandValue): Any = value.bytes
-      }, Follower,
-        initialData.copy(progress = oldProgress),
-        accepts11thru14.lastOption.value.id,
-        oldProgress)
+      }, PaxosAgent(0, Follower,
+        initialData.copy(progress = oldProgress)),
+        accepts11thru14.lastOption.value.id
+        )
       // then we will have committed
       newProgress.highestCommitted shouldBe accepts11thru14.lastOption.value.id
       results.size shouldBe 3

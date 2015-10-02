@@ -5,7 +5,7 @@ import org.scalatest.{Matchers, OptionValues, WordSpecLike}
 import scala.language.postfixOps
 
 class TestReturnToFollowerHandler extends ReturnToFollowerHandler[DummyRemoteRef] {
-  def commit(io: PaxosIO[DummyRemoteRef], state: PaxosRole, data: PaxosData[DummyRemoteRef], identifier: Identifier, progress: Progress): (Progress, Seq[(Identifier, Any)]) = (progress, Seq.empty)
+  def commit(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], identifier: Identifier): (Progress, Seq[(Identifier, Any)]) = (agent.data.progress, Seq.empty)
 }
 
 class ReturnToFollowerTests extends WordSpecLike with Matchers with OptionValues {
