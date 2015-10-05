@@ -127,7 +127,6 @@ object TrexKVStore {
   }
 }
 
-// TODO change store to AnyRef and move into core
 class TypedActorPaxosEndpoint(cluster: Cluster, config: PaxosActor.Configuration, nodeUniqueId: Int, journal: Journal, client: AnyRef) extends Actor with ActorLogging {
   val selfNode = cluster.nodeMap(nodeUniqueId)
 

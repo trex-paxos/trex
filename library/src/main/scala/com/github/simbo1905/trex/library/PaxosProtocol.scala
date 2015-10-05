@@ -76,7 +76,6 @@ object Progress {
  * Marker trait for messages
  */
 sealed trait PaxosMessage
-
 /**
  * Prepare is only sent to either establish a leader else to probe for the uncommitted values of a previous leader during the leader take-over phase. Followers must:
  *

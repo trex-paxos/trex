@@ -26,6 +26,7 @@ trait FollowerTimeoutHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
     PaxosAgent(agent.nodeUniqueId, Follower, timeoutPrepareResponsesLens.set(agent.data, (io.randomTimeout, prepareSelfVotes)))
   }
 
+  // FIXME too long
   def handleLowPrepareResponse(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], vote: PrepareResponse): PaxosAgent[RemoteRef] = {
     val selfHighestSlot = agent.data.progress.highestCommitted.logIndex
     val otherHighestSlot = vote.progress.highestCommitted.logIndex
@@ -46,7 +47,7 @@ trait FollowerTimeoutHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
               case FailoverResult(failover, _) if failover =>
                 val highestNumber = Seq(agent.data.progress.highestPromised, agent.data.progress.highestCommitted.number).max
                 val maxCommittedSlot = agent.data.progress.highestCommitted.logIndex
-                // TODO issue #13 here we should look at the max of all votes
+                // TODO issue #13 we ignore higher slots in responses here until we see accept responses we can speed up recovery by issuing more accepts
                 val maxAcceptedSlot = highestAcceptedIndex(io)
                 // create prepares for the known uncommitted slots else a refresh prepare for the next higher slot than committed
                 val prepares = recoverPrepares(agent.nodeUniqueId, highestNumber, maxCommittedSlot, maxAcceptedSlot)

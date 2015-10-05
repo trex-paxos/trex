@@ -36,6 +36,10 @@ object NoopPaxosLogging extends PaxosLogging {
   override def debug(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = {}
 
   override def error(msg: String): Unit = {}
+
+  override def warning(msg: String): Unit = {}
+
+  override def warning(msg: String, one: Any, two: Any): Unit = {}
 }
 
 class TestAcceptMapJournal extends Journal {

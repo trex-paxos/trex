@@ -4,7 +4,7 @@ import com.github.simbo1905.trex.library.Ordering._
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 
-class DummyRemoteRef
+case class DummyRemoteRef(val number: Int = 0)
 
 class UndefinedIO extends PaxosIO[DummyRemoteRef] {
   override def journal: Journal = throw new AssertionError("deliberately not implemented")
@@ -26,6 +26,11 @@ class UndefinedIO extends PaxosIO[DummyRemoteRef] {
   override def respond(client: DummyRemoteRef, data: Any): Unit = throw new AssertionError("deliberately not implemented")
 
   override def sender: DummyRemoteRef = throw new AssertionError("deliberately not implemented")
+}
+
+trait SilentLogging {
+  this: UndefinedIO =>
+  override def plog: PaxosLogging = NoopPaxosLogging
 }
 
 class UndefinedPrepareResponse extends PrepareResponse {
@@ -81,6 +86,12 @@ case class TimeAndParameter(time: Long, parameter: Any)
 object TestHelpers extends PaxosLenses[DummyRemoteRef] {
   val undefinedIO = new UndefinedIO
 
+  val undefinedSilentIO = new UndefinedIO with SilentLogging
+
+  val undefinedIOwithNoopLogging = new UndefinedIO {
+    override def plog: PaxosLogging = NoopPaxosLogging
+  }
+
   val noopJournal = new Journal {
     override def save(progress: Progress): Unit = {}
 
@@ -118,7 +129,7 @@ object TestHelpers extends PaxosLenses[DummyRemoteRef] {
 
   val undefinedAcceptResponse = new UndefinedAcceptResponse
 
-  val identifier98: Identifier = Identifier(1, BallotNumber(1, 1), 98L)
+  val identifier98: Identifier = Identifier(1, BallotNumber(2, 2), 98L)
 
   val a98 = Accept(identifier98, NoOperationCommandValue)
 
@@ -178,6 +189,8 @@ object TestHelpers extends PaxosLenses[DummyRemoteRef] {
 
   val misorderedAccepts = Seq(a98, a99, a101, a100)
 
+  val progress96 = Progress(BallotNumber(0, 0), Identifier(0, BallotNumber(0, 0), 96L))
+
   val progress97 = Progress(BallotNumber(0, 0), Identifier(0, BallotNumber(0, 0), 97L))
 
   val progress98 = Progress(BallotNumber(0, 0), Identifier(0, BallotNumber(0, 0), 98L))
@@ -202,4 +215,46 @@ object TestHelpers extends PaxosLenses[DummyRemoteRef] {
   val prepareSelfAck = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
     Seq((recoverHighPrepare.id -> Map(0 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None))))
   val selfAckPrepares = initialData.copy(clusterSize = 3, epoch = highPrepareEpoch, prepareResponses = prepareSelfAck, acceptResponses = SortedMap.empty)
+
+  val initialData97 = PaxosData[DummyRemoteRef](
+    progress = Progress(
+      highestPromised = BallotNumber(lowValue, lowValue),
+      highestCommitted = Identifier(from = 0, number = BallotNumber(lowValue, lowValue), logIndex = 97)
+    ),
+    leaderHeartbeat = 0,
+    timeout = 0,
+    clusterSize = 3, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, DummyRemoteRef)])
+
+  val initialData96 = initialData97.copy(progress = progress96)
+
+  val a98ack0 = AcceptAck(a98.id, 0, initialData97.progress)
+  val a98ack1 = AcceptAck(a98.id, 1, initialData97.progress)
+  val a98ack3 = AcceptAck(a98.id, 3, initialData97.progress)
+
+  val a98nack1 = AcceptNack(a98.id, 1, initialData97.progress)
+  val a98nack2 = AcceptNack(a98.id, 2, initialData97.progress)
+
+  val a99ack1 = AcceptAck(a99.id, 1, initialData97.progress)
+  val a99ack0 = AcceptAck(a99.id, 0, initialData97.progress)
+
+  val a98ackProgress98 = AcceptAck(a98.id, 1, progress98)
+
+  val acceptSelfAck98 = SortedMap.empty[Identifier, AcceptResponsesAndTimeout] ++
+    Seq((a98.id -> AcceptResponsesAndTimeout(Long.MaxValue, a98, Map(0 -> a98ack0))))
+
+  val acceptSplitAckAndNack = SortedMap.empty[Identifier, AcceptResponsesAndTimeout] ++
+    Seq((a98.id -> AcceptResponsesAndTimeout(Long.MaxValue, a98, Map(0 -> a98ack0, 1 -> a98nack1)))
+    )
+
+  val acceptkAndTwoNack = SortedMap.empty[Identifier, AcceptResponsesAndTimeout] ++
+    Seq((a98.id -> AcceptResponsesAndTimeout(Long.MaxValue, a98, Map(0 -> a98ack0, 1 -> a98nack1, 2 -> a98nack2)))
+    )
+
+  val acceptSelfAck98and99 = SortedMap.empty[Identifier, AcceptResponsesAndTimeout] ++
+    Seq((a98.id -> AcceptResponsesAndTimeout(Long.MaxValue, a98, Map(0 -> a98ack0))),
+      (a99.id -> AcceptResponsesAndTimeout(Long.MaxValue, a99, Map(0 -> a99ack0))))
+
+  val acceptAck98and99empty = SortedMap.empty[Identifier, AcceptResponsesAndTimeout] ++
+    Seq((a98.id -> AcceptResponsesAndTimeout(Long.MaxValue, a98, Map(0 -> a98ack0))),
+      (a99.id -> AcceptResponsesAndTimeout(Long.MaxValue, a99, Map.empty)))
 }

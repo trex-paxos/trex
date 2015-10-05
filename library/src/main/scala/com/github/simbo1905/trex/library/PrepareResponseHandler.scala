@@ -68,7 +68,7 @@ trait PrepareResponseHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
           io.plog.info("Node {} {} received {} prepare nacks returning to follower", agent.nodeUniqueId, agent.role, negatives.size)
           backdownAgent(io, agent)
         } else if (splitVote) {
-          io.plog.info("Node {} {} got a split vote out of {} total returning to follower", agent.nodeUniqueId, agent.role, votes.size)
+          io.plog.warning("Node {} {} got a split prepare vote returning to follower", agent.nodeUniqueId, agent.role)
           backdownAgent(io, agent)
         }
         else {

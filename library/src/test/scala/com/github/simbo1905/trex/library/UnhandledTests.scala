@@ -24,6 +24,10 @@ class UnhandledTests extends WordSpecLike {
     override def info(msg: String, one: Any, two: Any, three: Any): Unit = {}
 
     override def info(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = {}
+
+    override def warning(msg: String): Unit = {}
+
+    override def warning(msg: String, one: Any, two: Any): Unit = {}
   }
 
   "UnhandledHandler" should {
