@@ -22,7 +22,8 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 - [x] is retransmission of accepted values actually safe?
 - [x] overrideable send methods
 - [x] fix the fixmes
-- [ ] extract a core library with no dependencies
+- [x] extract a core functional library with no dependencies
+- [ ] retire monolithic tests and increase unit test coverage
 - [ ] nemesis (jepsen style destruction testing)
 
 0.6 - practical
