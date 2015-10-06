@@ -101,8 +101,8 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
     }
   }
 
-  object `A five node cluster` {
-    val clusterSize = 5
+  object `A four node cluster` {
+    val clusterSize = 4
 
     def `should survive the leader dying` {
 
@@ -113,7 +113,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
         }).sorted
 
         // first leader commits noop then byte=1, second leader commits no_op then byte=2
-        sizes should be (Seq(1,2,2,2,2))
+        sizes should be (Seq(1,2,2,2))
 
         delivered foreach { d =>
           if( d.size == 1) {

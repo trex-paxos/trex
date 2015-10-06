@@ -6,7 +6,7 @@ import org.scalatest.{OptionValues, Matchers, WordSpecLike}
 
 import scala.collection.mutable.ArrayBuffer
 
-class AcceptResponsesTests extends WordSpecLike with Matchers with MockFactory with OptionValues {
+class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory with OptionValues {
 
   import TestHelpers._
 
@@ -14,7 +14,7 @@ class AcceptResponsesTests extends WordSpecLike with Matchers with MockFactory w
 
     "ignores a response it is not awaiting" in {
       // given
-      val handler = new Object with AcceptResponsesHandler[DummyRemoteRef]
+      val handler = new Object with AcceptResponseHandler[DummyRemoteRef]
       val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98))
 
       // when
@@ -34,7 +34,7 @@ class AcceptResponsesTests extends WordSpecLike with Matchers with MockFactory w
 
     "ignores a repeated response it is not awaiting" in {
       // given
-      val handler = new Object with AcceptResponsesHandler[DummyRemoteRef]
+      val handler = new Object with AcceptResponseHandler[DummyRemoteRef]
       val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98))
 
       // when
@@ -54,7 +54,7 @@ class AcceptResponsesTests extends WordSpecLike with Matchers with MockFactory w
 
     "records a vote it is looking for when not got a majority ack or nack" in {
       // given
-      val handler = new Object with AcceptResponsesHandler[DummyRemoteRef]
+      val handler = new Object with AcceptResponseHandler[DummyRemoteRef]
       val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98))
       val randomTimeoutIO = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
@@ -78,7 +78,7 @@ class AcceptResponsesTests extends WordSpecLike with Matchers with MockFactory w
 
     "backdown if sees higher log index in a commit message" in {
       // given
-      val handler = new Object with AcceptResponsesHandler[DummyRemoteRef]
+      val handler = new Object with AcceptResponseHandler[DummyRemoteRef]
       val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98))
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
@@ -95,7 +95,7 @@ class AcceptResponsesTests extends WordSpecLike with Matchers with MockFactory w
 
     "backdown if sees a majority nack" in {
       // given
-      val handler = new Object with AcceptResponsesHandler[DummyRemoteRef]
+      val handler = new Object with AcceptResponseHandler[DummyRemoteRef]
       val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSplitAckAndNack))
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
@@ -112,7 +112,7 @@ class AcceptResponsesTests extends WordSpecLike with Matchers with MockFactory w
 
     "records the vote if it got a majority ack out of sequence" in {
       // given
-      val handler = new Object with AcceptResponsesHandler[DummyRemoteRef]
+      val handler = new Object with AcceptResponseHandler[DummyRemoteRef]
       val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98and99))
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
@@ -138,7 +138,7 @@ class AcceptResponsesTests extends WordSpecLike with Matchers with MockFactory w
 
     "backdown if it sees a majority ack but committable slows are not contiguous with highest committed" in {
       // given
-      val handler = new Object with AcceptResponsesHandler[DummyRemoteRef]
+      val handler = new Object with AcceptResponseHandler[DummyRemoteRef]
       val agent = PaxosAgent(0, Leader, initialData96.copy(acceptResponses = acceptSelfAck98))
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
@@ -154,7 +154,7 @@ class AcceptResponsesTests extends WordSpecLike with Matchers with MockFactory w
 
     "commit multiple contiguous slots on a majority ack" in {
       // given
-      val handler = new Object with AcceptResponsesHandler[DummyRemoteRef]
+      val handler = new Object with AcceptResponseHandler[DummyRemoteRef]
       val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptAck98and99empty))
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
       val mockJournal = stub[Journal]
@@ -194,7 +194,7 @@ class AcceptResponsesTests extends WordSpecLike with Matchers with MockFactory w
       var sendTime = 0L
       var saveTime = 0L
       val vote = AcceptAck(a98.id, 1, progress97)
-      val handler = new UndefinedAcceptResponsesHandler {
+      val handler = new UndefinedAcceptResponseHandler {
         override def commit(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], identifier: Identifier): (Progress, Seq[(Identifier, Any)]) =
           (progress98, Seq.empty)
       }
@@ -213,7 +213,7 @@ class AcceptResponsesTests extends WordSpecLike with Matchers with MockFactory w
 
     "responds to the clients who's command have been committed" in {
       // given
-      val handler = new Object with AcceptResponsesHandler[DummyRemoteRef]
+      val handler = new Object with AcceptResponseHandler[DummyRemoteRef]
       val clientCommands: Map[Identifier, (CommandValue, DummyRemoteRef)] = Map(
         (a100.id ->(NoOperationCommandValue, DummyRemoteRef(100))),
         (a98.id ->(NoOperationCommandValue, DummyRemoteRef(98))),
@@ -247,7 +247,7 @@ class AcceptResponsesTests extends WordSpecLike with Matchers with MockFactory w
 
     "deals with a split vote in even number sized cluster" in {
       // given
-      val handler = new Object with AcceptResponsesHandler[DummyRemoteRef]
+      val handler = new Object with AcceptResponseHandler[DummyRemoteRef]
       val agent = PaxosAgent(0, Leader, initialData97.copy(clusterSize = 4, acceptResponses = acceptkAndTwoNack))
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
@@ -264,7 +264,7 @@ class AcceptResponsesTests extends WordSpecLike with Matchers with MockFactory w
   }
 }
 
-class UndefinedAcceptResponsesHandler extends AcceptResponsesHandler[DummyRemoteRef] {
+class UndefinedAcceptResponseHandler extends AcceptResponseHandler[DummyRemoteRef] {
 
   override def commit(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], identifier: Identifier): (Progress, Seq[(Identifier, Any)]) = throw new AssertionError("deliberately not implemented")
 

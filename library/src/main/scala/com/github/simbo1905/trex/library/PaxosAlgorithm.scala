@@ -45,7 +45,7 @@ with RetransmitHandler[RemoteRef]
 with PromiseHandler[RemoteRef]
 with HighAcceptHandler[RemoteRef]
 with PrepareResponseHandler[RemoteRef]
-with AcceptResponsesHandler[RemoteRef]
+with AcceptResponseHandler[RemoteRef]
 with ResendHandler[RemoteRef]
 with ReturnToFollowerHandler[RemoteRef]
 with ClientCommandHandler[RemoteRef] {

@@ -3,6 +3,7 @@ package com.github.simbo1905.trex.library
 import com.github.simbo1905.trex.library.Ordering._
 
 import scala.collection.immutable.SortedMap
+import Vote._
 
 trait PrepareResponseHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownAgent[RemoteRef] {
 
@@ -15,6 +16,11 @@ trait PrepareResponseHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
       io.plog.info("Node {} Recoverer requesting retransmission to target {} with highestCommittedIndex {}", agent.nodeUniqueId, from, highestCommittedIndex)
       io.send(RetransmitRequest(agent.nodeUniqueId, from, highestCommittedIndex))
     }
+  }
+
+  val prepareVoteDiscriminator: (PrepareResponse => Boolean) = {
+    case v: PrepareAck => true
+    case _ => false
   }
 
   def handlePrepareResponse(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], vote: PrepareResponse): PaxosAgent[RemoteRef] = {
@@ -32,48 +38,42 @@ trait PrepareResponseHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
         // register the vote
         val votes = map + (vote.from -> vote)
 
-        // tally the votes
-        val (positives, negatives) = votes.partition {
-          case (_, response) => response.isInstanceOf[PrepareAck]
-        }
+        count(agent.data.clusterSize, votes.values, prepareVoteDiscriminator) match {
+          case Some(MajorityAck) =>
+            // issue new prepare messages if others have accepted higher slot indexes
+            val expandedPreparesData = expandedPrepareSlotRange(io, this, agent, votes)
+            // choose the value to set as the highest returned from a majority response else a noop
+            val accept: Accept = chooseAccept(io, agent, votes.values, id)
+            // only accept your own broadcast if we have not made a higher promise whilst awaiting responses from other nodes
+            val selfResponse: AcceptResponse = respondToSelf(io, agent, agent.data, accept)
+            // broadcast accept
+            io.plog.debug("Node {} {} sending {}", agent.nodeUniqueId, agent.role, accept)
+            io.send(accept)
+            // create a fresh vote for your new accept message
+            val expandedAccepts = agent.data.acceptResponses + (accept.id -> AcceptResponsesAndTimeout(io.randomTimeout, accept, Map(agent.nodeUniqueId -> selfResponse)))
+            // we are no longer awaiting responses to the prepare
+            val updatedPrepares = expandedPreparesData - vote.requestId
+            val newData = leaderLens.set(agent.data, (updatedPrepares, expandedAccepts, Map.empty))
+            if (updatedPrepares.isEmpty) {
+              // we have completed recovery so we now switch to stable Leader state
+              io.plog.info("Node {} {} has issued accept messages for all prepare messages to promoting to be Leader.", agent.nodeUniqueId, agent.role)
+              agent.copy(role = Leader, data = newData.copy(timeout = io.randomTimeout))
+            } else {
+              io.plog.info("Node {} {} is still recovering {} slots", agent.nodeUniqueId, agent.role, updatedPrepares.size)
+              agent.copy(data = newData)
+            }
 
-        val majorityPositiveResponse = positives.size > agent.data.clusterSize / 2
-        lazy val majorityNegativeResponse = negatives.size > agent.data.clusterSize / 2
-        lazy val splitVote = !majorityPositiveResponse && !majorityNegativeResponse && votes.size == agent.data.clusterSize
+          case Some(MajorityNack) =>
+            io.plog.info("Node {} {} received majority prepare nacks returning to follower", agent.nodeUniqueId, agent.role)
+            backdownAgent(io, agent)
 
-        if (majorityPositiveResponse) {
-          // issue new prepare messages if others have accepted higher slot indexes
-          val expandedPreparesData = expandedPrepareSlotRange(io, this, agent, votes)
-          // choose the value to set as the highest returned from a majority response else a noop
-          val accept: Accept = chooseAccept(io, agent, positives, id)
-          // only accept your own broadcast if we have not made a higher promise whilst awaiting responses from other nodes
-          val selfResponse: AcceptResponse = respondToSelf(io, agent, agent.data, accept)
-          // broadcast accept
-          io.plog.debug("Node {} {} sending {}", agent.nodeUniqueId, agent.role, accept)
-          io.send(accept)
-          // create a fresh vote for your new accept message
-          val expandedAccepts = agent.data.acceptResponses + (accept.id -> AcceptResponsesAndTimeout(io.randomTimeout, accept, Map(agent.nodeUniqueId -> selfResponse)))
-          // we are no longer awaiting responses to the prepare
-          val updatedPrepares = expandedPreparesData - vote.requestId
-          val newData = leaderLens.set(agent.data, (updatedPrepares, expandedAccepts, Map.empty))
-          if (updatedPrepares.isEmpty) {
-            // we have completed recovery so we now switch to stable Leader state
-            io.plog.info("Node {} {} has issued accept messages for all prepare messages to promoting to be Leader.", agent.nodeUniqueId, agent.role)
-            agent.copy(role = Leader, data = newData.copy(timeout = io.randomTimeout))
-          } else {
-            io.plog.info("Node {} {} is still recovering {} slots", agent.nodeUniqueId, agent.role, updatedPrepares.size)
-            agent.copy(data = newData)
-          }
-        } else if (majorityNegativeResponse) {
-          io.plog.info("Node {} {} received {} prepare nacks returning to follower", agent.nodeUniqueId, agent.role, negatives.size)
-          backdownAgent(io, agent)
-        } else if (splitVote) {
-          io.plog.warning("Node {} {} got a split prepare vote returning to follower", agent.nodeUniqueId, agent.role)
-          backdownAgent(io, agent)
-        }
-        else {
-          val updated = agent.data.prepareResponses + (vote.requestId -> votes)
-          agent.copy(data = prepareResponsesLens.set(agent.data, updated))
+          case Some(SplitVote) =>
+            io.plog.warning("Node {} {} got a split prepare vote returning to follower", agent.nodeUniqueId, agent.role)
+            backdownAgent(io, agent)
+
+          case None =>
+            val updated = agent.data.prepareResponses + (vote.requestId -> votes)
+            agent.copy(data = prepareResponsesLens.set(agent.data, updated))
         }
     }
   }
@@ -116,9 +116,9 @@ object PrepareResponseHandler {
     }
   }
 
-  def chooseAccept[RemoteRef](io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], positives: Map[Int, PrepareResponse], id: Identifier) = {
+  def chooseAccept[RemoteRef](io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], positives: Iterable[PrepareResponse], id: Identifier) = {
     val accepts = positives flatMap {
-      case (_, PrepareAck(_, _, _, _, _, optionAccept)) => optionAccept
+      case PrepareAck(_, _, _, _, _, optionAccept) => optionAccept
       case _ => None
     }
     if (accepts.isEmpty) {

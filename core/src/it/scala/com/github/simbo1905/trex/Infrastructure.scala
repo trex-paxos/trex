@@ -197,6 +197,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       children foreach {
         case (id, actor) if r.to == id =>
           actor ! r
+        case _ =>
       }
     case ClusterHarness.Halt =>
 
