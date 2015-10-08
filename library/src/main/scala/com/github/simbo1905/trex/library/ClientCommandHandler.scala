@@ -3,6 +3,7 @@ package com.github.simbo1905.trex.library
 import scala.collection.immutable.SortedMap
 import Ordering._
 
+// FIXME no test coverage in library project
 trait ClientCommandHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
   def handleClientCommand(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], value: CommandValue, client: RemoteRef): PaxosAgent[RemoteRef] = {
     agent.data.epoch match {

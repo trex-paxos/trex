@@ -69,7 +69,7 @@ trait LeaderLikeSpec {
     val commit = Commit(node3slot1Identifier)
     node2 ! commit
     // it sends no messages
-    expectNoMsg(25 millisecond)
+    expectMsg(100 millisecond, RetransmitRequest(2,0,1))
     // and returns to be follower
     assert(node2.underlyingActor.role == Follower)
     // and clears data

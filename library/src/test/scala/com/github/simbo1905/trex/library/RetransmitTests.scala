@@ -94,7 +94,6 @@ with OptionValues {
       val handler = new TestRetransmitHandler {
         override def processRetransmitResponse(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], response: RetransmitResponse): Retransmission =
           Retransmission(progress, accepts98thru100, accepts98thru100.map(_.value))
-
       }
       // when it is passed a retransmit response
       handler.handleRetransmitResponse(new TestIO(new UndefinedJournal){
@@ -155,5 +154,93 @@ with OptionValues {
       acceptable should be(Seq(accepts98thru100.last))
     }
 
+    "ignore already committed accepts" in {
+      // given
+      val committed = Seq(a98, a99)
+      val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
+      val handler = new RetransmitHandler[DummyRemoteRef] {}
+      val agent = PaxosAgent[DummyRemoteRef](99, Follower, initialData98)
+      // when
+      val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
+      // then
+      assert(retransmission.committed.headOption.value eq a99.value)
+    }
+
+    "only select commands contiguous with its last commit" in {
+      // given
+      val committed = Seq(a98, a99)
+      val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
+      val handler = new RetransmitHandler[DummyRemoteRef] {}
+      val agent = PaxosAgent[DummyRemoteRef](99, Follower, initialData96)
+      // when
+      val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
+      // then
+      retransmission.committed.isEmpty shouldBe true
+    }
+
+    "only select contiguous commits" in {
+      // given
+      require(a98.value != a100.value)
+      val committed = Seq(a98, a100)
+      val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
+      val handler = new RetransmitHandler[DummyRemoteRef] {}
+      val agent = PaxosAgent[DummyRemoteRef](99, Follower, initialData97)
+      // when
+      val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
+      // then
+      retransmission.committed.headOption.value shouldBe a98.value
+      retransmission.newProgress.highestCommitted shouldBe a98.id
+    }
+
+    "treat uncommitable values as acceptable" in {
+      // given
+      val committed = Seq(a98, a100)
+      val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
+      val handler = new RetransmitHandler[DummyRemoteRef] {}
+      val agent = PaxosAgent[DummyRemoteRef](99, Follower, initialData97)
+      // when
+      val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
+      // then
+      assert(retransmission.accepts.contains(a100))
+    }
+
+    "increases promise based on acceptable values" in {
+      // given
+      val uncommitted = Seq(a98, a100)
+      val retransmitResponse = RetransmitResponse(0, 0, Seq(), uncommitted)
+      val handler = new RetransmitHandler[DummyRemoteRef] {}
+      val agent = PaxosAgent[DummyRemoteRef](99, Follower, initialData97)
+      // when
+      val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
+      // then
+      assert(retransmission.newProgress.highestPromised != initialData97.progress.highestPromised)
+      assert(retransmission.newProgress.highestPromised == a100.id.number)
+    }
+
+    "increases promise based on committed values it cannot commit" in {
+      // given
+      val committed = Seq(a98, a100)
+      val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
+      val handler = new RetransmitHandler[DummyRemoteRef] {}
+      val agent = PaxosAgent[DummyRemoteRef](99, Follower, initialData97)
+      // when
+      val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
+      // then
+      assert(retransmission.newProgress.highestPromised != initialData97.progress.highestPromised)
+      assert(retransmission.newProgress.highestPromised == a100.id.number)
+    }
+
+    "does not accept values if it has made a higher promise" in {
+      // given
+      val uncommitted = Seq(a98, a99)
+      val retransmitResponse = RetransmitResponse(0, 0, Seq(), uncommitted)
+      val handler = new RetransmitHandler[DummyRemoteRef] {}
+      val highPromise = BallotNumber(Int.MaxValue -1 , Int.MaxValue - 1)
+      val agent = PaxosAgent[DummyRemoteRef](99, Follower, highestPromisedLens.set(initialData97, highPromise))
+      // when
+      val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
+      // then
+      retransmission.accepts.isEmpty shouldBe true
+    }
   }
 }

@@ -120,6 +120,23 @@ class LeaderTests extends Spec {
       val dataPrepareResponses = initialDataAgent.data.copy(prepareResponses = TreeMap(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0) -> Map.empty))
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent.copy(data = dataPrepareResponses), undefinedPrepareResponse)))
     }
+
+    val leader = PaxosAgent(0, Leader, initialDataAgent.data.copy(
+      epoch = Option(BallotNumber(Int.MaxValue, Int.MaxValue)),
+      acceptResponses = acceptSelfAck98,
+      clientCommands = initialDataClientCommand
+    ))
+
+
+    def `Return to follower handler should do nothing for commit not at higher slot ` = {
+      val handler = new ReturnToFollowerHandler[DummyRemoteRef] with CommitHandler[DummyRemoteRef] {}
+      val commitAtIndex = Commit(leader.data.progress.highestCommitted)
+      handler.handleReturnToFollowerOnHigherCommit(undefinedSilentIO, leader, commitAtIndex) match {
+        case `leader` => // good
+        case f => fail(f.toString)
+      }
+
+    }
   }
 
 }

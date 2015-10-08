@@ -165,17 +165,9 @@ with ClientCommandHandler[RemoteRef] {
       handleResendAccepts(io, agent, io.clock)
   }
 
-  /**
-   * If we see a commit at a higher slot we should backdown and request retransmission.
-   * If we see a commit for the same slot but with a higher number from a node with a higher node unique id we should backdown.
-   * Other commits are ignored.
-   */
   val leaderLikeFunction: PaxosFunction[RemoteRef] = {
-    case PaxosEvent(io, agent@PaxosAgent(_, _, HighestCommittedIndexAndEpoch(committedLogIndex, epoch)), c@Commit(i@Identifier(_, number, logIndex), _)) if logIndex > committedLogIndex || (logIndex == committedLogIndex && number > epoch) =>
-      handleReturnToFollowerOnHigherCommit(io, agent, c)
-
     case PaxosEvent(io, agent, c: Commit) =>
-      agent
+      handleReturnToFollowerOnHigherCommit(io, agent, c)
   }
 
   val recoveringFunction: PaxosFunction[RemoteRef] =

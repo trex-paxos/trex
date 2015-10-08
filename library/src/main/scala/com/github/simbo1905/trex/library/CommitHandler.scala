@@ -44,6 +44,7 @@ trait CommitHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
     }
   }
 
+  // FIXME no test coverage in library project
   def handleCommit(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], c: Commit): PaxosAgent[RemoteRef] = {
     val heartbeat = c.heartbeat
     val oldData = agent.data

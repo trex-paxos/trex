@@ -227,6 +227,8 @@ object TestHelpers extends PaxosLenses[DummyRemoteRef] {
 
   val initialData96 = initialData97.copy(progress = progress96)
 
+  val initialData98 = initialData97.copy(progress = progress98)
+
   val a98ack0 = AcceptAck(a98.id, 0, initialData97.progress)
   val a98ack1 = AcceptAck(a98.id, 1, initialData97.progress)
   val a98ack3 = AcceptAck(a98.id, 3, initialData97.progress)
@@ -257,4 +259,6 @@ object TestHelpers extends PaxosLenses[DummyRemoteRef] {
   val acceptAck98and99empty = SortedMap.empty[Identifier, AcceptResponsesAndTimeout] ++
     Seq((a98.id -> AcceptResponsesAndTimeout(Long.MaxValue, a98, Map(0 -> a98ack0))),
       (a99.id -> AcceptResponsesAndTimeout(Long.MaxValue, a99, Map.empty)))
+
+  val initialDataClientCommand = Map(initialData.progress.highestCommitted -> (NoOperationCommandValue, new DummyRemoteRef))
 }

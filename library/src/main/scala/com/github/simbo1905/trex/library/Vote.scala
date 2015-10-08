@@ -10,8 +10,8 @@ object Vote {
 
   case object SplitVote extends Outcome
 
-  def count[ResponseType](clusterSize: Int, votes: Iterable[ResponseType], descriminator: (ResponseType) => Boolean): Option[Outcome] = {
-    votes.toList.partition(descriminator) match {
+  def count[ResponseType](clusterSize: Int, votes: Iterable[ResponseType], discriminator: (ResponseType) => Boolean): Option[Outcome] = {
+    votes.toList.partition(discriminator) match {
       case (positives, negatives) if positives.size > clusterSize / 2 =>
         Option(MajorityAck)
       case (positives, negatives) if negatives.size > clusterSize / 2 =>

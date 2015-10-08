@@ -34,7 +34,8 @@ class ReturnToFollowerTests extends WordSpecLike with Matchers with OptionValues
       // and a commit message id higher than the initial data value of 0L
       val id = initialData.progress.highestCommitted.copy(logIndex = 99L, from = 2)
       // and a some client commands
-      val dataWithClient = initialData.copy(clientCommands = Map(initialData.progress.highestCommitted -> (NoOperationCommandValue, new DummyRemoteRef)))
+      val dataWithClient = initialData.copy(
+        clientCommands = initialDataClientCommand)
       // when we handle that message
       handler.handleReturnToFollowerOnHigherCommit(new TestIO(new UndefinedJournal){
         override def sendNoLongerLeader(cc: Map[Identifier, (CommandValue, DummyRemoteRef)]): Unit = clientCommands = cc

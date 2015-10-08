@@ -113,7 +113,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses[DummyRemoteR
   val accept = Accept(Identifier(1, BallotNumber(1, 1), 98L), NoOperationCommandValue)
 
   "Backing down" should {
-    "should reset Paxos data" in {
+    "should reset data" in {
       import Ordering._
       // given lots of leadership data
       val number = BallotNumber(Int.MinValue, Int.MinValue)

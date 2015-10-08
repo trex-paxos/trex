@@ -4,7 +4,8 @@ case class JournalBounds(min: Long, max: Long)
 
 object Journal {
   // timed-out nodes issue the Int.MinValue prepare so we must be one higher at startup
-  val minBookwork = Progress(BallotNumber(Int.MinValue+1, Int.MinValue+1), Identifier(0, BallotNumber(Int.MinValue+1, Int.MinValue+1),0))
+  val minNumber = BallotNumber(Int.MinValue+1, Int.MinValue+1)
+  val minBookwork = Progress(minNumber, Identifier(0, minNumber,0))
 }
 
 /** 
