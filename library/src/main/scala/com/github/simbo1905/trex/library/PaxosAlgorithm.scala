@@ -55,7 +55,7 @@ with ClientCommandHandler[RemoteRef] {
   val followingFunction: PaxosFunction[RemoteRef] = {
     // update heartbeat and attempt to commit contiguous accept messages
     case PaxosEvent(io, agent@PaxosAgent(_, Follower, _), c@Commit(i, heartbeat)) =>
-      handleCommit(io, agent, c)
+      handleFollowerCommit(io, agent, c)
     // upon timeout having not issued low prepares start the leader takeover protocol by issuing a min prepare
     case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, prepareResponses, _, _, _)), CheckTimeout) if io.clock >= to && prepareResponses.isEmpty =>
       handleFollowerTimeout(io, agent)

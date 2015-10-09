@@ -1,8 +1,7 @@
 package com.github.simbo1905.trex.library
 
-import org.scalamock.proxy.ProxyMockFactory
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{OptionValues, Matchers, WordSpecLike}
+import org.scalatest.{Matchers, OptionValues, WordSpecLike}
 
 import scala.collection.mutable.ArrayBuffer
 

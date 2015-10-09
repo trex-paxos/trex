@@ -21,40 +21,36 @@ trait CommitHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
 
     val committable: Seq[Accept] = committableValues(number, highestCommitted, commitIndex, (io.journal.accepted _))
 
-    if (committable.isEmpty) {
-      (agent.data.progress, Seq.empty[(Identifier, Any)])
-    } else {
-      val results = committable map { a =>
-        val bytes = a.value match {
-          case noop@NoOperationCommandValue => noop.bytes
-          case _ => io.deliver(a.value)
+    committable.lastOption match {
+      case Some(newHighestCommitted) =>
+        val results = committable map { a =>
+          val bytes = a.value match {
+            case noop@NoOperationCommandValue => noop.bytes
+            case _ => io.deliver(a.value)
+          }
+          (a.id, bytes)
         }
-        (a.id, bytes)
-      }
-
-      committable.lastOption match {
-        case Some(newHighestCommitted) =>
-          val newProgress = Progress.highestCommittedLens.set(agent.data.progress, newHighestCommitted.id)
-          io.journal.save(newProgress)
-          (newProgress, results)
-        case x =>
-          io.plog.error(s"this code should be unreachable but found $x")
-          (agent.data.progress, Seq.empty[(Identifier, Any)])
-      }
+        val newProgress = Progress.highestCommittedLens.set(agent.data.progress, newHighestCommitted.id)
+        io.journal.save(newProgress)
+        (newProgress, results)
+      case x =>
+        (agent.data.progress, Seq.empty[(Identifier, Any)])
     }
+
   }
 
-  // FIXME no test coverage in library project
-  def handleCommit(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], c: Commit): PaxosAgent[RemoteRef] = {
+  def handleFollowerCommit(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], c: Commit): PaxosAgent[RemoteRef] = {
     val heartbeat = c.heartbeat
     val oldData = agent.data
     val i = c.identifier
     // if the leadership has changed or we see a new heartbeat from the same leader cancel any timeout work
     val newData = heartbeat match {
-      case heartbeat if heartbeat > oldData.leaderHeartbeat || i.number > oldData.progress.highestPromised =>
-        oldData.copy(leaderHeartbeat = heartbeat, prepareResponses = SortedMap.empty[Identifier, Map[Int, PrepareResponse]], timeout = io.randomTimeout) // TODO lens
+      case heartbeat if heartbeat > oldData.leaderHeartbeat || i.number > oldData.progress.highestCommitted.number =>
+        oldData.copy(leaderHeartbeat = heartbeat,
+          prepareResponses = SortedMap.empty[Identifier, Map[Int, PrepareResponse]],
+          timeout = io.randomTimeout)
       case _ =>
-       oldData
+        oldData
     }
     if (i.logIndex <= oldData.progress.highestCommitted.logIndex) {
       // no new commit information in this message
