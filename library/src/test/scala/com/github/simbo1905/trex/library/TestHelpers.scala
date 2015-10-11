@@ -206,6 +206,7 @@ object TestHelpers extends PaxosLenses[DummyRemoteRef] {
   )
 
   val recoverHighPrepare = Prepare(Identifier(0, BallotNumber(lowValue + 1, 0), 1L))
+  val recoverHighPrepare2 = Prepare(Identifier(0, BallotNumber(lowValue + 1, 0), 2L))
 
   val highPrepareEpoch = Some(recoverHighPrepare.id.number)
   val prepareSelfNack = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
@@ -215,6 +216,14 @@ object TestHelpers extends PaxosLenses[DummyRemoteRef] {
   val prepareSelfAck = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
     Seq((recoverHighPrepare.id -> Map(0 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None))))
   val selfAckPrepares = initialData.copy(clusterSize = 3, epoch = highPrepareEpoch, prepareResponses = prepareSelfAck, acceptResponses = SortedMap.empty)
+
+  val prepareSelfAck2 = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
+    Seq(
+      (recoverHighPrepare.id -> Map(0 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None))),
+      (recoverHighPrepare2.id -> Map(0 -> PrepareAck(recoverHighPrepare2.id, 0, initialData.progress, 0, 0, None)))
+    )
+  val selfAckPrepares2 = initialData.copy(clusterSize = 5, epoch = highPrepareEpoch, prepareResponses = prepareSelfAck2, acceptResponses = SortedMap.empty)
+
 
   val initialData97 = PaxosData[DummyRemoteRef](
     progress = Progress(

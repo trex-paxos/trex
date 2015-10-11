@@ -24,7 +24,7 @@ trait ResendHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
   def handleResendAccepts(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], time: Long): PaxosAgent[RemoteRef] = {
     // compute the timed out accepts, making fresh ones with higher numbers on a new epoch if required
     val AcceptsAndData(accepts, newData) = computeResendAccepts(io, agent, time)
-    // if we have bumped the epoch we need to save fresh accepts and journal the new procis
+    // if we have bumped the epoch we need to save fresh accepts and journal the new progress
     if (newData.epoch != agent.data.epoch) {
       io.journal.save(newData.progress)
       io.journal.accept(accepts.toSeq: _*)
@@ -34,7 +34,6 @@ trait ResendHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
     agent.copy(data = newData)
   }
 
-  // FIXME no coverage in library
   def handleResendPrepares(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], time: Long): PaxosAgent[RemoteRef] = {
     agent.data.prepareResponses foreach {
       case (id, _) =>
