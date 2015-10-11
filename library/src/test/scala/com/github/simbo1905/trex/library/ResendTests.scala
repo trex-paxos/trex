@@ -128,7 +128,7 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
     "resend prepares and refresh its timeout" in {
       // given
       val agent = PaxosAgent(0, Follower, selfAckPrepares2)
-      val handler = new ResendHandler[DummyRemoteRef] {}
+      val handler = new ResendHandler[DummyRemoteRef]{}
       val sent = ArrayBuffer[PaxosMessage]()
       val ioWithTimeout = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = 12345L
@@ -147,6 +147,22 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
       val sentPrepareIds = prepares.flatten.map(_.id)
       val expectedPrepareIds = selfAckPrepares2.prepareResponses.values.flatMap(_.values.map(_.requestId))
       sentPrepareIds shouldBe expectedPrepareIds
+    }
+    "does not timeout on accepts which have not timed-out" in {
+      // given
+      val timeoutAt50 = 50L
+      val timeNow = 49L
+      val handler = new TestResendHandler
+      val higherPromise = emptyAcceptResponses +
+        (a99.id -> AcceptResponsesAndTimeout(timeoutAt50, a99, Map(0 -> AcceptNack(a99.id, 0, progressWith(zeroProgress.highestPromised, BallotNumber(99, 99))))))
+      val agent = PaxosAgent[DummyRemoteRef](100, Leader, initialData.copy(acceptResponses = higherPromise))
+
+      // when
+      val AcceptsAndData(accepts, data) = handler.computeResendAccepts(undefinedIO, agent, timeNow)
+      // then
+      data shouldBe agent.data
+      accepts.isEmpty shouldBe true
+
     }
   }
 

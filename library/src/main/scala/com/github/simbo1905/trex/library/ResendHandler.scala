@@ -44,21 +44,21 @@ trait ResendHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
 
   def computeResendAccepts(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], time: Long): AcceptsAndData[RemoteRef] = {
 
-    val oldEpoch: BallotNumber = agent.data.epoch.getOrElse(Journal.minBookwork.highestPromised)
-
-    val newTimeout = io.randomTimeout
-
-    // update the top level timeout which is a fast check guard on timeouts
-    val data = timeoutLens.set(agent.data, io.randomTimeout)
-
     // find the individual responses that have timed out
-    val late = timedOutResponse(time, data.acceptResponses)
+    val late = timedOutResponse(time, agent.data.acceptResponses)
 
     if (late.isEmpty) {
       // nothing more to do
-      AcceptsAndData[RemoteRef](Seq.empty, data)
+      AcceptsAndData[RemoteRef](Seq.empty, agent.data)
     } else {
       io.plog.info(s"timed out on ${late.size} accepts")
+
+      val oldEpoch: BallotNumber = agent.data.epoch.getOrElse(Journal.minBookwork.highestPromised)
+
+      val newTimeout = io.randomTimeout
+
+      // update the top level timeout which is a fast check guard on timeouts
+      val data = timeoutLens.set(agent.data, io.randomTimeout)
 
       // the accepts we timed out on responses for
       val oldAccepts = late.map {
