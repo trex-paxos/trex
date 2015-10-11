@@ -13,7 +13,7 @@ class TestPrepareResponseHandlerNoRetransmission extends PrepareResponseHandler[
   override def requestRetransmissionIfBehind(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], from: Int, highestCommitted: Identifier): Unit = {}
 }
 
-class PrepareResponseTests extends WordSpecLike with Matchers with OptionValues {
+class PrepareResponseHandlerTests extends WordSpecLike with Matchers with OptionValues {
 
   import TestHelpers._
 
@@ -405,7 +405,6 @@ class PrepareResponseTests extends WordSpecLike with Matchers with OptionValues 
 
   }
   "records a vote if it does not have a majority response" in {
-
     // given a handler to test
     val handler = new TestPrepareResponseHandlerNoRetransmission
 
@@ -440,5 +439,24 @@ class PrepareResponseTests extends WordSpecLike with Matchers with OptionValues 
       1 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None),
       2 -> PrepareNack(recoverHighPrepare.id, 2, initialData.progress, 0, 0)
     ))
+  }
+
+  "ignores a late response" in {
+    // given a handler to test
+    val recoverHighNumber = BallotNumber(Int.MaxValue, 0)
+    val progress = Progress.highestPromisedLens.set(selfAckPrepares.progress, recoverHighNumber)
+
+    // and an agent ready to choose the highest accept
+    val agent: PaxosAgent[DummyRemoteRef] =
+      PaxosAgent(0, Recoverer, initialData.copy(clusterSize = 5, epoch = Some(recoverHighNumber),
+        progress = progress))
+
+    val lenses: PaxosLenses[DummyRemoteRef] = new TestPrepareResponseHandlerNoRetransmission
+
+    // when we get the majority
+    val prepareResponses = PrepareResponseHandler.expandedPrepareSlotRange[DummyRemoteRef](undefinedIO, lenses, agent, SortedMap.empty)
+
+    // then we have simply recorded the vote
+    prepareResponses.size shouldBe 0
   }
 }

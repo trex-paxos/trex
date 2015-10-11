@@ -31,8 +31,8 @@ trait PrepareResponseHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
 
     agent.data.prepareResponses.getOrElse(id, Map.empty) match {
       case map if map.isEmpty =>
-        // we already had a majority positive response so nothing to do
-        io.plog.debug("Node {} Ignored prepare response as no longer tracking this request: {}", agent.nodeUniqueId, vote)
+        // ignore late responses when we already had a majority so no longer waiting
+        io.plog.debug("Node {} Ignored prepare response as not tracking this request: {}", agent.nodeUniqueId, vote)
         agent
       case map =>
         // register the vote
@@ -80,7 +80,10 @@ trait PrepareResponseHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
 }
 
 object PrepareResponseHandler {
-  def expandedPrepareSlotRange[RemoteRef](io: PaxosIO[RemoteRef], lenses: PaxosLenses[RemoteRef], agent: PaxosAgent[RemoteRef], votes: Map[Int, PrepareResponse]): SortedMap[Identifier, Map[Int, PrepareResponse]] = {
+  def expandedPrepareSlotRange[RemoteRef](io: PaxosIO[RemoteRef],
+                                          lenses: PaxosLenses[RemoteRef],
+                                          agent: PaxosAgent[RemoteRef],
+                                          votes: Map[Int, PrepareResponse]): SortedMap[Identifier, Map[Int, PrepareResponse]] = {
     // issue more prepares there are more accepted slots than we so far ran recovery upon
     agent.data.prepareResponses.lastOption match {
       case Some((Identifier(_, _, highestKnownSlotToRecover), _)) =>
@@ -108,11 +111,11 @@ object PrepareResponseHandler {
             })(scala.collection.breakOut)
           agent.data.prepareResponses ++ newPrepareSelfVotes
         } else {
+          // no additional slots learnt about from the responses
           agent.data.prepareResponses
         }
       case None =>
-        // FIXME test coverage
-        // recovery is complete so we can ignore the late response
+        // no longer awaiting any responses ignore a late response
         agent.data.prepareResponses
     }
   }
