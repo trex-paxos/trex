@@ -34,6 +34,7 @@ trait ResendHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
     agent.copy(data = newData)
   }
 
+  // FIXME no coverage in library
   def handleResendPrepares(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], time: Long): PaxosAgent[RemoteRef] = {
     agent.data.prepareResponses foreach {
       case (id, _) =>

@@ -248,7 +248,7 @@ object TestHelpers extends PaxosLenses[DummyRemoteRef] {
     Seq((a98.id -> AcceptResponsesAndTimeout(Long.MaxValue, a98, Map(0 -> a98ack0, 1 -> a98nack1)))
     )
 
-  val acceptkAndTwoNack = SortedMap.empty[Identifier, AcceptResponsesAndTimeout] ++
+  val acceptkAndTwoNack98 = SortedMap.empty[Identifier, AcceptResponsesAndTimeout] ++
     Seq((a98.id -> AcceptResponsesAndTimeout(Long.MaxValue, a98, Map(0 -> a98ack0, 1 -> a98nack1, 2 -> a98nack2)))
     )
 

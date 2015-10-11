@@ -88,6 +88,7 @@ trait FollowerTimeoutHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
             agent.copy(role = Follower, data = agent.data)
         }
       case FailoverResult(_, maxHeartbeat) =>
+        // FIXME test coverage
         io.plog.debug(s"Node {} {} sees evidence of a leader is not failing over. ", agent.nodeUniqueId, agent.role)
         // other nodes are showing a leader behind a partial network partition so we backdown.
         // we update the local known heartbeat in case that leader dies causing a new scenario were only this node can form a majority.

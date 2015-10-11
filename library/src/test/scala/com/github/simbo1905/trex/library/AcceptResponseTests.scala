@@ -247,7 +247,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
     "deals with a split vote in even number sized cluster" in {
       // given
       val handler = new Object with AcceptResponseHandler[DummyRemoteRef]
-      val agent = PaxosAgent(0, Leader, initialData97.copy(clusterSize = 4, acceptResponses = acceptkAndTwoNack))
+      val agent = PaxosAgent(0, Leader, initialData97.copy(clusterSize = 4, acceptResponses = acceptkAndTwoNack98))
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
       }
@@ -259,6 +259,31 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       role shouldBe Follower
       data.acceptResponses.size shouldBe 0
       data.timeout shouldBe Long.MaxValue
+    }
+
+    "logs an error if we have not issued accept messages for slots contiguous with highest committed" in {
+      // given
+      val handler = new Object with AcceptResponseHandler[DummyRemoteRef]
+      // an agent committed up to slot 96 awaiting responses only on slot 98 so got illegal gap at slot 97
+      val (id, AcceptResponsesAndTimeout(_, accept, responses)) = acceptkAndTwoNack98.headOption.value
+      val agent = PaxosAgent(0, Leader, initialData96.copy(clusterSize = 3, acceptResponses = acceptkAndTwoNack98))
+      val errorLog = ArrayBuffer[String]()
+      val ioRandomTimeout = new UndefinedIO {
+        override def randomTimeout: Long = Long.MaxValue
+
+        override def plog: PaxosLogging = new EmptyLogging {
+          override def error(msg: String): Unit = errorLog += msg
+        }
+      }
+      val latestVotes = responses + (a98ack3.from -> a98ack3)
+      // when
+      val PaxosAgent(_, role, data) = handler.handleFreshResponse(ioRandomTimeout, agent, latestVotes, accept, a98ack3)
+
+      // then
+      role shouldBe Follower
+      data.acceptResponses.size shouldBe 0
+      data.timeout shouldBe Long.MaxValue
+      assert(errorLog.mkString("").contains("committable work which is not contiguous with progress implying we have not issued Prepare/Accept messages for the correct range of slots"))
     }
   }
 }

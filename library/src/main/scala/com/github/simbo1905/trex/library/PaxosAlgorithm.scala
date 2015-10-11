@@ -26,16 +26,8 @@ trait PaxosIO[RemoteRef] {
   def sender: RemoteRef
 }
 
-object HighestCommittedIndexAndEpoch {
-  def unapply(data: PaxosData[_]) = data.epoch match {
-    case Some(number) => Some(data.progress.highestCommitted.logIndex, number)
-    case None => None
-  }
-}
-
 object PaxosAlgorithm {
   type PaxosFunction[RemoteRef] = PartialFunction[PaxosEvent[RemoteRef], PaxosAgent[RemoteRef]]
-
 }
 
 class PaxosAlgorithm[RemoteRef] extends PaxosLenses[RemoteRef]
