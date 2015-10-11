@@ -5,22 +5,24 @@ import org.scalatest.{Matchers, OptionValues, WordSpecLike}
 import scala.collection.immutable.TreeMap
 import TestHelpers._
 
+import Ordering._
+
 object TestFollowerTimeoutHandler extends PaxosLenses[DummyRemoteRef] {
 
-  import Ordering._
 
   val minPrepare: Prepare = Prepare(Identifier(99, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
 
   val selfNack = PrepareNack(minPrepare.id, 0, initialData.progress, 0, 999)
 
-  val initialDataWithTimeoutAndPrepareResponses = timeoutPrepareResponsesLens.set(initialData, (99L, TreeMap(minPrepare.id -> Map(0 -> selfNack))))
+  val initialDataWithTimeoutAndPrepareResponses =
+    timeoutPrepareResponsesLens.set(initialData, (99L, TreeMap(minPrepare.id -> Map(0 -> selfNack))))
 }
 
 class TestFollowerTimeoutHandler extends FollowerTimeoutHandler[DummyRemoteRef] with BackdownAgent[DummyRemoteRef] {
   override def highestAcceptedIndex(io: PaxosIO[DummyRemoteRef]): Long = 0L
 }
 
-class FollowerTimeoutTests extends WordSpecLike with Matchers with OptionValues {
+class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with OptionValues {
 
   import TestFollowerTimeoutHandler._
 
@@ -139,7 +141,7 @@ class FollowerTimeoutTests extends WordSpecLike with Matchers with OptionValues 
     }
     "knows not to failover when there is sufficient evidence of other leaders heartbeat" in {
       val nack1 = PrepareNack(minPrepare.id, 0, initialData.progress, 0, 998)
-      val nack2 = PrepareNack(minPrepare.id, 0, initialData.progress, 0, 999)
+      val nack2 = PrepareNack(minPrepare.id, 1, initialData.progress, 0, 999)
       FollowerTimeoutHandler.computeFailover(NoopPaxosLogging, 0, initialData, Map(1 -> nack1, 2 -> nack2) ) match {
         case FailoverResult(false, 999) => // good
         case x => fail(x.toString)
@@ -212,6 +214,23 @@ class FollowerTimeoutTests extends WordSpecLike with Matchers with OptionValues 
           }
         case x => fail(x.toString())
       }
+    }
+    "resets if it sees sufficient evidence of a leader via heartbeats in low prepare responses" in {
+      // given two nacks that see leader heartbeats at 999
+      val nack1 = PrepareNack(minPrepare.id, 1, initialData.progress, 0, 999)
+      val nack2 = PrepareNack(minPrepare.id, 2, initialData.progress, 0, 999)
+      val votes = Map(1 -> nack1, 2 -> nack2)
+      // and a Follower agent which last saw a heartbeat at 888
+      val data =
+        timeoutPrepareResponsesLens.set(initialData, (Long.MinValue,
+          TreeMap(minPrepare.id -> votes)))
+      val agent = PaxosAgent(0, Follower, data.copy(leaderHeartbeat = 888))
+      // when
+      val handler = new Object with FollowerTimeoutHandler[DummyRemoteRef]
+      val PaxosAgent(_, _, newData) = handler.handleMajorityResponse(undefinedIOwithNoopLogging, agent, votes)
+      // then
+      newData.prepareResponses.isEmpty shouldBe true
+      newData.leaderHeartbeat shouldBe 999
     }
   }
 
