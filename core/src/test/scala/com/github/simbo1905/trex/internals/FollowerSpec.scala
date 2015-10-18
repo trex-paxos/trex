@@ -42,7 +42,7 @@ class FollowerSpec
       ackHigherPrepare(Follower)
       checkForLeakedMessages
     }
-    "journals commits not adjacent to last commit in retransmit response" in {
+    "not commit non contiguous retransmission response" in {
       journalsButDoesNotCommitIfNotContiguousRetransmissionResponse(Follower)
       checkForLeakedMessages
     }

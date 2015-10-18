@@ -42,7 +42,7 @@ class LeaderSpec
     "accept higher prepare" in {
       ackHigherPrepare(Leader)
     }
-    "journals commits not adjacent to last commit in retransmit response" in {
+    "not commit non contiguous retransmission response" in {
       journalsButDoesNotCommitIfNotContiguousRetransmissionResponse(Leader)
     }
     "journals accept messages and sets higher promise" in {
