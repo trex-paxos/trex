@@ -46,7 +46,7 @@ class LeaderSpec
       journalsButDoesNotCommitIfNotContiguousRetransmissionResponse(Leader)
     }
     "journals accept messages and sets higher promise" in {
-      journalsAcceptMessagesAndSetsHigherPromise(Follower)
+      journalsAcceptMessagesAndSetsHigherPromise(Leader)
     }
     "nack an accept lower than its last promise" in {
       nackAcceptLowerThanPromise(Leader)

@@ -38,7 +38,7 @@ class RecovererSpec
     journalsButDoesNotCommitIfNotContiguousRetransmissionResponse(Recoverer)
   }
   "journals accept messages and sets higher promise" in {
-    journalsAcceptMessagesAndSetsHigherPromise(Follower)
+    journalsAcceptMessagesAndSetsHigherPromise(Recoverer)
   }
   "nack an accept lower than its last promise" in {
     nackAcceptLowerThanPromise(Recoverer)
