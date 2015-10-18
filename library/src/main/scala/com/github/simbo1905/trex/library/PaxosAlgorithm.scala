@@ -34,7 +34,7 @@ class PaxosAlgorithm[RemoteRef] extends PaxosLenses[RemoteRef]
 with CommitHandler[RemoteRef]
 with FollowerHandler[RemoteRef]
 with RetransmitHandler[RemoteRef]
-with PromiseHandler[RemoteRef]
+with PrepareHandler[RemoteRef]
 with HighAcceptHandler[RemoteRef]
 with PrepareResponseHandler[RemoteRef]
 with AcceptResponseHandler[RemoteRef]
@@ -65,21 +65,9 @@ with ClientCommandHandler[RemoteRef] {
       handleRetransmitResponse(io, agent, rs)
   }
 
-  // FIXME push the matching down into new method handlePromise
   val prepareStateFunction: PaxosFunction[RemoteRef] = {
-    // nack a low prepare
-    case PaxosEvent(io, agent, p@Prepare(id)) if id.number < agent.data.progress.highestPromised =>
-      io.send(PrepareNack(id, agent.nodeUniqueId, agent.data.progress, io.journal.bounds.max, agent.data.leaderHeartbeat))
-      agent
-
-    // ack a higher prepare
-    case PaxosEvent(io, agent, p@Prepare(id)) if id.number > agent.data.progress.highestPromised =>
-      handlePromise(io, agent, p)
-
-    // ack prepare that matches our promise
-    case PaxosEvent(io, agent, p@Prepare(id)) if id.number == agent.data.progress.highestPromised =>
-      io.send(PrepareAck(id, agent.nodeUniqueId, agent.data.progress, io.journal.bounds.max, agent.data.leaderHeartbeat, io.journal.accepted(id.logIndex)))
-      agent
+    case PaxosEvent(io, agent, p@Prepare(id)) =>
+      handlePrepare(io, agent, p)
   }
 
   // FIXME push the matching logic down into a handler

@@ -9,18 +9,18 @@ import scala.compat.Platform
 
 import Ordering._
 
-class TestPromiseHandler extends PromiseHandler[DummyRemoteRef]
+class TestPrepareHandler extends PrepareHandler[DummyRemoteRef]
 
 class PromiseHandlerTests extends Spec with MockFactory with OptionValues {
   val agentPromise10 = PaxosAgent(0, Follower, initialData.copy(progress = initialData.progress.copy(highestPromised = BallotNumber(10, 10))))
 
   object `A PromiseHandler` {
 
-    val testPromiseHandler = new TestPromiseHandler
+    val testPromiseHandler = new TestPrepareHandler
 
     def `should require that the prepare number is higher than the current promise` {
       intercept[IllegalArgumentException] {
-        testPromiseHandler.handlePromise(undefinedIO, agentPromise10, Prepare(Identifier(0, BallotNumber(1, 1), 10)))
+        testPromiseHandler.handleHighPrepare(undefinedIO, agentPromise10, Prepare(Identifier(0, BallotNumber(1, 1), 10)))
       }
     }
 
@@ -29,7 +29,7 @@ class PromiseHandlerTests extends Spec with MockFactory with OptionValues {
       (mockJournal.save _ ).when(*)
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
       val io = new TestIO(mockJournal)
-      testPromiseHandler.handlePromise(io, agentPromise10, Prepare(Identifier(0, BallotNumber(11, 11), 10)))
+      testPromiseHandler.handleHighPrepare(io, agentPromise10, Prepare(Identifier(0, BallotNumber(11, 11), 10)))
       io.sent.headOption.value match {
         case MessageAndTimestamp(ack: PrepareAck, _) => // good
         case x => fail(x.toString)
@@ -45,7 +45,7 @@ class PromiseHandlerTests extends Spec with MockFactory with OptionValues {
       }
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
       val io = new TestIO(mockJournal)
-      testPromiseHandler.handlePromise(io, agentPromise10, Prepare(Identifier(0, BallotNumber(11, 11), 10)))
+      testPromiseHandler.handleHighPrepare(io, agentPromise10, Prepare(Identifier(0, BallotNumber(11, 11), 10)))
       io.sent.headOption.value match {
         case MessageAndTimestamp(ack: PrepareAck, ts) if ts > saveTs => // good
         case x => fail(x.toString)
@@ -57,7 +57,7 @@ class PromiseHandlerTests extends Spec with MockFactory with OptionValues {
       (mockJournal.save _ ).when(*)
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
       val io = new TestIO(mockJournal)
-      testPromiseHandler.handlePromise(io, agentPromise10, Prepare(Identifier(0, BallotNumber(11, 11), 10))) match {
+      testPromiseHandler.handleHighPrepare(io, agentPromise10, Prepare(Identifier(0, BallotNumber(11, 11), 10))) match {
         case PaxosAgent(_, _, data) if data.progress.highestPromised == BallotNumber(11, 11) => // good
         case x => fail(x.toString)
       }
@@ -72,7 +72,7 @@ class PromiseHandlerTests extends Spec with MockFactory with OptionValues {
       (mockJournal.save _ ).when(*)
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
       val io = new TestIO(mockJournal)
-      testPromiseHandler.handlePromise(io, agentPromise10.copy(data = recoverLikeData, role = Recoverer), Prepare(Identifier(0, BallotNumber(11, 11), 10))) match {
+      testPromiseHandler.handleHighPrepare(io, agentPromise10.copy(data = recoverLikeData, role = Recoverer), Prepare(Identifier(0, BallotNumber(11, 11), 10))) match {
         case PaxosAgent(_, _, data) if data.progress.highestPromised == BallotNumber(11, 11) =>
           data match {
             case p if p.epoch == None && p.acceptResponses.isEmpty && p.prepareResponses.isEmpty && p.clientCommands.isEmpty => // good
@@ -100,7 +100,7 @@ class PromiseHandlerTests extends Spec with MockFactory with OptionValues {
           }
         }
       }
-      testPromiseHandler.handlePromise(io, agentPromise10.copy(data = clientCommandsData, role = Leader), Prepare(Identifier(0, BallotNumber(11, 11), 10)))
+      testPromiseHandler.handleHighPrepare(io, agentPromise10.copy(data = clientCommandsData, role = Leader), Prepare(Identifier(0, BallotNumber(11, 11), 10)))
       assert(sentNoLongerLeader)
     }
   }
