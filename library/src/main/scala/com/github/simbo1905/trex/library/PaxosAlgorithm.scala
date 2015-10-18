@@ -32,7 +32,7 @@ object PaxosAlgorithm {
 
 class PaxosAlgorithm[RemoteRef] extends PaxosLenses[RemoteRef]
 with CommitHandler[RemoteRef]
-with FollowerTimeoutHandler[RemoteRef]
+with FollowerHandler[RemoteRef]
 with RetransmitHandler[RemoteRef]
 with PromiseHandler[RemoteRef]
 with HighAcceptHandler[RemoteRef]
@@ -48,21 +48,13 @@ with ClientCommandHandler[RemoteRef] {
     // update heartbeat and attempt to commit contiguous accept messages
     case PaxosEvent(io, agent@PaxosAgent(_, Follower, _), c@Commit(i, heartbeat)) =>
       handleFollowerCommit(io, agent, c)
- // FIXME collapse the following two?
-    // upon timeout having not issued low prepares start the leader takeover protocol by issuing a min prepare
-    case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, prepareResponses, _, _, _)), CheckTimeout) if io.clock >= to && prepareResponses.isEmpty =>
+    case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, _, _, _, _)), CheckTimeout) if io.clock >= to =>
       handleFollowerTimeout(io, agent)
-    // on a timeout where we have issued a low prepare but not yet received a majority response we should rebroadcast the low prepare
-    case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, prepareResponses, _, _, _)), CheckTimeout) if io.clock >= to && prepareResponses.nonEmpty =>
-      handleResendLowPrepares(io, agent)
- // FIXME collapse the following two?
-    // having broadcast a low prepare if we see insufficient evidence of a leader in a majority response promote to recoverer
-    case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, _, _, prepareResponses, _, _, _)), vote: PrepareResponse) if prepareResponses.nonEmpty =>
-      handleLowPrepareResponse(io, agent, vote)
-    // we may see a prepare response that we are not awaiting any more which we will ignore
-    case PaxosEvent(_, agent@PaxosAgent(_, Follower, _), vote: PrepareResponse) if agent.data.prepareResponses.isEmpty => agent
+    case PaxosEvent(io, agent, vote: PrepareResponse) if agent.role == Follower =>
+      handelFollowerPrepareResponse(io, agent, vote)
     // ignore an accept response which may be seen after we backdown to follower
-    case PaxosEvent(_, agent@PaxosAgent(_, Follower, _), vote: AcceptResponse) => agent
+    case PaxosEvent(_, agent@PaxosAgent(_, Follower, _), vote: AcceptResponse) =>
+      agent
   }
 
   val retransmissionStateFunction: PaxosFunction[RemoteRef] = {

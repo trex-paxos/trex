@@ -4,24 +4,45 @@ import com.github.simbo1905.trex.library.Ordering._
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 
-trait FollowerTimeoutHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownAgent[RemoteRef] {
-  import FollowerTimeoutHandler._
+trait FollowerHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownAgent[RemoteRef] {
+  import FollowerHandler._
 
   def highestAcceptedIndex(io: PaxosIO[RemoteRef]): Long = io.journal.bounds.max
 
-  def handleResendLowPrepares(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef]): PaxosAgent[RemoteRef] = {
+  def handleFollowerResendLowPrepares(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef]): PaxosAgent[RemoteRef] = {
     io.plog.debug("Node {} {} timed-out having already issued a low. rebroadcasting", agent.nodeUniqueId, agent.role)
     io.send(io.minPrepare)
     agent.copy(data = timeoutLens.set(agent.data, io.randomTimeout))
   }
 
   def handleFollowerTimeout(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef]): PaxosAgent[RemoteRef] = {
+    agent.data.prepareResponses.isEmpty match {
+      case true =>
+        sendLowPrepares(io, agent)
+      case false =>
+        handleFollowerResendLowPrepares(io, agent)
+    }
+  }
+  
+  def sendLowPrepares(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef]): PaxosAgent[RemoteRef] = {
     io.plog.info("Node {} {} timed-out progress: {}", agent.nodeUniqueId, agent.role, agent.data.progress)
     // nack our own prepare
     val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
       Map(io.minPrepare.id -> Map(agent.nodeUniqueId -> PrepareNack(io.minPrepare.id, agent.nodeUniqueId, agent.data.progress, highestAcceptedIndex(io), agent.data.leaderHeartbeat)))
     io.send(io.minPrepare)
     PaxosAgent(agent.nodeUniqueId, Follower, timeoutPrepareResponsesLens.set(agent.data, (io.randomTimeout, prepareSelfVotes)))
+  }
+
+  def handelFollowerPrepareResponse(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], vote: PrepareResponse): PaxosAgent[RemoteRef] = {
+
+    agent.data.prepareResponses.nonEmpty match {
+      case true =>
+        // having broadcast a low prepare if we see insufficient evidence of a leader in a majority response promote to recoverer
+        handleLowPrepareResponse(io, agent, vote)
+      case false =>
+        // we may see a prepare response that we are not awaiting any more which we will ignore
+        agent
+    }
   }
 
   def handleLowPrepareResponse(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], vote: PrepareResponse): PaxosAgent[RemoteRef] = {
@@ -99,7 +120,7 @@ trait FollowerTimeoutHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
 
 case class FailoverResult(failover: Boolean, maxHeartbeat: Long)
 
-object FollowerTimeoutHandler {
+object FollowerHandler {
 
   /**
    * Generates fresh prepare messages targeting the range of slots from the highest committed to one higher than the highest accepted slot positions.
