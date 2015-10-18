@@ -1,12 +1,11 @@
 package com.github.simbo1905.trex.library
 
-import org.scalatest.Spec
 import TestHelpers._
 import Ordering._
 
 import scala.collection.immutable.TreeMap
 
-class FollowerTests extends Spec {
+class FollowerTests extends AllTests {
 
   class ClockPaxosIO(time: Long) extends UndefinedIO {
     override def clock: Long = time
@@ -14,7 +13,7 @@ class FollowerTests extends Spec {
 
   val initialDataAgent = PaxosAgent(0, Follower, initialData)
 
-  object `The FollowerMainFunction` {
+  object `The FollowingFunction` {
 
     val commit = Commit(Identifier(0, BallotNumber(0, 0), 0))
 
@@ -169,6 +168,10 @@ class FollowerTests extends Spec {
     def `should be defined for a CheckTimeout when not timedout` {
       val agent = PaxosAgent(0, Follower, initialData)
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, CheckTimeout)))
+    }
+
+    def `should nack a low prepare` {
+      nackLowPrepare(Follower)
     }
 
   }

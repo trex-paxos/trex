@@ -1,12 +1,11 @@
 package com.github.simbo1905.trex.library
 
 import com.github.simbo1905.trex.library.TestHelpers._
-import org.scalatest.Spec
 
 import scala.collection.immutable.TreeMap
 import Ordering._
 
-class LeaderTests extends Spec {
+class LeaderTests extends AllTests {
   val initialDataAgent = PaxosAgent(0, Leader, initialData)
 
   object `The Leader Function` {
@@ -127,7 +126,6 @@ class LeaderTests extends Spec {
       clientCommands = initialDataClientCommand
     ))
 
-
     def `Return to follower handler should do nothing for commit not at higher slot ` = {
       val handler = new ReturnToFollowerHandler[DummyRemoteRef] with CommitHandler[DummyRemoteRef] {}
       val commitAtIndex = Commit(leader.data.progress.highestCommitted)
@@ -135,7 +133,10 @@ class LeaderTests extends Spec {
         case `leader` => // good
         case f => fail(f.toString)
       }
+    }
 
+    def `should nack a low prepare` {
+      nackLowPrepare(Leader)
     }
   }
 

@@ -1,13 +1,12 @@
 package com.github.simbo1905.trex.library
 
 import com.github.simbo1905.trex.library.TestHelpers._
-import org.scalatest.Spec
 
 import scala.collection.immutable.{TreeMap, SortedMap}
 
 import Ordering._
 
-class RecovererTests extends Spec {
+class RecovererTests extends AllTests {
 
   val initialDataAgent = PaxosAgent(0, Recoverer, initialData)
 
@@ -163,6 +162,9 @@ class RecovererTests extends Spec {
       assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, CheckTimeout)))
     }
 
+    def `should nack a low prepare` {
+      nackLowPrepare(Recoverer)
+    }
   }
 
 }

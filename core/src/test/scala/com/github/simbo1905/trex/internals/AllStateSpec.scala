@@ -414,52 +414,6 @@ trait AllStateSpec {
     }
   }
 
-  def nackLowerCounterPrepare(state: PaxosRole)(implicit sender: ActorRef) {
-    val stubJournal: Journal = stub[Journal]
-    // given higher initial state
-    val high = BallotNumber(10, 1)
-    val initialData = PaxosData(Progress(high, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
-    // and low prepare
-    val low = BallotNumber(5, 2)
-    val lowIdentifier = Identifier(0, low, 1)
-    val lowPrepare = Prepare(lowIdentifier)
-    // and an empty accept journal
-    stubJournal.bounds _ when() returns minJournalBounds
-    // when our candidate node sees this
-    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
-    fsm.underlyingActor.setAgent(state, initialData)
-    fsm ! lowPrepare
-    // then it responds with a nack
-    expectMsg(250 millisecond, PrepareNack(lowIdentifier, 0, initialData.progress, Long.MinValue, leaderHeartbeat2))
-    // stays in the same state
-    assert(fsm.underlyingActor.role == state)
-    // does not update its data
-    assert(fsm.underlyingActor.data == initialData)
-  }
-
-  def nackLowerNumberedPrepare(state: PaxosRole)(implicit sender: ActorRef) {
-    val stubJournal: Journal = stub[Journal]
-    // given higher initial state
-    val high = BallotNumber(10, 2)
-    val initialData = PaxosData(Progress(high, minIdentifier), leaderHeartbeat2, timeout4, clusterSize3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
-    // and prepare which is lower by node
-    val low = BallotNumber(10, 1)
-    val lowIdentifier = Identifier(0, low, 1)
-    val lowPrepare = Prepare(lowIdentifier)
-    // and an empty accept journal
-    stubJournal.bounds _ when() returns minJournalBounds
-    // when our node sees this
-    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
-    fsm.underlyingActor.setAgent(state, initialData)
-    fsm ! lowPrepare
-    // then it responds with a nack
-    expectMsg(250 millisecond, PrepareNack(lowIdentifier, 0, initialData.progress, Long.MinValue, 2))
-    // stays in the same state
-    assert(fsm.underlyingActor.role == state)
-    // does not update its data
-    assert(fsm.underlyingActor.data == initialData)
-  }
-
   def ackRepeatedPrepare(state: PaxosRole)(implicit sender: ActorRef) {
     // given no previous value
     val stubJournal: Journal = stub[Journal]

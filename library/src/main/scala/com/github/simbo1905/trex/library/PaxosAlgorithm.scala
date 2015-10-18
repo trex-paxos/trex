@@ -48,12 +48,14 @@ with ClientCommandHandler[RemoteRef] {
     // update heartbeat and attempt to commit contiguous accept messages
     case PaxosEvent(io, agent@PaxosAgent(_, Follower, _), c@Commit(i, heartbeat)) =>
       handleFollowerCommit(io, agent, c)
+ // FIXME collapse the following two?
     // upon timeout having not issued low prepares start the leader takeover protocol by issuing a min prepare
     case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, prepareResponses, _, _, _)), CheckTimeout) if io.clock >= to && prepareResponses.isEmpty =>
       handleFollowerTimeout(io, agent)
     // on a timeout where we have issued a low prepare but not yet received a majority response we should rebroadcast the low prepare
     case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, prepareResponses, _, _, _)), CheckTimeout) if io.clock >= to && prepareResponses.nonEmpty =>
       handleResendLowPrepares(io, agent)
+ // FIXME collapse the following two?
     // having broadcast a low prepare if we see insufficient evidence of a leader in a majority response promote to recoverer
     case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, _, _, prepareResponses, _, _, _)), vote: PrepareResponse) if prepareResponses.nonEmpty =>
       handleLowPrepareResponse(io, agent, vote)
@@ -71,6 +73,7 @@ with ClientCommandHandler[RemoteRef] {
       handleRetransmitResponse(io, agent, rs)
   }
 
+  // FIXME push the matching down into new method handlePromise
   val prepareStateFunction: PaxosFunction[RemoteRef] = {
     // nack a low prepare
     case PaxosEvent(io, agent, p@Prepare(id)) if id.number < agent.data.progress.highestPromised =>
@@ -87,6 +90,7 @@ with ClientCommandHandler[RemoteRef] {
       agent
   }
 
+  // FIXME push the matching logic down into a handler
   val acceptStateFunction: PaxosFunction[RemoteRef] = {
     // nack lower accept
     case PaxosEvent(io, agent, a@Accept(id, _)) if id.number < agent.data.progress.highestPromised =>
@@ -109,6 +113,7 @@ with ClientCommandHandler[RemoteRef] {
       agent
   }
 
+  // FIXME this should disappear if we push the check timeout logic down into handlers
   /**
    * If no other logic has caught a timeout then do nothing.
    */
@@ -142,6 +147,7 @@ with ClientCommandHandler[RemoteRef] {
       handleAcceptResponse(io, agent, vote)
   }
 
+  // FIXME extract to a handler
   /**
    * Here on a timeout we deal with either pending prepares or pending accepts putting a priority on prepare handling
    * which backs down easily. Only if we have dealt with all timed out prepares do we handle timed out accepts which

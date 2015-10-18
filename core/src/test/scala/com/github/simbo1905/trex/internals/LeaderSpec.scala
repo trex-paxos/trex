@@ -36,12 +36,6 @@ class LeaderSpec
   val expectedBytes3 = expectedString2.getBytes
 
   "Leader" should {
-    "nack a lower counter prepare" in {
-      nackLowerCounterPrepare(Leader)
-    }
-    "nack a lower number prepare" in {
-      nackLowerNumberedPrepare(Leader)
-    }
     "ack a repeated prepare" in {
       ackRepeatedPrepare(Leader)
     }

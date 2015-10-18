@@ -34,14 +34,6 @@ class FollowerSpec
       respondsToClientDataBySayingNotTheLeader(Follower)
       checkForLeakedMessages
     }
-    "nack a lower counter prepare" in {
-      nackLowerCounterPrepare(Follower)
-      checkForLeakedMessages
-    }
-    "nack a lower numbered prepare" in {
-      nackLowerNumberedPrepare(Follower)
-      checkForLeakedMessages
-    }
     "ack a repeated prepare" in {
       ackRepeatedPrepare(Follower)
       checkForLeakedMessages

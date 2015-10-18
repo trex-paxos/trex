@@ -29,12 +29,6 @@ class RecovererSpec
     "respond to client data by saying that you are not the leader" in {
       respondsToClientDataBySayingNotTheLeader(Recoverer)
     }
-    "nack a lower counter prepare" in {
-      nackLowerCounterPrepare(Recoverer)
-    }
-    "nack a lower node prepare" in {
-      nackLowerNumberedPrepare(Recoverer)
-    }
     "ack a repeated prepare" in {
       ackRepeatedPrepare(Recoverer)
     }
