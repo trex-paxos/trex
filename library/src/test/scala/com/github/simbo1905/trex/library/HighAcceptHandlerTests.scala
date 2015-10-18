@@ -3,13 +3,13 @@ package com.github.simbo1905.trex.library
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{OptionValues, Spec}
 
-class TestHighAcceptHandler extends HighAcceptHandler[DummyRemoteRef]
+class TestAcceptHandler extends AcceptHandler[DummyRemoteRef]
 
 class HighAcceptHandlerTests extends Spec with MockFactory with OptionValues {
 
   object `A HighAcceptHandler` {
     def `should require accept number at least as high as promise` {
-      val handler = new TestHighAcceptHandler
+      val handler = new TestAcceptHandler
       val mockJournal = stub[Journal]
       val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
       val agent = PaxosAgent(1, Follower, TestHelpers.initialData)
@@ -21,7 +21,7 @@ class HighAcceptHandlerTests extends Spec with MockFactory with OptionValues {
     def `should ack an Accept equal to its promise and journal message but not save progress sending last` {
       val id = Identifier(0, TestHelpers.initialData.progress.highestPromised, 0)
       val accept = Accept(id, NoOperationCommandValue)
-      val handler = new TestHighAcceptHandler
+      val handler = new TestAcceptHandler
       var saveTs = 0L
       val journal = new UndefinedJournal {
         override def accept(a: Accept*): Unit = saveTs = System.nanoTime
@@ -39,7 +39,7 @@ class HighAcceptHandlerTests extends Spec with MockFactory with OptionValues {
       val highNumber = BallotNumber(Int.MaxValue, Int.MaxValue)
       val id = Identifier(0, highNumber, 0)
       val accept = Accept(id, NoOperationCommandValue)
-      val handler = new TestHighAcceptHandler
+      val handler = new TestAcceptHandler
       var saveTs = 0L
       val journal = new UndefinedJournal {
         override def accept(a: Accept*): Unit = {}

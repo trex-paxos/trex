@@ -35,7 +35,7 @@ with CommitHandler[RemoteRef]
 with FollowerHandler[RemoteRef]
 with RetransmitHandler[RemoteRef]
 with PrepareHandler[RemoteRef]
-with HighAcceptHandler[RemoteRef]
+with AcceptHandler[RemoteRef]
 with PrepareResponseHandler[RemoteRef]
 with AcceptResponseHandler[RemoteRef]
 with ResendHandler[RemoteRef]
@@ -70,21 +70,9 @@ with ClientCommandHandler[RemoteRef] {
       handlePrepare(io, agent, p)
   }
 
-  // FIXME push the matching logic down into a handler
   val acceptStateFunction: PaxosFunction[RemoteRef] = {
-    // nack lower accept
-    case PaxosEvent(io, agent, a@Accept(id, _)) if id.number < agent.data.progress.highestPromised =>
-      io.send(AcceptNack(id, agent.nodeUniqueId, agent.data.progress))
-      agent
-
-    // nack higher accept for slot which is committed
-    case PaxosEvent(io, agent, a@Accept(id, _)) if id.number > agent.data.progress.highestPromised && id.logIndex <= agent.data.progress.highestCommitted.logIndex =>
-      io.send(AcceptNack(id, agent.nodeUniqueId, agent.data.progress))
-      agent
-
-    // ack accept as high as promise. if id.number > highestPromised must update highest promised in progress http://stackoverflow.com/q/29880949/329496
-    case PaxosEvent(io, agent, a@Accept(id, _)) if agent.data.progress.highestPromised <= id.number =>
-      handleHighAccept(io, agent, a)
+    case PaxosEvent(io, agent, a: Accept) =>
+      handleAccept(io, agent, a)
   }
 
   val ignoreHeartbeatStateFunction: PaxosFunction[RemoteRef] = {
@@ -93,7 +81,6 @@ with ClientCommandHandler[RemoteRef] {
       agent
   }
 
-  // FIXME this should disappear if we push the check timeout logic down into handlers
   /**
    * If no other logic has caught a timeout then do nothing.
    */
@@ -127,7 +114,6 @@ with ClientCommandHandler[RemoteRef] {
       handleAcceptResponse(io, agent, vote)
   }
 
-  // FIXME extract to a handler
   /**
    * Here on a timeout we deal with either pending prepares or pending accepts putting a priority on prepare handling
    * which backs down easily. Only if we have dealt with all timed out prepares do we handle timed out accepts which
