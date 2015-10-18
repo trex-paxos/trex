@@ -5,7 +5,7 @@ import com.github.simbo1905.trex.library.TestHelpers._
 import scala.collection.immutable.TreeMap
 import Ordering._
 
-class LeaderTests extends AllTests {
+class LeaderTests extends AllRolesTests {
   val initialDataAgent = PaxosAgent(0, Leader, initialData)
 
   object `The Leader Function` {

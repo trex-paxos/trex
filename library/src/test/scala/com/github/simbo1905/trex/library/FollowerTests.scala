@@ -5,7 +5,7 @@ import Ordering._
 
 import scala.collection.immutable.TreeMap
 
-class FollowerTests extends AllTests {
+class FollowerTests extends AllRolesTests {
 
   class ClockPaxosIO(time: Long) extends UndefinedIO {
     override def clock: Long = time

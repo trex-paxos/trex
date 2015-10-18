@@ -6,7 +6,7 @@ import scala.collection.immutable.{TreeMap, SortedMap}
 
 import Ordering._
 
-class RecovererTests extends AllTests {
+class RecovererTests extends AllRolesTests {
 
   val initialDataAgent = PaxosAgent(0, Recoverer, initialData)
 

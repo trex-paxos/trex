@@ -4,7 +4,7 @@ import org.scalatest.{OptionValues, Matchers, Spec}
 
 import scala.collection.mutable.ArrayBuffer
 
-class AllTests extends Spec with PaxosLenses[DummyRemoteRef] with Matchers with OptionValues {
+class AllRolesTests extends Spec with PaxosLenses[DummyRemoteRef] with Matchers with OptionValues {
   import TestHelpers._
 
   def nackLowPrepare(role: PaxosRole) = {
