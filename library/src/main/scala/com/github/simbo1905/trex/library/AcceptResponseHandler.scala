@@ -8,14 +8,14 @@ package com.github.simbo1905.trex.library
  */
 case class AcceptResponsesAndTimeout(timeout: Long, accept: Accept, responses: Map[Int, AcceptResponse])
 
-trait AcceptResponseHandler[RemoteRef] extends PaxosLenses[RemoteRef]
-with BackdownAgent[RemoteRef]
-with CommitHandler[RemoteRef] {
+trait AcceptResponseHandler extends PaxosLenses
+with BackdownAgent
+with CommitHandler {
 
   import AcceptResponseHandler._
   import Vote._
 
-  def handleAcceptResponse(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], vote: AcceptResponse): PaxosAgent[RemoteRef] = {
+  def handleAcceptResponse(io: PaxosIO, agent: PaxosAgent, vote: AcceptResponse): PaxosAgent = {
 
     val highestCommitted = agent.data.progress.highestCommitted.logIndex
     val highestCommittedOther = vote.progress.highestCommitted.logIndex
@@ -47,7 +47,7 @@ with CommitHandler[RemoteRef] {
     case _ => false
   }
 
-  def handleFreshResponse(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], votes: Map[Int, AcceptResponse], accept: Accept, vote: AcceptResponse) = {
+  def handleFreshResponse(io: PaxosIO, agent: PaxosAgent, votes: Map[Int, AcceptResponse], accept: Accept, vote: AcceptResponse) = {
 
     count(agent.data.clusterSize, votes.values, acceptVoteDiscriminator) match {
       case Some(MajorityNack) =>
@@ -91,7 +91,7 @@ with CommitHandler[RemoteRef] {
     }
   }
 
-  def processCommit(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], lastId: Identifier) = {
+  def processCommit(io: PaxosIO, agent: PaxosAgent, lastId: Identifier) = {
     val (newProgress, results) = commit(io, agent, lastId)
 
     io.journal.save(newProgress)
@@ -102,7 +102,7 @@ with CommitHandler[RemoteRef] {
       val (multipleCommittedIds, _) = results.unzip
 
       val (responds, remainders) = agent.data.clientCommands.partition {
-        idCmdRef: (Identifier, (CommandValue, RemoteRef)) =>
+        idCmdRef: (Identifier, (CommandValue, String)) =>
           val (id, (_, _)) = idCmdRef
           multipleCommittedIds.contains(id)
       }

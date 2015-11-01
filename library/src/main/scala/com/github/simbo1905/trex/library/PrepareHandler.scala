@@ -1,8 +1,8 @@
 package com.github.simbo1905.trex.library
 
-trait PrepareHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownAgent[RemoteRef] {
+trait PrepareHandler extends PaxosLenses with BackdownAgent {
 
-  def handlePrepare(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], prepare: Prepare): PaxosAgent[RemoteRef] = {
+  def handlePrepare(io: PaxosIO, agent: PaxosAgent, prepare: Prepare): PaxosAgent = {
     prepare match {
       case Prepare(id) if id.number < agent.data.progress.highestPromised =>
         // nack a low prepare
@@ -26,7 +26,7 @@ trait PrepareHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownAgen
    * @param prepare The message.
    * @return The updated agent.
    */
-  def handleHighPrepare(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], prepare: Prepare): PaxosAgent[RemoteRef] = {
+  def handleHighPrepare(io: PaxosIO, agent: PaxosAgent, prepare: Prepare): PaxosAgent = {
     require(prepare.id.number > agent.data.progress.highestPromised)
     // backdown if required
     val a = if (agent.role != Follower) backdownAgent(io, agent) else agent

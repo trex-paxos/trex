@@ -1,10 +1,12 @@
 package com.github.simbo1905.trex.library
 
-case class PaxosAgent[RemoteRef](nodeUniqueId: Int, role: PaxosRole, data: PaxosData[RemoteRef])
+//trait RemoteRef // FIXME is this needed
 
-case class PaxosEvent[RemoteRef](io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], message: PaxosMessage)
+case class PaxosAgent(nodeUniqueId: Int, role: PaxosRole, data: PaxosData)
 
-trait PaxosIO[RemoteRef] {
+case class PaxosEvent(io: PaxosIO, agent: PaxosAgent, message: PaxosMessage)
+
+trait PaxosIO {
   def journal: Journal
 
   def plog: PaxosLogging
@@ -15,36 +17,39 @@ trait PaxosIO[RemoteRef] {
 
   def deliver(value: CommandValue): Any
 
-  def respond(client: RemoteRef, data: Any)
 
   def send(msg: PaxosMessage)
 
-  def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, RemoteRef)]): Unit
 
   def minPrepare: Prepare
 
-  def sender: RemoteRef
+  // actor version side-effects by adding id to a weak map
+  def senderId(): String
+
+  def respond(client: String, data: Any)
+
+  def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit
 }
 
 object PaxosAlgorithm {
-  type PaxosFunction[RemoteRef] = PartialFunction[PaxosEvent[RemoteRef], PaxosAgent[RemoteRef]]
+  type PaxosFunction = PartialFunction[PaxosEvent, PaxosAgent]
 }
 
-class PaxosAlgorithm[RemoteRef] extends PaxosLenses[RemoteRef]
-with CommitHandler[RemoteRef]
-with FollowerHandler[RemoteRef]
-with RetransmitHandler[RemoteRef]
-with PrepareHandler[RemoteRef]
-with AcceptHandler[RemoteRef]
-with PrepareResponseHandler[RemoteRef]
-with AcceptResponseHandler[RemoteRef]
-with ResendHandler[RemoteRef]
-with ReturnToFollowerHandler[RemoteRef]
-with ClientCommandHandler[RemoteRef] {
+class PaxosAlgorithm extends PaxosLenses
+with CommitHandler
+with FollowerHandler
+with RetransmitHandler
+with PrepareHandler
+with AcceptHandler
+with PrepareResponseHandler
+with AcceptResponseHandler
+with ResendHandler
+with ReturnToFollowerHandler
+with ClientCommandHandler {
 
   import PaxosAlgorithm._
 
-  val followingFunction: PaxosFunction[RemoteRef] = {
+  val followingFunction: PaxosFunction = {
     // update heartbeat and attempt to commit contiguous accept messages
     case PaxosEvent(io, agent@PaxosAgent(_, Follower, _), c@Commit(i, heartbeat)) =>
       handleFollowerCommit(io, agent, c)
@@ -57,7 +62,7 @@ with ClientCommandHandler[RemoteRef] {
       agent
   }
 
-  val retransmissionStateFunction: PaxosFunction[RemoteRef] = {
+  val retransmissionStateFunction: PaxosFunction = {
     case PaxosEvent(io, agent, rq: RetransmitRequest) =>
       handleRetransmitRequest(io, agent, rq)
 
@@ -65,17 +70,17 @@ with ClientCommandHandler[RemoteRef] {
       handleRetransmitResponse(io, agent, rs)
   }
 
-  val prepareStateFunction: PaxosFunction[RemoteRef] = {
+  val prepareStateFunction: PaxosFunction = {
     case PaxosEvent(io, agent, p@Prepare(id)) =>
       handlePrepare(io, agent, p)
   }
 
-  val acceptStateFunction: PaxosFunction[RemoteRef] = {
+  val acceptStateFunction: PaxosFunction = {
     case PaxosEvent(io, agent, a: Accept) =>
       handleAccept(io, agent, a)
   }
 
-  val ignoreHeartbeatStateFunction: PaxosFunction[RemoteRef] = {
+  val ignoreHeartbeatStateFunction: PaxosFunction = {
     // ingore a HeartBeat which has not already been handled
     case PaxosEvent(io, agent, HeartBeat) =>
       agent
@@ -84,32 +89,32 @@ with ClientCommandHandler[RemoteRef] {
   /**
    * If no other logic has caught a timeout then do nothing.
    */
-  val ignoreNotTimedOutCheck: PaxosFunction[RemoteRef] = {
+  val ignoreNotTimedOutCheck: PaxosFunction = {
     case PaxosEvent(_, agent, CheckTimeout) =>
       agent
   }
 
-  val commonStateFunction: PaxosFunction[RemoteRef] =
+  val commonStateFunction: PaxosFunction =
     retransmissionStateFunction orElse
       prepareStateFunction orElse
       acceptStateFunction orElse
       ignoreHeartbeatStateFunction orElse
       ignoreNotTimedOutCheck
 
-  val notLeaderFunction: PaxosFunction[RemoteRef] = {
+  val notLeaderFunction: PaxosFunction = {
     case PaxosEvent(io, agent, v: CommandValue) =>
       io.send(NotLeader(agent.nodeUniqueId, v.msgId))
       agent
   }
 
-  val followerFunction: PaxosFunction[RemoteRef] = followingFunction orElse notLeaderFunction orElse commonStateFunction
+  val followerFunction: PaxosFunction = followingFunction orElse notLeaderFunction orElse commonStateFunction
 
-  val takeoverFunction: PaxosFunction[RemoteRef] = {
+  val takeoverFunction: PaxosFunction = {
     case PaxosEvent(io, agent, vote: PrepareResponse) =>
       handlePrepareResponse(io, agent, vote)
   }
 
-  val acceptResponseFunction: PaxosFunction[RemoteRef] = {
+  val acceptResponseFunction: PaxosFunction = {
     case PaxosEvent(io, agent, vote: AcceptResponse) =>
       handleAcceptResponse(io, agent, vote)
   }
@@ -119,7 +124,7 @@ with ClientCommandHandler[RemoteRef] {
    * which backs down easily. Only if we have dealt with all timed out prepares do we handle timed out accepts which
    * is more aggressive as it attempts to go-higher than any other node number.
    */
-  val resendFunction: PaxosFunction[RemoteRef] = {
+  val resendFunction: PaxosFunction = {
     // if we have timed-out on prepare messages
     case PaxosEvent(io, agent, CheckTimeout) if agent.data.prepareResponses.nonEmpty && io.clock > agent.data.timeout =>
       handleResendPrepares(io, agent, io.clock)
@@ -129,12 +134,12 @@ with ClientCommandHandler[RemoteRef] {
       handleResendAccepts(io, agent, io.clock)
   }
 
-  val leaderLikeFunction: PaxosFunction[RemoteRef] = {
+  val leaderLikeFunction: PaxosFunction = {
     case PaxosEvent(io, agent, c: Commit) =>
       handleReturnToFollowerOnHigherCommit(io, agent, c)
   }
 
-  val recoveringFunction: PaxosFunction[RemoteRef] =
+  val recoveringFunction: PaxosFunction =
     takeoverFunction orElse
       acceptResponseFunction orElse
       resendFunction orElse
@@ -142,9 +147,9 @@ with ClientCommandHandler[RemoteRef] {
       notLeaderFunction orElse
       commonStateFunction
 
-  val recovererFunction: PaxosFunction[RemoteRef] = recoveringFunction orElse notLeaderFunction orElse commonStateFunction
+  val recovererFunction: PaxosFunction = recoveringFunction orElse notLeaderFunction orElse commonStateFunction
 
-  val leaderStateFunction: PaxosFunction[RemoteRef] = {
+  val leaderStateFunction: PaxosFunction = {
     // heartbeats the highest commit message
     case PaxosEvent(io, agent, HeartBeat) =>
       io.send(Commit(agent.data.progress.highestCommitted))
@@ -152,21 +157,21 @@ with ClientCommandHandler[RemoteRef] {
 
     // broadcasts a new client value
     case PaxosEvent(io, agent, value: CommandValue) =>
-      handleClientCommand(io, agent, value, io.sender)
+      handleClientCommand(io, agent, value, io.senderId)
 
     // ignore late vote as we would have transitioned on a majority ack
     case PaxosEvent(io, agent, value: PrepareResponse) =>
       agent
   }
 
-  val leaderFunction: PaxosFunction[RemoteRef] =
+  val leaderFunction: PaxosFunction =
     leaderStateFunction orElse
       acceptResponseFunction orElse
       resendFunction orElse
       leaderLikeFunction orElse
       commonStateFunction
 
-  def apply(e: PaxosEvent[RemoteRef]): PaxosAgent[RemoteRef] = e.agent.role match {
+  def apply(e: PaxosEvent): PaxosAgent = e.agent.role match {
     case Follower => followerFunction(e)
     case Recoverer => recovererFunction(e)
     case Leader => leaderFunction(e)

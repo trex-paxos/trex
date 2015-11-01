@@ -9,8 +9,8 @@ import Ordering._
 
 case class TimeAndMessage(message: Any, time: Long)
 
-class TestPrepareResponseHandlerNoRetransmission extends PrepareResponseHandler[DummyRemoteRef] with BackdownAgent[DummyRemoteRef] {
-  override def requestRetransmissionIfBehind(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], from: Int, highestCommitted: Identifier): Unit = {}
+class TestPrepareResponseHandlerNoRetransmission extends PrepareResponseHandler with BackdownAgent {
+  override def requestRetransmissionIfBehind(io: PaxosIO, agent: PaxosAgent, from: Int, highestCommitted: Identifier): Unit = {}
 }
 
 class PrepareResponseHandlerTests extends WordSpecLike with Matchers with OptionValues {
@@ -249,7 +249,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
     "invokes request retransmission function when sees a committed slot higher than its own" in {
       // given
       val sentValues: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val handler = new PrepareResponseHandler[DummyRemoteRef] with BackdownAgent[DummyRemoteRef]
+      val handler = new PrepareResponseHandler with BackdownAgent
       val otherCommittedIndex = 11L
       val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), otherCommittedIndex)), 12L, 13, None)
 
@@ -447,14 +447,14 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
     val progress = Progress.highestPromisedLens.set(selfAckPrepares.progress, recoverHighNumber)
 
     // and an agent ready to choose the highest accept
-    val agent: PaxosAgent[DummyRemoteRef] =
+    val agent: PaxosAgent =
       PaxosAgent(0, Recoverer, initialData.copy(clusterSize = 5, epoch = Some(recoverHighNumber),
         progress = progress))
 
-    val lenses: PaxosLenses[DummyRemoteRef] = new TestPrepareResponseHandlerNoRetransmission
+    val lenses: PaxosLenses = new TestPrepareResponseHandlerNoRetransmission
 
     // when we get the majority
-    val prepareResponses = PrepareResponseHandler.expandedPrepareSlotRange[DummyRemoteRef](undefinedIO, lenses, agent, SortedMap.empty)
+    val prepareResponses = PrepareResponseHandler.expandedPrepareSlotRange(undefinedIO, lenses, agent, SortedMap.empty)
 
     // then we have simply recorded the vote
     prepareResponses.size shouldBe 0

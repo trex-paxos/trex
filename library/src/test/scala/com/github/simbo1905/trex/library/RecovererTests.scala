@@ -89,12 +89,12 @@ class RecovererTests extends AllRolesTests {
     def `should deal with timed-out prepares before timed-out accepts` {
       var handleResendAcceptsInvoked = false
       var handleResendPreparesInvoked = false
-      val paxosAlgorithm = new PaxosAlgorithm[DummyRemoteRef] {
-        override def handleResendAccepts(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], time: Long): PaxosAgent[DummyRemoteRef] = {
+      val paxosAlgorithm = new PaxosAlgorithm {
+        override def handleResendAccepts(io: PaxosIO, agent: PaxosAgent, time: Long): PaxosAgent = {
           handleResendAcceptsInvoked = true
           agent
         }
-        override def handleResendPrepares(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], time: Long): PaxosAgent[DummyRemoteRef] = {
+        override def handleResendPrepares(io: PaxosIO, agent: PaxosAgent, time: Long): PaxosAgent = {
           handleResendPreparesInvoked = true
           agent
         }

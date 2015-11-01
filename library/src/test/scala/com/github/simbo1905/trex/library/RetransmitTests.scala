@@ -4,7 +4,7 @@ import com.github.simbo1905.trex.library.RetransmitHandler.{AcceptState, CommitS
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{OptionValues, Matchers, WordSpecLike}
 
-class TestRetransmitHandler extends RetransmitHandler[DummyRemoteRef]
+class TestRetransmitHandler extends RetransmitHandler
 
 class RetransmitTests extends WordSpecLike
 with Matchers
@@ -92,7 +92,7 @@ with OptionValues {
       // and a retransmit handler which records what was delivered when
       var deliveredWithTs: Seq[(Long, CommandValue)] = Seq.empty
       val handler = new TestRetransmitHandler {
-        override def processRetransmitResponse(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], response: RetransmitResponse): Retransmission =
+        override def processRetransmitResponse(io: PaxosIO, agent: PaxosAgent, response: RetransmitResponse): Retransmission =
           Retransmission(progress, accepts98thru100, accepts98thru100.map(_.value))
       }
       // when it is passed a retransmit response
@@ -102,7 +102,7 @@ with OptionValues {
         }
 
         override def journal: Journal = stubJournal
-      }, PaxosAgent[DummyRemoteRef](99, Follower, initialData), RetransmitResponse(1, 0, accepts98thru100, Seq.empty))
+      }, PaxosAgent(99, Follower, initialData), RetransmitResponse(1, 0, accepts98thru100, Seq.empty))
       // then we deliver before we save
       deliveredWithTs.headOption.getOrElse(fail("empty delivered list")) match {
         case (ts, _) =>
@@ -158,8 +158,8 @@ with OptionValues {
       // given
       val committed = Seq(a98, a99)
       val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
-      val handler = new RetransmitHandler[DummyRemoteRef] {}
-      val agent = PaxosAgent[DummyRemoteRef](99, Follower, initialData98)
+      val handler = new RetransmitHandler {}
+      val agent = PaxosAgent(99, Follower, initialData98)
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
@@ -170,8 +170,8 @@ with OptionValues {
       // given
       val committed = Seq(a98, a99)
       val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
-      val handler = new RetransmitHandler[DummyRemoteRef] {}
-      val agent = PaxosAgent[DummyRemoteRef](99, Follower, initialData96)
+      val handler = new RetransmitHandler {}
+      val agent = PaxosAgent(99, Follower, initialData96)
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
@@ -183,8 +183,8 @@ with OptionValues {
       require(a98.value != a100.value)
       val committed = Seq(a98, a100)
       val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
-      val handler = new RetransmitHandler[DummyRemoteRef] {}
-      val agent = PaxosAgent[DummyRemoteRef](99, Follower, initialData97)
+      val handler = new RetransmitHandler {}
+      val agent = PaxosAgent(99, Follower, initialData97)
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
@@ -196,8 +196,8 @@ with OptionValues {
       // given
       val committed = Seq(a98, a100)
       val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
-      val handler = new RetransmitHandler[DummyRemoteRef] {}
-      val agent = PaxosAgent[DummyRemoteRef](99, Follower, initialData97)
+      val handler = new RetransmitHandler {}
+      val agent = PaxosAgent(99, Follower, initialData97)
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
@@ -208,8 +208,8 @@ with OptionValues {
       // given
       val uncommitted = Seq(a98, a100)
       val retransmitResponse = RetransmitResponse(0, 0, Seq(), uncommitted)
-      val handler = new RetransmitHandler[DummyRemoteRef] {}
-      val agent = PaxosAgent[DummyRemoteRef](99, Follower, initialData97)
+      val handler = new RetransmitHandler {}
+      val agent = PaxosAgent(99, Follower, initialData97)
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
@@ -221,8 +221,8 @@ with OptionValues {
       // given
       val committed = Seq(a98, a100)
       val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
-      val handler = new RetransmitHandler[DummyRemoteRef] {}
-      val agent = PaxosAgent[DummyRemoteRef](99, Follower, initialData97)
+      val handler = new RetransmitHandler {}
+      val agent = PaxosAgent(99, Follower, initialData97)
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
@@ -234,9 +234,9 @@ with OptionValues {
       // given
       val uncommitted = Seq(a98, a99)
       val retransmitResponse = RetransmitResponse(0, 0, Seq(), uncommitted)
-      val handler = new RetransmitHandler[DummyRemoteRef] {}
+      val handler = new RetransmitHandler {}
       val highPromise = BallotNumber(Int.MaxValue -1 , Int.MaxValue - 1)
-      val agent = PaxosAgent[DummyRemoteRef](99, Follower, highestPromisedLens.set(initialData97, highPromise))
+      val agent = PaxosAgent(99, Follower, highestPromisedLens.set(initialData97, highPromise))
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then

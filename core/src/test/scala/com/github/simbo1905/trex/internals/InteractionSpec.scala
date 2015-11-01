@@ -139,7 +139,12 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       Seq(node0, node1).map(_._map.get(2).getOrElse(fail).value) should be(Seq(hw, hw))
     }
 
+
     def `should return a response to the correct client` {
+
+
+
+
       // given node zero leader
       val node0 = new TestJournal
       val actor0 = TestActorRef(new TestPaxosActor(Configuration(InteractionSpec.config, 3), 0, self, node0, ArrayBuffer.empty, None))

@@ -5,7 +5,7 @@ import org.scalatest.{Matchers, OptionValues, WordSpecLike}
 
 import scala.collection.mutable.ArrayBuffer
 
-class TestableCommitHandler extends CommitHandler[DummyRemoteRef] with OptionValues
+class TestableCommitHandler extends CommitHandler with OptionValues
 
 object CommitHandlerTests {
   val v1 = ClientRequestCommandValue(0, Array[Byte](0))
@@ -86,7 +86,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
     }
     "do nothing if no committable values" in {
       // given a handler
-      val handler = new Object with CommitHandler[DummyRemoteRef]
+      val handler = new Object with CommitHandler
       // and an empty journal
       val emptyJournal = stub[Journal]
       (emptyJournal.accepted _) when (*) returns None
@@ -102,7 +102,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
     }
     "cancels prepare work and sets a new timeout if it sees commit with higher heartbeat" in {
       // given a handler
-      val handler = new Object with CommitHandler[DummyRemoteRef]
+      val handler = new Object with CommitHandler
       // and an agent
       val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareSelfAck, leaderHeartbeat = Long.MinValue))
       // and an io with a new timeout
@@ -120,7 +120,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
     }
     "cancels prepare work and sets a new timeout if it sees commit with higher committed number" in {
       // given a handler
-      val handler = new Object with CommitHandler[DummyRemoteRef]
+      val handler = new Object with CommitHandler
       // some number
       val high = BallotNumber(Int.MaxValue, Int.MaxValue)
       // and an agent
@@ -141,7 +141,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
     }
     "sends a retransmit if it has no committable value in the journal" in {
       // given a handler
-      val handler = new Object with CommitHandler[DummyRemoteRef]
+      val handler = new Object with CommitHandler
       // and an empty journal
       val emptyJournal = stub[Journal]
       (emptyJournal.accepted _) when (*) returns None
@@ -162,7 +162,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
     }
     "ignore repeated commit" in {
       // given a handler
-      val handler = new Object with CommitHandler[DummyRemoteRef]
+      val handler = new Object with CommitHandler
       // and an empty journal
       val emptyJournal = stub[Journal]
       (emptyJournal.accepted _) when (*) returns None

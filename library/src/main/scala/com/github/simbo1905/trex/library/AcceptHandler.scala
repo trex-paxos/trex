@@ -1,8 +1,8 @@
 package com.github.simbo1905.trex.library
 
-trait AcceptHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
+trait AcceptHandler extends PaxosLenses {
 
-  def handleAccept(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], accept: Accept): PaxosAgent[RemoteRef] = {
+  def handleAccept(io: PaxosIO, agent: PaxosAgent, accept: Accept): PaxosAgent = {
 
     accept.id match {
       case id if id.number < agent.data.progress.highestPromised =>
@@ -26,7 +26,7 @@ trait AcceptHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
    * @param accept The accept required to have number greater or equal to the agent's promise.
    * @return
    */
-  def handleHighAccept(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], accept: Accept): PaxosAgent[RemoteRef] = {
+  def handleHighAccept(io: PaxosIO, agent: PaxosAgent, accept: Accept): PaxosAgent = {
     require(agent.data.progress.highestPromised <= accept.id.number)
     io.journal.accept(accept)
     val updatedData = if (accept.id.number > agent.data.progress.highestPromised) {

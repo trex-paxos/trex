@@ -2,11 +2,11 @@ package com.github.simbo1905.trex.library
 
 case class Retransmission(newProgress: Progress, accepts: Seq[Accept], committed: Seq[CommandValue])
 
-trait RetransmitHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
+trait RetransmitHandler extends PaxosLenses {
 
   import RetransmitHandler._
 
-  def handleRetransmitResponse(io:PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], response: RetransmitResponse): PaxosAgent[RemoteRef] = {
+  def handleRetransmitResponse(io:PaxosIO, agent: PaxosAgent, response: RetransmitResponse): PaxosAgent = {
     // pure functional computation
     val retransmission = processRetransmitResponse(io, agent, response)
 
@@ -25,7 +25,7 @@ trait RetransmitHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
    * halt the progress of the receiving node.  
    * @return
    */
-  def processRetransmitResponse(io:PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], response: RetransmitResponse): Retransmission = {
+  def processRetransmitResponse(io:PaxosIO, agent: PaxosAgent, response: RetransmitResponse): Retransmission = {
     val highestCommitted = agent.data.progress.highestCommitted
     val highestPromised = agent.data.progress.highestPromised
 
@@ -52,7 +52,7 @@ trait RetransmitHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
     Retransmission(newProgress, (aboveCommitted ++ acceptState.acceptable).distinct, commitState.committed.map(_.value))
   }
 
-  def handleRetransmitRequest(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], request: RetransmitRequest): PaxosAgent[RemoteRef] = {
+  def handleRetransmitRequest(io: PaxosIO, agent: PaxosAgent, request: RetransmitRequest): PaxosAgent = {
     // extract who to respond to, where they are requesting from and where we are committed up to
     val RetransmitRequest(to, _, requestedLogIndex) = request
     val HighestCommittedIndex(committedLogIndex) = agent.data

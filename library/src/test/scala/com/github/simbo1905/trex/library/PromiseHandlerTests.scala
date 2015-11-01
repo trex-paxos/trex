@@ -9,7 +9,7 @@ import scala.compat.Platform
 
 import Ordering._
 
-class TestPrepareHandler extends PrepareHandler[DummyRemoteRef]
+class TestPrepareHandler extends PrepareHandler
 
 class PromiseHandlerTests extends Spec with MockFactory with OptionValues {
   val agentPromise10 = PaxosAgent(0, Follower, initialData.copy(progress = initialData.progress.copy(highestPromised = BallotNumber(10, 10))))
@@ -85,14 +85,14 @@ class PromiseHandlerTests extends Spec with MockFactory with OptionValues {
 
     def `should send out NotLeader and return to follower if leader` {
       val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
-      val clientCommands: Map[Identifier, (CommandValue, DummyRemoteRef)] = Map(id -> (NoOperationCommandValue -> new DummyRemoteRef))
+      val clientCommands: Map[Identifier, (CommandValue, String)] = Map(id -> (NoOperationCommandValue -> DummyRemoteRef()))
       val clientCommandsData = initialData.copy(clientCommands = clientCommands)
       val mockJournal = stub[Journal]
       (mockJournal.save _ ).when(*)
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
       var sentNoLongerLeader = false
       val io = new TestIO(mockJournal) {
-        override def sendNoLongerLeader(cmds: Map[Identifier, (CommandValue, DummyRemoteRef)]): Unit = {
+        override def sendNoLongerLeader(cmds: Map[Identifier, (CommandValue, String)]): Unit = {
           sentNoLongerLeader = true
           cmds match {
             case `clientCommands` => // good

@@ -14,7 +14,7 @@ import scala.language.postfixOps
 class LeaderSpec
   extends TestKit(ActorSystem("LeaderSpec", AllStateSpec.config))
   with DefaultTimeout with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with AllStateSpec with LeaderLikeSpec with PaxosLenses[ActorRef] {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with AllStateSpec with LeaderLikeSpec with PaxosLenses {
 
   import AllStateSpec._
   import Ordering._
@@ -189,19 +189,20 @@ class LeaderSpec
       // given two clients who have sent a request a leader
       val client1 = TestProbe()
       val client1msg = Identifier(0, epoch, 96L)
-      val client1cmd = new CommandValue() {
+      val client1cmd: CommandValue = new CommandValue() {
         val msgId = 1L
 
         override def bytes: Array[Byte] = Array()
       }
       val client2 = TestProbe()
       val client2msg = Identifier(0, epoch, 97L)
-      val client2cmd = new CommandValue() {
+      val client2cmd: CommandValue = new CommandValue() {
         val msgId = 2L
 
         override def bytes: Array[Byte] = Array()
       }
-      val clientResponses: Map[Identifier, (CommandValue, ActorRef)] = Map(client1msg ->(client1cmd, client1.ref), client2msg ->(client2cmd, client2.ref))
+
+      val clientActorMap = Map(client1msg ->(client1cmd, client1.ref), client2msg ->(client2cmd, client2.ref))
 
       // given a leader who has boardcast slot 99 and self voted on it and committed 98
       val lastCommitted = Identifier(0, epoch, 98L)
@@ -209,12 +210,14 @@ class LeaderSpec
       val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
 
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
-      val data = acceptResponsesClientCommandsLens.set(initialData, (votes, clientResponses))
+      val data = acceptResponsesClientCommandsLens.set(initialData, (votes, Map.empty))
       val committed = Progress.highestPromisedHighestCommitted.set(data.progress, (lastCommitted.number, lastCommitted))
       val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def freshTimeout(interval: Long): Long = 1234L
       })
-      fsm.underlyingActor.setAgent(Leader, data.copy(progress = committed))
+
+      val clientCommands = fsm.underlyingActor.setClientData(clientActorMap)
+      fsm.underlyingActor.setAgent(Leader, data.copy(progress = committed, clientCommands = clientCommands))
 
       // when it gets one accept giving it a majority
       fsm ! AcceptNack(id99, 1, initialData.progress)
@@ -380,7 +383,7 @@ class LeaderSpec
 
       // given low initial state committed up to 97
       val low = BallotNumber(5, 1)
-      val initialData = PaxosData(Progress(low, minIdentifier), leaderHeartbeat2, timeout4, clusterSize5, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)])
+      val initialData = PaxosData(Progress(low, minIdentifier), leaderHeartbeat2, timeout4, clusterSize5, TreeMap(), None, TreeMap(), Map.empty)
       val lastCommitted = Identifier(0, epoch, 97L)
       val committed = Progress.highestPromisedHighestCommitted.set(initialData.progress, (lastCommitted.number, lastCommitted))
       // and some other node high prepare for slot 98

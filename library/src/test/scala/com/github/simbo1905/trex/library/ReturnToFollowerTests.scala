@@ -4,8 +4,8 @@ import org.scalatest.{Matchers, OptionValues, WordSpecLike}
 
 import scala.language.postfixOps
 
-class TestReturnToFollowerHandler extends ReturnToFollowerHandler[DummyRemoteRef] {
-  def commit(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], identifier: Identifier): (Progress, Seq[(Identifier, Any)]) = (agent.data.progress, Seq.empty)
+class TestReturnToFollowerHandler extends ReturnToFollowerHandler {
+  def commit(io: PaxosIO, agent: PaxosAgent, identifier: Identifier): (Progress, Seq[(Identifier, Any)]) = (agent.data.progress, Seq.empty)
 }
 
 class ReturnToFollowerTests extends WordSpecLike with Matchers with OptionValues {
@@ -29,7 +29,7 @@ class ReturnToFollowerTests extends WordSpecLike with Matchers with OptionValues
 
     "send no longer leader to any clients" in {
       // given a handler that collects client commands
-      var clientCommands: Map[Identifier, (CommandValue, DummyRemoteRef)] = Map.empty
+      var clientCommands: Map[Identifier, (CommandValue, String)] = Map.empty
       val handler = new TestReturnToFollowerHandler
       // and a commit message id higher than the initial data value of 0L
       val id = initialData.progress.highestCommitted.copy(logIndex = 99L, from = 2)
@@ -38,7 +38,7 @@ class ReturnToFollowerTests extends WordSpecLike with Matchers with OptionValues
         clientCommands = initialDataClientCommand)
       // when we handle that message
       handler.handleReturnToFollowerOnHigherCommit(new TestIO(new UndefinedJournal){
-        override def sendNoLongerLeader(cc: Map[Identifier, (CommandValue, DummyRemoteRef)]): Unit = clientCommands = cc
+        override def sendNoLongerLeader(cc: Map[Identifier, (CommandValue, String)]): Unit = clientCommands = cc
       }, PaxosAgent(0, Recoverer, dataWithClient), Commit(id))
       // then the client is sent a NoLongerLeaderException
       clientCommands shouldBe dataWithClient.clientCommands

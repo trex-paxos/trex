@@ -55,7 +55,7 @@ class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, nodeUniqueId: 
   // custom heartbeat interval as things are all in memory
   override def heartbeatInterval = 33
 
-  override def trace(state: PaxosRole, data: PaxosData[ActorRef], msg: Any): Unit = tracer.foreach(t => t(TraceData(nodeUniqueId, state, data, None, msg)))
+  override def trace(state: PaxosRole, data: PaxosData, msg: Any): Unit = tracer.foreach(t => t(TraceData(nodeUniqueId, state, data, None, msg)))
 }
 
 object ClusterHarness {

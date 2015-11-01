@@ -4,13 +4,13 @@ import com.github.simbo1905.trex.library.Ordering._
 
 import scala.collection.SortedMap
 
-case class AcceptsAndData[RemoteRef](accepts: Traversable[Accept], data: PaxosData[RemoteRef])
+case class AcceptsAndData(accepts: Traversable[Accept], data: PaxosData)
 
-trait ResendHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
+trait ResendHandler extends PaxosLenses {
 
   import ResendHandler._
 
-  def highestNumberProgressed(data: PaxosData[RemoteRef]): BallotNumber = Seq(data.epoch, Option(data.progress.highestPromised), Option(data.progress.highestCommitted.number)).flatten.max
+  def highestNumberProgressed(data: PaxosData): BallotNumber = Seq(data.epoch, Option(data.progress.highestPromised), Option(data.progress.highestCommitted.number)).flatten.max
 
   /**
    * Locates the accepts where we have timed-out on getting a majority accept response. If we have seen evidence of
@@ -21,7 +21,7 @@ trait ResendHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
    * @param time The current time
    * @return
    */
-  def handleResendAccepts(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], time: Long): PaxosAgent[RemoteRef] = {
+  def handleResendAccepts(io: PaxosIO, agent: PaxosAgent, time: Long): PaxosAgent = {
     // compute the timed out accepts, making fresh ones with higher numbers on a new epoch if required
     val AcceptsAndData(accepts, newData) = computeResendAccepts(io, agent, time)
     // if we have bumped the epoch we need to save fresh accepts and journal the new progress
@@ -34,7 +34,7 @@ trait ResendHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
     agent.copy(data = newData)
   }
 
-  def handleResendPrepares(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], time: Long): PaxosAgent[RemoteRef] = {
+  def handleResendPrepares(io: PaxosIO, agent: PaxosAgent, time: Long): PaxosAgent = {
     agent.data.prepareResponses foreach {
       case (id, _) =>
         io.send(Prepare(id))
@@ -42,14 +42,14 @@ trait ResendHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
     agent.copy(data = timeoutLens.set(agent.data, io.randomTimeout))
   }
 
-  def computeResendAccepts(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], time: Long): AcceptsAndData[RemoteRef] = {
+  def computeResendAccepts(io: PaxosIO, agent: PaxosAgent, time: Long): AcceptsAndData = {
 
     // find the individual responses that have timed out
     val late = timedOutResponse(time, agent.data.acceptResponses)
 
     if (late.isEmpty) {
       // nothing more to do
-      AcceptsAndData[RemoteRef](Seq.empty, agent.data)
+      AcceptsAndData(Seq.empty, agent.data)
     } else {
       io.plog.info(s"timed out on ${late.size} accepts")
 

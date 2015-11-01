@@ -35,14 +35,14 @@ class UnhandledTests extends WordSpecLike {
       // given
       var loggedError: String = ""
 
-      val handler = new UnhandledHandler[DummyRemoteRef] {
+      val handler = new UnhandledHandler {
         override def stderr(message: String): Unit = loggedError = message
       }
 
       val unknown = "~unknown message~"
 
       //andler.handleUnhandled(99, Leader, probe.ref, AllStateSpec.initialData, unknown)
-      handler.handleUnhandled(new TestIO(new UndefinedJournal), PaxosAgent[DummyRemoteRef](99, Leader, initialData), unknown)
+      handler.handleUnhandled(new TestIO(new UndefinedJournal), PaxosAgent(99, Leader, initialData), unknown)
 
       assert(loggedError.contains("99") && loggedError.contains("Leader") && loggedError.contains(unknown))
     }

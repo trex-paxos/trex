@@ -4,7 +4,7 @@ import scala.collection.immutable.SortedMap
 
 import Ordering._
 
-trait CommitHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
+trait CommitHandler extends PaxosLenses {
 
   import CommitHandler._
 
@@ -15,7 +15,7 @@ trait CommitHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
    * @param identifier The value to commit specified by its number and slot position.
    * @return A tuple of the new progress and a seq of the identifiers and the response to the deliver operation.
    */
-  def commit(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], identifier: Identifier): (Progress, Seq[(Identifier, Any)]) = {
+  def commit(io: PaxosIO, agent: PaxosAgent, identifier: Identifier): (Progress, Seq[(Identifier, Any)]) = {
     val Identifier(_, number, commitIndex) = identifier
     val Progress(_, highestCommitted) = agent.data.progress
 
@@ -39,7 +39,7 @@ trait CommitHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
 
   }
 
-  def handleFollowerCommit(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], c: Commit): PaxosAgent[RemoteRef] = {
+  def handleFollowerCommit(io: PaxosIO, agent: PaxosAgent, c: Commit): PaxosAgent = {
     val heartbeat = c.heartbeat
     val oldData = agent.data
     val i = c.identifier

@@ -9,7 +9,13 @@ import com.github.simbo1905.trex.library._
 import com.typesafe.config.Config
 
 import scala.collection.immutable.{SortedMap, TreeMap}
+import scala.collection.mutable
 import scala.util.Try
+
+/**
+A concrete reference to a remote client.
+*/
+//case class ActorRemoteRef(val ref: ActorRef) extends RemoteRef
 
 /**
  * Note that for testing this class does not schedule and manage its own timeouts. Extend a subclass which schedules
@@ -21,20 +27,39 @@ import scala.util.Try
  * @param journal The durable journal required to store the state of the node in a stable manner between crashes.
  */
 abstract class PaxosActor(config: Configuration, val nodeUniqueId: Int, broadcastRef: ActorRef, val journal: Journal) extends Actor
-with PaxosIO[ActorRef]
+with PaxosIO
 with ActorLogging
 with AkkaLoggingAdapter {
   log.info("timeout min {}, timeout max {}", config.leaderTimeoutMin, config.leaderTimeoutMax)
 
-  var paxosAgent = new PaxosAgent[ActorRef](nodeUniqueId, Follower, PaxosData[ActorRef](journal.load(), 0, 0, config.clusterSize, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, ActorRef)]))
+  var paxosAgent = new PaxosAgent(nodeUniqueId, Follower, PaxosData(journal.load(), 0, 0, config.clusterSize, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, String)]))
 
   val plog = this
 
-  private val paxosAlgorithm = new PaxosAlgorithm[ActorRef]
+  private val paxosAlgorithm = new PaxosAlgorithm
+
+  protected val actorRefWeakMap = new mutable.WeakHashMap[String,ActorRef]
+
+  // for the algorithm to have no dependency on akka we need to assign a String IDs
+  // to pass into the algorithm then later resolve the ActorRef by ID
+  override def senderId: String = {
+    val ref = sender()
+    val pathAsString = ref.path.toString
+    actorRefWeakMap.put(pathAsString, ref)
+    plog.debug("weak map key {} value {}", pathAsString, ref)
+    pathAsString
+  }
+
+  def respond(pathAsString: String, data: Any) = actorRefWeakMap.get(pathAsString) match {
+    case Some(ref) =>
+      ref ! data
+    case _ =>
+      plog.debug("weak map does not hold key {} to reply with {}", pathAsString, data)
+  }
 
   override def receive: Receive = {
     case m: PaxosMessage =>
-      val event = new PaxosEvent[ActorRef](this, paxosAgent, m)
+      val event = new PaxosEvent(this, paxosAgent, m)
       trace(event)
       val agent = paxosAlgorithm(event)
       transmit(sender())
@@ -57,8 +82,6 @@ with AkkaLoggingAdapter {
     this.sent = Seq()
   }
 
-  def respond(ref: ActorRef, data: Any) = ref ! data
-
   def broadcast(msg: PaxosMessage): Unit = broadcastRef ! msg
 
   // tests can override this
@@ -68,7 +91,7 @@ with AkkaLoggingAdapter {
 
   def highestAcceptedIndex = journal.bounds.max
 
-  def event(io: PaxosIO[ActorRef], stateName: PaxosRole, data: PaxosData[ActorRef], msg: PaxosMessage): PaxosEvent[ActorRef] = PaxosEvent[ActorRef](io, PaxosAgent(nodeUniqueId, stateName, data), msg)
+  def event(io: PaxosIO, stateName: PaxosRole, data: PaxosData, msg: PaxosMessage): PaxosEvent = PaxosEvent(io, PaxosAgent(nodeUniqueId, stateName, data), msg)
 
   def randomInterval: Long = {
     config.leaderTimeoutMin + ((config.leaderTimeoutMax - config.leaderTimeoutMin) * random.nextDouble()).toLong
@@ -87,9 +110,9 @@ with AkkaLoggingAdapter {
   type Epoch = Option[BallotNumber]
   type PrepareSelfVotes = SortedMap[Identifier, Option[Map[Int, PrepareResponse]]]
 
-  def trace(state: PaxosRole, data: PaxosData[ActorRef], msg: Any): Unit = {}
+  def trace(state: PaxosRole, data: PaxosData, msg: Any): Unit = {}
 
-  def trace(event: PaxosEvent[ActorRef]): Unit = trace(event.agent.role, event.agent.data, event.message)
+  def trace(event: PaxosEvent): Unit = trace(event.agent.role, event.agent.data, event.message)
 
   /**
    * The deliver method is called when the value is committed.
@@ -110,10 +133,10 @@ with AkkaLoggingAdapter {
   /**
    * Notifies clients that it is no longer the leader by sending them an exception.
    */
-  def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, ActorRef)]): Unit = clientCommands foreach {
+  def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = clientCommands foreach {
     case (id, (cmd, client)) =>
       log.warning("Sending NoLongerLeader to client {} the outcome of the client cmd {} at slot {} is unknown.", client, cmd, id.logIndex)
-      send(client, new NoLongerLeaderException(nodeUniqueId, cmd.msgId))
+      respond(client, new NoLongerLeaderException(nodeUniqueId, cmd.msgId))
   }
 
   /**
@@ -132,6 +155,7 @@ with AkkaLoggingAdapter {
    * This method is abstract as the implementation is specific to the host application.
    */
   val deliverClient: PartialFunction[CommandValue, AnyRef]
+
 }
 
 /**
@@ -194,7 +218,7 @@ object PaxosActor {
   val random = new SecureRandom
 
   // Log the nodeUniqueID, stateName,.underlyingActor.data. sender and message for tracing purposes
-  case class TraceData(nodeUniqueId: Int, stateName: PaxosRole, statData: PaxosData[ActorRef], sender: Option[ActorRef], message: Any)
+  case class TraceData(nodeUniqueId: Int, stateName: PaxosRole, statData: PaxosData, sender: Option[String], message: Any)
 
   type Tracer = TraceData => Unit
 

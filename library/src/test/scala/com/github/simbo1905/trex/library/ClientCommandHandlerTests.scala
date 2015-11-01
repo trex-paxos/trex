@@ -7,7 +7,7 @@ import scala.collection.mutable.ArrayBuffer
 class ClientCommandHandlerTests extends WordSpecLike
 with Matchers
 with OptionValues
-with PaxosLenses[DummyRemoteRef] {
+with PaxosLenses {
 
   import TestHelpers._
 
@@ -29,7 +29,7 @@ with PaxosLenses[DummyRemoteRef] {
     }
     "ack if has not made a higher promise" in {
       // given a leader
-      val agent: PaxosAgent[DummyRemoteRef] = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)))
+      val agent: PaxosAgent = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)))
       // and a fresh timeout
       val ioWithTimeout = new UndefinedIO {
         override def randomTimeout: Long = 12345L
@@ -58,7 +58,7 @@ with PaxosLenses[DummyRemoteRef] {
     "nacks if has made a higher promise" in {
       // given an Leader agent with a high promise
       val highPromiseData = highestPromisedLens.set(initialData, BallotNumber(Int.MaxValue, Int.MaxValue))
-      val agent: PaxosAgent[DummyRemoteRef] = PaxosAgent(5, Leader, highPromiseData.copy(epoch = Option(highPromiseData.progress.highestPromised)))
+      val agent: PaxosAgent = PaxosAgent(5, Leader, highPromiseData.copy(epoch = Option(highPromiseData.progress.highestPromised)))
       // and a fresh timeout
       val ioWithTimeout = new UndefinedIO {
         override def randomTimeout: Long = 12345L
@@ -86,10 +86,10 @@ with PaxosLenses[DummyRemoteRef] {
     }
     "does not journal a nack" in {
       // given a handler
-      val handler = new Object with ClientCommandHandler[DummyRemoteRef]
+      val handler = new Object with ClientCommandHandler
       // and a Leader agent with a high promise
       val highPromiseData = highestPromisedLens.set(initialData, BallotNumber(Int.MaxValue, Int.MaxValue))
-      val agent: PaxosAgent[DummyRemoteRef] =
+      val agent: PaxosAgent =
         PaxosAgent(5, Leader, highPromiseData.copy(epoch = Option(BallotNumber(Int.MinValue, Int.MinValue))))
       // and a fresh timeout
       val ioWithTimeout = new UndefinedIO {
@@ -113,9 +113,9 @@ with PaxosLenses[DummyRemoteRef] {
     }
     "journals before sending" in {
       // given a handler
-      val handler = new Object with ClientCommandHandler[DummyRemoteRef]
+      val handler = new Object with ClientCommandHandler
       // and a leader
-      val agent: PaxosAgent[DummyRemoteRef] = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)))
+      val agent: PaxosAgent = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)))
       // and an IO which records when it sent and saved
       val acceptedTs = ArrayBuffer[Long]()
       val sent = ArrayBuffer[Long]()
@@ -137,9 +137,9 @@ with PaxosLenses[DummyRemoteRef] {
     "holds onto the client ref" in {
       require(initialData.clientCommands.isEmpty)
       // given a handler
-      val handler = new Object with ClientCommandHandler[DummyRemoteRef]
+      val handler = new Object with ClientCommandHandler
       // and a leader
-      val agent: PaxosAgent[DummyRemoteRef] = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)))
+      val agent: PaxosAgent = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)))
       // and a minimal IO that captures the sent accept
       val sent = ArrayBuffer[PaxosMessage]()
       val ioWithTimeout = new UndefinedIO {

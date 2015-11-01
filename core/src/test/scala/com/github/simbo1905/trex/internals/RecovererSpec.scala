@@ -15,7 +15,7 @@ import scala.language.postfixOps
 class RecovererSpec
   extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.config))
   with DefaultTimeout with WordSpecLike with Matchers with MockFactory with ImplicitSender
-  with BeforeAndAfter with AllStateSpec with LeaderLikeSpec with NotLeaderSpec with OptionValues with PaxosLenses[ActorRef] {
+  with BeforeAndAfter with AllStateSpec with LeaderLikeSpec with NotLeaderSpec with OptionValues with PaxosLenses {
 
   import AllStateSpec._
   import Ordering._

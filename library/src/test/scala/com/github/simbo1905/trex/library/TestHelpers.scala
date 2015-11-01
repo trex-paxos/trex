@@ -4,9 +4,11 @@ import com.github.simbo1905.trex.library.Ordering._
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 
-case class DummyRemoteRef(val number: Int = 0)
+object DummyRemoteRef {
+  def apply(number: Int = 0) = s"DummyRemoteRef$number"
+}
 
-class UndefinedIO extends PaxosIO[DummyRemoteRef] {
+class UndefinedIO extends PaxosIO{
   override def journal: Journal = throw new AssertionError("deliberately not implemented")
 
   override def plog: PaxosLogging = throw new AssertionError("deliberately not implemented")
@@ -21,11 +23,11 @@ class UndefinedIO extends PaxosIO[DummyRemoteRef] {
 
   override def deliver(value: CommandValue): Any = throw new AssertionError("deliberately not implemented")
 
-  override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, DummyRemoteRef)]): Unit = throw new AssertionError("deliberately not implemented")
+  override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = throw new AssertionError("deliberately not implemented")
 
-  override def respond(client: DummyRemoteRef, data: Any): Unit = throw new AssertionError("deliberately not implemented")
+  override def respond(client: String, data: Any): Unit = throw new AssertionError("deliberately not implemented")
 
-  override def sender: DummyRemoteRef = throw new AssertionError("deliberately not implemented")
+  override def senderId: String = throw new AssertionError("deliberately not implemented")
 }
 
 trait SilentLogging {
@@ -83,7 +85,7 @@ class UndefinedAcceptResponse extends AcceptResponse {
 
 case class TimeAndParameter(time: Long, parameter: Any)
 
-object TestHelpers extends PaxosLenses[DummyRemoteRef] {
+object TestHelpers extends PaxosLenses{
   val undefinedIO = new UndefinedIO
 
   val undefinedSilentIO = new UndefinedIO with SilentLogging
@@ -112,18 +114,18 @@ object TestHelpers extends PaxosLenses[DummyRemoteRef] {
     override def clock: Long = Long.MaxValue
   }
 
-  val paxosAlgorithm = new PaxosAlgorithm[DummyRemoteRef]
+  val paxosAlgorithm = new PaxosAlgorithm
 
   val lowValue = Int.MinValue + 1
 
-  val initialData = PaxosData[DummyRemoteRef](
+  val initialData = PaxosData(
     progress = Progress(
       highestPromised = BallotNumber(lowValue, lowValue),
       highestCommitted = Identifier(from = 0, number = BallotNumber(lowValue, lowValue), logIndex = 0)
     ),
     leaderHeartbeat = 0,
     timeout = 0,
-    clusterSize = 3, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, DummyRemoteRef)])
+    clusterSize = 3, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, String)])
 
   val undefinedPrepareResponse = new UndefinedPrepareResponse
 
@@ -183,7 +185,7 @@ object TestHelpers extends PaxosLenses[DummyRemoteRef] {
   val initialDataCommittedSlotOne = PaxosData(
     Progress(
       BallotNumber(lowValue, lowValue), Identifier(0, BallotNumber(lowValue, lowValue), 1)
-    ), 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, DummyRemoteRef)])
+    ), 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, String)])
 
   val a101 = Accept(identifier101, v3)
 
@@ -225,14 +227,14 @@ object TestHelpers extends PaxosLenses[DummyRemoteRef] {
   val selfAckPrepares2 = initialData.copy(clusterSize = 5, epoch = highPrepareEpoch, prepareResponses = prepareSelfAck2, acceptResponses = SortedMap.empty)
 
 
-  val initialData97 = PaxosData[DummyRemoteRef](
+  val initialData97 = PaxosData(
     progress = Progress(
       highestPromised = BallotNumber(lowValue, lowValue),
       highestCommitted = Identifier(from = 0, number = BallotNumber(lowValue, lowValue), logIndex = 97)
     ),
     leaderHeartbeat = 0,
     timeout = 0,
-    clusterSize = 3, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, DummyRemoteRef)])
+    clusterSize = 3, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, String)])
 
   val initialData96 = initialData97.copy(progress = progress96)
 
@@ -269,5 +271,5 @@ object TestHelpers extends PaxosLenses[DummyRemoteRef] {
     Seq((a98.id -> AcceptResponsesAndTimeout(Long.MaxValue, a98, Map(0 -> a98ack0))),
       (a99.id -> AcceptResponsesAndTimeout(Long.MaxValue, a99, Map.empty)))
 
-  val initialDataClientCommand = Map(initialData.progress.highestCommitted -> (NoOperationCommandValue, new DummyRemoteRef))
+  val initialDataClientCommand = Map(initialData.progress.highestCommitted -> (NoOperationCommandValue, DummyRemoteRef()))
 }

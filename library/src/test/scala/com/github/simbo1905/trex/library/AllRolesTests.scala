@@ -4,7 +4,7 @@ import org.scalatest.{OptionValues, Matchers, Spec}
 
 import scala.collection.mutable.ArrayBuffer
 
-class AllRolesTests extends Spec with PaxosLenses[DummyRemoteRef] with Matchers with OptionValues {
+class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValues {
   import TestHelpers._
 
   def nackLowPrepare(role: PaxosRole) = {
@@ -20,8 +20,8 @@ class AllRolesTests extends Spec with PaxosLenses[DummyRemoteRef] with Matchers 
         override def bounds: JournalBounds = JournalBounds(0, highestAccepted)
       }
     }
-    val event = new PaxosEvent[DummyRemoteRef](io, agent, prepare)
-    val paxosAlgorithm = new PaxosAlgorithm[DummyRemoteRef]
+    val event = new PaxosEvent(io, agent, prepare)
+    val paxosAlgorithm = new PaxosAlgorithm
     // when
     val PaxosAgent(_, _, data) = paxosAlgorithm(event)
     // then

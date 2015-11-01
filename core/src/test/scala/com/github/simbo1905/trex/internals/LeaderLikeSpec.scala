@@ -13,7 +13,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 trait LeaderLikeSpec {
-  self: TestKit with MockFactory with AllStateSpec with Matchers with PaxosLenses[ActorRef] =>
+  self: TestKit with MockFactory with AllStateSpec with Matchers with PaxosLenses =>
 
   import AllStateSpec._
   import Ordering._

@@ -4,7 +4,7 @@ import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 
-class CoreTests extends WordSpecLike with Matchers with PaxosLenses[DummyRemoteRef] {
+class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
   "Paxos Numbers" should {
     "have working equalities" in {
       assert(BallotNumber(2, 2) > BallotNumber(1, 2))
@@ -36,7 +36,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses[DummyRemoteR
 
     import Ordering._
 
-    val nodeData = PaxosData(progress, 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, DummyRemoteRef)])
+    val nodeData = PaxosData(progress, 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, String)])
     val id = Identifier(0, BallotNumber(1, 2), 3L)
 
     "set prepare responses" in {
@@ -66,7 +66,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses[DummyRemoteR
 
     "set client commands" in {
       {
-        val newData = clientCommandsLens.set(nodeData, Map.empty[Identifier, (CommandValue, DummyRemoteRef)])
+        val newData = clientCommandsLens.set(nodeData, Map.empty[Identifier, (CommandValue, String)])
         assert(newData == nodeData)
       }
       {
@@ -75,7 +75,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses[DummyRemoteR
 
           override def bytes: Array[Byte] = Array()
         }
-        val remoteRef = new DummyRemoteRef
+        val remoteRef = DummyRemoteRef()
         val clientCommands = Map(id ->(commandValue, remoteRef))
         val newData = clientCommandsLens.set(nodeData, clientCommands)
         assert(newData.clientCommands(id) == (commandValue -> remoteRef))
@@ -87,7 +87,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses[DummyRemoteR
         val newData = leaderLens.set(nodeData, (
           SortedMap.empty[Identifier, Map[Int, PrepareResponse]],
           SortedMap.empty[Identifier, AcceptResponsesAndTimeout],
-          Map.empty[Identifier, (CommandValue, DummyRemoteRef)])
+          Map.empty[Identifier, (CommandValue, String)])
         )
         assert(newData == nodeData)
       }
@@ -100,7 +100,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses[DummyRemoteR
 
           override def bytes: Array[Byte] = Array()
         }
-        val remoteRef = new DummyRemoteRef
+        val remoteRef = DummyRemoteRef()
         val clientCommands = Map(id ->(commandValue, remoteRef))
         val newData = leaderLens.set(nodeData, (prepareResponses, acceptResponses, clientCommands))
         assert(newData.prepareResponses(id) == Map.empty)
@@ -128,14 +128,14 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses[DummyRemoteR
         prepareResponses = TreeMap(id -> Map.empty),
         epoch = Some(number),
         acceptResponses = TreeMap(id -> AcceptResponsesAndTimeout(0, accept, Map.empty)),
-        clientCommands = Map(id ->(NoOperationCommandValue, new DummyRemoteRef))
+        clientCommands = Map(id ->(NoOperationCommandValue, DummyRemoteRef()))
       )
-      val handler = new PaxosLenses[DummyRemoteRef] with BackdownAgent[DummyRemoteRef]
+      val handler = new PaxosLenses with BackdownAgent
       var sentNoLongerLeader = false
       val io = new TestIO(new UndefinedJournal) {
         override def randomTimeout: Long = 99L
 
-        override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, DummyRemoteRef)]): Unit = sentNoLongerLeader = true
+        override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = sentNoLongerLeader = true
       }
       // when we backdown
       val PaxosAgent(nuid, role, followerData) = handler.backdownAgent(io, PaxosAgent(0, Leader, leaderData))

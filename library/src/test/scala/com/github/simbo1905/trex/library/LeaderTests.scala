@@ -73,12 +73,12 @@ class LeaderTests extends AllRolesTests {
     def `should deal with timed-out prepares before timed-out accepts` {
       var handleResendAcceptsInvoked = false
       var handleResendPreparesInvoked = false
-      val paxosAlgorithm = new PaxosAlgorithm[DummyRemoteRef] {
-        override def handleResendAccepts(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], time: Long): PaxosAgent[DummyRemoteRef] = {
+      val paxosAlgorithm = new PaxosAlgorithm {
+        override def handleResendAccepts(io: PaxosIO, agent: PaxosAgent, time: Long): PaxosAgent = {
           handleResendAcceptsInvoked = true
           agent
         }
-        override def handleResendPrepares(io: PaxosIO[DummyRemoteRef], agent: PaxosAgent[DummyRemoteRef], time: Long): PaxosAgent[DummyRemoteRef] = {
+        override def handleResendPrepares(io: PaxosIO, agent: PaxosAgent, time: Long): PaxosAgent = {
           handleResendPreparesInvoked = true
           agent
         }
@@ -127,7 +127,7 @@ class LeaderTests extends AllRolesTests {
     ))
 
     def `Return to follower handler should do nothing for commit not at higher slot ` = {
-      val handler = new ReturnToFollowerHandler[DummyRemoteRef] with CommitHandler[DummyRemoteRef] {}
+      val handler = new ReturnToFollowerHandler with CommitHandler {}
       val commitAtIndex = Commit(leader.data.progress.highestCommitted)
       handler.handleReturnToFollowerOnHigherCommit(undefinedSilentIO, leader, commitAtIndex) match {
         case `leader` => // good

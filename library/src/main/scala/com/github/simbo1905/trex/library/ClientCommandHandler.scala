@@ -3,11 +3,11 @@ package com.github.simbo1905.trex.library
 import scala.collection.immutable.SortedMap
 import Ordering._
 
-trait ClientCommandHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
+trait ClientCommandHandler extends PaxosLenses {
 
   import ClientCommandHandler._
 
-  def handleClientCommand(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], value: CommandValue, client: RemoteRef): PaxosAgent[RemoteRef] = {
+  def handleClientCommand(io: PaxosIO, agent: PaxosAgent, value: CommandValue, client: String): PaxosAgent = {
     val accept = acceptFor(agent, value)
     val SelfAckOrNack(response, updated) = leaderSelfAckOrNack(io, agent, accept)
     response match {
@@ -25,7 +25,7 @@ trait ClientCommandHandler[RemoteRef] extends PaxosLenses[RemoteRef] {
 case class SelfAckOrNack(response: AcceptResponse, acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout])
 
 object ClientCommandHandler {
-  def acceptFor[RemoteRef](agent: PaxosAgent[RemoteRef], value: CommandValue): Accept = {
+  def acceptFor(agent: PaxosAgent, value: CommandValue): Accept = {
     // compute next slot
     val lastLogIndex: Long = agent.data.acceptResponses.lastOption match {
       case Some((id, _)) => id.logIndex
@@ -37,7 +37,7 @@ object ClientCommandHandler {
     Accept(aid, value)
   }
 
-  def leaderSelfAckOrNack[RemoteRef](io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], accept: Accept): SelfAckOrNack = {
+  def leaderSelfAckOrNack(io: PaxosIO, agent: PaxosAgent, accept: Accept): SelfAckOrNack = {
     val response = agent.data.progress.highestPromised match {
       case promise if promise > accept.id.number => AcceptNack(accept.id, agent.nodeUniqueId, agent.data.progress)
       case _ => AcceptAck(accept.id, agent.nodeUniqueId, agent.data.progress)

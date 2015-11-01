@@ -5,11 +5,11 @@ import com.github.simbo1905.trex.library.Ordering._
 import scala.collection.immutable.SortedMap
 import Vote._
 
-trait PrepareResponseHandler[RemoteRef] extends PaxosLenses[RemoteRef] with BackdownAgent[RemoteRef] {
+trait PrepareResponseHandler extends PaxosLenses with BackdownAgent {
 
   import PrepareResponseHandler._
 
-  def requestRetransmissionIfBehind(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], from: Int, highestCommitted: Identifier): Unit = {
+  def requestRetransmissionIfBehind(io: PaxosIO, agent: PaxosAgent, from: Int, highestCommitted: Identifier): Unit = {
     val highestCommittedIndex = agent.data.progress.highestCommitted.logIndex
     val highestCommittedIndexOther = highestCommitted.logIndex
     if (highestCommittedIndexOther > highestCommittedIndex) {
@@ -23,7 +23,7 @@ trait PrepareResponseHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
     case _ => false
   }
 
-  def handlePrepareResponse(io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], vote: PrepareResponse): PaxosAgent[RemoteRef] = {
+  def handlePrepareResponse(io: PaxosIO, agent: PaxosAgent, vote: PrepareResponse): PaxosAgent = {
     require(agent.role == Recoverer, s"handle prepare response must be called in state Recoverer not ${agent.role}")
     requestRetransmissionIfBehind(io, agent, vote.from, vote.progress.highestCommitted)
 
@@ -80,9 +80,9 @@ trait PrepareResponseHandler[RemoteRef] extends PaxosLenses[RemoteRef] with Back
 }
 
 object PrepareResponseHandler {
-  def expandedPrepareSlotRange[RemoteRef](io: PaxosIO[RemoteRef],
-                                          lenses: PaxosLenses[RemoteRef],
-                                          agent: PaxosAgent[RemoteRef],
+  def expandedPrepareSlotRange(io: PaxosIO,
+                                          lenses: PaxosLenses,
+                                          agent: PaxosAgent,
                                           votes: Map[Int, PrepareResponse]): SortedMap[Identifier, Map[Int, PrepareResponse]] = {
     // issue more prepares there are more accepted slots than we so far ran recovery upon
     agent.data.prepareResponses.lastOption match {
@@ -120,7 +120,7 @@ object PrepareResponseHandler {
     }
   }
 
-  def chooseAccept[RemoteRef](io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], positives: Iterable[PrepareResponse], id: Identifier) = {
+  def chooseAccept(io: PaxosIO, agent: PaxosAgent, positives: Iterable[PrepareResponse], id: Identifier) = {
     val accepts = positives flatMap {
       case PrepareAck(_, _, _, _, _, optionAccept) => optionAccept
       case _ => None
@@ -137,7 +137,7 @@ object PrepareResponseHandler {
     }
   }
 
-  def respondToSelf[RemoteRef](io: PaxosIO[RemoteRef], agent: PaxosAgent[RemoteRef], expandedData: PaxosData[RemoteRef], accept: Accept) = {
+  def respondToSelf(io: PaxosIO, agent: PaxosAgent, expandedData: PaxosData, accept: Accept) = {
     if (accept.id.number >= expandedData.progress.highestPromised) {
       io.plog.debug("Node {} {} accepting own message {}", agent.nodeUniqueId, agent.role, accept.id)
       io.journal.accept(accept)

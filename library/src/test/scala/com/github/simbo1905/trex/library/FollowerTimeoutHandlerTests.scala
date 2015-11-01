@@ -7,7 +7,7 @@ import TestHelpers._
 
 import Ordering._
 
-object TestFollowerHandler extends PaxosLenses[DummyRemoteRef] {
+object TestFollowerHandler extends PaxosLenses {
 
 
   val minPrepare: Prepare = Prepare(Identifier(99, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
@@ -18,8 +18,8 @@ object TestFollowerHandler extends PaxosLenses[DummyRemoteRef] {
     timeoutPrepareResponsesLens.set(initialData, (99L, TreeMap(minPrepare.id -> Map(0 -> selfNack))))
 }
 
-class TestFollowerHandler extends FollowerHandler[DummyRemoteRef] with BackdownAgent[DummyRemoteRef] {
-  override def highestAcceptedIndex(io: PaxosIO[DummyRemoteRef]): Long = 0L
+class TestFollowerHandler extends FollowerHandler with BackdownAgent {
+  override def highestAcceptedIndex(io: PaxosIO): Long = 0L
 }
 
 class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with OptionValues {
@@ -31,14 +31,14 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       // given a handler which records what it broadcasts
       var sentMsg: Option[Any] = None
       val handler = new TestFollowerHandler
-      val agent: PaxosAgent[DummyRemoteRef] = PaxosAgent(99, Follower, initialData)
+      val agent: PaxosAgent = PaxosAgent(99, Follower, initialData)
       // when timeout on minPrepare logic is invoked
       handler.sendLowPrepares(new TestIO(new UndefinedJournal){
         override def send(msg: PaxosMessage): Unit = sentMsg = Option(msg)
         override def randomTimeout: Long = 12345L
         override def minPrepare: Prepare = TestFollowerHandler.minPrepare
       }, agent) match {
-        case PaxosAgent(99, Follower,data: PaxosData[DummyRemoteRef]) =>
+        case PaxosAgent(99, Follower,data: PaxosData) =>
           // it should set a fresh timeout
           data.timeout shouldBe 12345L
           // and have nacked its own minPrepare
@@ -226,7 +226,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
           TreeMap(minPrepare.id -> votes)))
       val agent = PaxosAgent(0, Follower, data.copy(leaderHeartbeat = 888))
       // when
-      val handler = new Object with FollowerHandler[DummyRemoteRef]
+      val handler = new Object with FollowerHandler
       val PaxosAgent(_, _, newData) = handler.handleMajorityResponse(undefinedIOwithNoopLogging, agent, votes)
       // then
       newData.prepareResponses.isEmpty shouldBe true
