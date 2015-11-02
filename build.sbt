@@ -6,7 +6,7 @@ val akkaVersion = "2.3.14"
 
 lazy val commonSettings = Seq(
   scalaVersion := "2.11.7",
-  organization := "com.github.simbo1905",
+  organization := "com.github.trex",
   version := "0.1",
   scalacOptions := Seq("-feature", "-deprecation", "-Xfatal-warnings")
 )
