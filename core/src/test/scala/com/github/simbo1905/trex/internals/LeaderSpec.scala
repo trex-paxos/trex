@@ -36,32 +36,11 @@ class LeaderSpec
   val expectedBytes3 = expectedString2.getBytes
 
   "Leader" should {
-    "ack a repeated prepare" in {
-      ackRepeatedPrepare(Leader)
-    }
-    "accept higher prepare" in {
-      ackHigherPrepare(Leader)
-    }
     "not commit non contiguous retransmission response" in {
       journalsButDoesNotCommitIfNotContiguousRetransmissionResponse(Leader)
     }
     "journals accept messages and sets higher promise" in {
       journalsAcceptMessagesAndSetsHigherPromise(Leader)
-    }
-    "nack an accept lower than its last promise" in {
-      nackAcceptLowerThanPromise(Leader)
-    }
-    "nack an accept for a slot which is committed" in {
-      nackAcceptAboveCommitWatermark(Leader)
-    }
-    "ack duplidated accept" in {
-      ackDuplicatedAccept(Leader)
-    }
-    "journal accepted messages" in {
-      ackAccept(Leader)
-    }
-    "increments promise with higher accept" in {
-      ackHigherAcceptMakingPromise(Leader)
     }
     "ignore commit message for lower log index" in {
       ignoreCommitMessageLogIndexLessThanLastCommit(Leader)

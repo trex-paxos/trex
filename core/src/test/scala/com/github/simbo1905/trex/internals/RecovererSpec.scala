@@ -29,33 +29,11 @@ class RecovererSpec
     "respond to client data by saying that you are not the leader" in {
       respondsToClientDataBySayingNotTheLeader(Recoverer)
     }
-    "ack a repeated prepare" in {
-      ackRepeatedPrepare(Recoverer)
-    }
-    "accept higher prepare" in {
-      ackHigherPrepare(Recoverer)
-    }
     "not commit non contiguous retransmission response" in {
       journalsButDoesNotCommitIfNotContiguousRetransmissionResponse(Recoverer)
     }
-
     "journals accept messages and sets higher promise" in {
       journalsAcceptMessagesAndSetsHigherPromise(Recoverer)
-    }
-    "nack an accept lower than its last promise" in {
-      nackAcceptLowerThanPromise(Recoverer)
-    }
-    "nack an accept for a slot which is committed" in {
-      nackAcceptAboveCommitWatermark(Recoverer)
-    }
-    "ack duplidated accept" in {
-      ackDuplicatedAccept(Recoverer)
-    }
-    "journals accepted message" in {
-      ackAccept(Recoverer)
-    }
-    "increments promise with higher accept" in {
-      ackHigherAcceptMakingPromise(Recoverer)
     }
     "ignore commit message for lower log index" in {
       ignoreCommitMessageLogIndexLessThanLastCommit(Recoverer)

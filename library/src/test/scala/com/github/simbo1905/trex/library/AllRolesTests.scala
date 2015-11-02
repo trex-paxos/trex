@@ -1,13 +1,36 @@
 package com.github.simbo1905.trex.library
 
+import java.util.concurrent.atomic.{AtomicReference, AtomicBoolean}
+
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.{OptionValues, Matchers, Spec}
 
 import scala.collection.mutable.ArrayBuffer
 
-class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValues {
+class InMemoryJournal extends Journal {
+  val p = new AtomicReference[(Long, Progress)]()
+  override def save(progress: Progress): Unit = p.set((System.nanoTime(), progress))
+
+  override def bounds: JournalBounds = JournalBounds(0,0)
+
+  override def load(): Progress = p.get()._2
+
+  // Map[logIndex,(nanoTs,accept)]
+  val a = collection.mutable.Map.empty[Long,(Long, Accept)]
+
+  override def accept(as: Accept*): Unit = as foreach { i =>
+    a.put(i.id.logIndex, (System.nanoTime(), i))
+  }
+
+  override def accepted(logIndex: Long): Option[Accept] = a.get(logIndex).map(_._2)
+
+}
+
+class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValues with MockFactory {
   import TestHelpers._
 
-  def nackLowPrepare(role: PaxosRole) = {
+  // TODO more of this type of test
+  def usesPrepareHandler(role: PaxosRole) = {
     // given
     val highestAccepted = 909L
     val highPromise = highestPromisedHighestCommittedLens.set(initialData, (BallotNumber(Int.MaxValue, Int.MaxValue), initialData.progress.highestCommitted))
@@ -21,15 +44,16 @@ class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValue
       }
     }
     val event = new PaxosEvent(io, agent, prepare)
-    val paxosAlgorithm = new PaxosAlgorithm
+    val invoked = new AtomicBoolean(false)
+    val paxosAlgorithm = new PaxosAlgorithm{
+      override def handlePrepare(io: PaxosIO, agent: PaxosAgent, prepare: Prepare): PaxosAgent = {
+        invoked.set(true)
+        agent
+      }
+    }
     // when
     val PaxosAgent(_, _, data) = paxosAlgorithm(event)
     // then
-    val actualNacks = (sent.collect {
-      case p: PrepareNack => Option(p)
-      case _ => None
-    }).flatten
-    actualNacks.size shouldBe 1
-    actualNacks.headOption.value shouldBe PrepareNack(prepare.id, 0, agent.data.progress, highestAccepted, agent.data.leaderHeartbeat)
+    invoked.get() shouldBe true
   }
 }

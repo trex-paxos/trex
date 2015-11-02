@@ -1,7 +1,5 @@
 package com.github.simbo1905.trex.library
 
-//trait RemoteRef // FIXME is this needed
-
 case class PaxosAgent(nodeUniqueId: Int, role: PaxosRole, data: PaxosData)
 
 case class PaxosEvent(io: PaxosIO, agent: PaxosAgent, message: PaxosMessage)

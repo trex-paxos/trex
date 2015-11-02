@@ -134,10 +134,13 @@ class LeaderTests extends AllRolesTests {
         case f => fail(f.toString)
       }
     }
+  }
 
-    def `should nack a low prepare` {
-      nackLowPrepare(Leader)
+  object `A Leader` {
+    def `should use prepare handler` {
+      usesPrepareHandler(Leader)
     }
+
   }
 
 }

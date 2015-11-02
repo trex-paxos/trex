@@ -169,9 +169,11 @@ class FollowerTests extends AllRolesTests {
       val agent = PaxosAgent(0, Follower, initialData)
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, CheckTimeout)))
     }
+  }
 
-    def `should nack a low prepare` {
-      nackLowPrepare(Follower)
+  object `A Follower` {
+    def `should use prepare handler` {
+      usesPrepareHandler(Follower)
     }
 
   }

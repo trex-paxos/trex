@@ -34,14 +34,6 @@ class FollowerSpec
       respondsToClientDataBySayingNotTheLeader(Follower)
       checkForLeakedMessages
     }
-    "ack a repeated prepare" in {
-      ackRepeatedPrepare(Follower)
-      checkForLeakedMessages
-    }
-    "ack higher prepare" in {
-      ackHigherPrepare(Follower)
-      checkForLeakedMessages
-    }
     "not commit non contiguous retransmission response" in {
       journalsButDoesNotCommitIfNotContiguousRetransmissionResponse(Follower)
       checkForLeakedMessages
@@ -110,26 +102,6 @@ class FollowerSpec
         case Progress(_, a3.id) => // good
         case p => fail(s"got $p not ${Progress(a3.id.number, a3.id)}")
       }
-      checkForLeakedMessages
-    }
-    "nack an accept lower than its last promise" in {
-      nackAcceptLowerThanPromise(Follower)
-      checkForLeakedMessages
-    }
-    "nack an accept for a slot which is committed" in {
-      nackAcceptAboveCommitWatermark(Follower)
-      checkForLeakedMessages
-    }
-    "ack duplidated accept" in {
-      ackDuplicatedAccept(Follower)
-      checkForLeakedMessages
-    }
-    "journals accepted message" in {
-      ackAccept(Follower)
-      checkForLeakedMessages
-    }
-    "increments promise with higher accept" in {
-      ackHigherAcceptMakingPromise(Follower)
       checkForLeakedMessages
     }
     "not switch to recoverer if it does not timeout" in {

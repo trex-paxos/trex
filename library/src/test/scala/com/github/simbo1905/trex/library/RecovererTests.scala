@@ -161,10 +161,13 @@ class RecovererTests extends AllRolesTests {
       val agent = PaxosAgent(0, Follower, initialData)
       assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, CheckTimeout)))
     }
+  }
 
-    def `should nack a low prepare` {
-      nackLowPrepare(Recoverer)
+  object `A Recoverer` {
+    def `should use prepare handler` {
+      usesPrepareHandler(Recoverer)
     }
+
   }
 
 }
