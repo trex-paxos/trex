@@ -1,4 +1,9 @@
 
+val mapdbVersion = "1.0.8"
+val scalatestVersion = "2.2.5"
+val scalmockVersion = "3.2.2"
+val akkaVersion = "2.3.14"
+
 lazy val commonSettings = Seq(
   scalaVersion := "2.11.7",
   organization := "com.github.simbo1905",
@@ -12,8 +17,8 @@ lazy val library = project.settings(commonSettings: _*).
   settings( name := "trex-library").
   settings(
     libraryDependencies ++= Seq(
-      "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
-      "org.scalamock" %% "scalamock-scalatest-support" % "3.2.1" % "test"
+      "org.scalatest" % "scalatest_2.11" % scalatestVersion % "test",
+      "org.scalamock" %% "scalamock-scalatest-support" % scalmockVersion % "test"
     )
   )
 
@@ -25,11 +30,11 @@ lazy val core = project.dependsOn(library).
   settings(name := "trex-core").
   settings(
 		libraryDependencies ++= Seq(
-		  "com.typesafe.akka" %% "akka-actor" % "2.3.9",
-		  "com.typesafe.akka" %% "akka-testkit" % "2.3.9",
-		  "org.mapdb" % "mapdb" % "1.0.6",
-		  "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test,it",
-		  "org.scalamock" %% "scalamock-scalatest-support" % "3.2.1" % "test,it"
+		  "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+		  "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
+		  "org.mapdb" % "mapdb" % mapdbVersion,
+		  "org.scalatest" % "scalatest_2.11" % scalatestVersion % "test,it",
+		  "org.scalamock" %% "scalamock-scalatest-support" % scalmockVersion % "test,it"
 		  )
   )
   
@@ -40,12 +45,11 @@ lazy val demo = project.dependsOn(core).
   settings(
     libraryDependencies ++= Seq(
       "org.scala-lang" % "scala-compiler" % scalaVersion.value,
-      "com.typesafe.akka" %% "akka-actor" % "2.3.9",
-      "com.typesafe.akka" %% "akka-remote" % "2.3.9",
-      "com.typesafe.akka" %% "akka-testkit" % "2.3.9",
-      "org.mapdb" % "mapdb" % "1.0.6",
-      "org.scala-lang.modules" %% "scala-pickling" % "0.10.0",
-      "org.scalatest" % "scalatest_2.11" % "2.2.4" % "test",
-      "org.scalamock" %% "scalamock-scalatest-support" % "3.2.1" % "test"
+      "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+      "com.typesafe.akka" %% "akka-remote" % akkaVersion,
+      "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
+      "org.mapdb" % "mapdb" % mapdbVersion,
+      "org.scalatest" % "scalatest_2.11" % scalatestVersion % "test",
+      "org.scalamock" %% "scalamock-scalatest-support" % scalmockVersion % "test"
     )
   )
