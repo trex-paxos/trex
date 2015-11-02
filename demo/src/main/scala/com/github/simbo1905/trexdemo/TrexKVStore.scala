@@ -112,7 +112,7 @@ object TrexKVStore {
         val dataFile = new java.io.File(folder.getCanonicalPath + "/kvstore")
         println(s"node kv data store is ${dataFile.getCanonicalPath}")
         val db: DB = DBMaker.newFileDB(dataFile).make
-        val clientApp = new MapDBConsistentKVStore(db)
+        val target = new MapDBConsistentKVStore(db)
         val logFile = new java.io.File(folder.getCanonicalPath + "/paxos")
         println(s"paxos data log is ${logFile.getCanonicalPath}")
         val journal = new FileJournal(logFile, cluster.retained)
@@ -120,53 +120,10 @@ object TrexKVStore {
         val system =
           ActorSystem(cluster.name, ConfigFactory.load("server.conf").withValue("akka.remote.netty.tcp.port", ConfigValueFactory.fromAnyRef(node.clientPort)))
         // generic entry point accepts TypedActor MethodCall messages and reflectively invokes them on our client app
-        system.actorOf(Props(classOf[TypedActorPaxosEndpoint], cluster, PaxosActor.Configuration(config, cluster.nodes.size), node.id, journal, clientApp, "TrexServer"))
+        system.actorOf(Props(classOf[TrexServer], cluster, PaxosActor.Configuration(config, cluster.nodes.size), node.id, journal, target))
 
       case None => err.println(s"$nodeId is not a valid node number in cluster $cluster")
     }
   }
 }
 
-class TypedActorPaxosEndpoint(cluster: Cluster, config: PaxosActor.Configuration, nodeUniqueId: Int, journal: Journal, client: AnyRef) extends Actor with ActorLogging {
-  val selfNode = cluster.nodeMap(nodeUniqueId)
-
-  val peerNodes = cluster.nodes.filterNot(_.id == nodeUniqueId)
-
-  val peers: Map[Int, ActorRef] = Cluster.senders(context.system, peerNodes)
-
-  val broadcast = context.system.actorOf(Props(classOf[Broadcast], peers.values.toSeq), "broadcast")
-
-  val kvStore = context.system.actorOf(Props(classOf[TypedActorPaxosEndpoint], config, broadcast, nodeUniqueId, journal, client), "PaxosActor")
-
-  val listener = context.system.actorOf(Props(classOf[UdpListener], new InetSocketAddress(selfNode.host, selfNode.nodePort), self), "UdpListener")
-
-  override def receive: Receive = {
-    case outbound: AnyRef if sender == kvStore =>
-      route(outbound) ! outbound
-    case inbound: AnyRef if sender == listener =>
-      kvStore ! inbound
-    case t: Terminated =>
-      // TODO handle this
-      log.warning(s"Termination notice $t")
-    case unknown =>
-      log.warning("{} unknown message {} from {}", this.getClass.getCanonicalName, unknown, sender())
-  }
-
-  def route(msg: AnyRef): ActorRef = {
-    val nodeId = msg match {
-      case acceptResponse: AcceptResponse =>
-        acceptResponse.requestId.from
-      case prepareResponse: PrepareResponse =>
-        prepareResponse.requestId.from
-      case retransmitResponse: RetransmitResponse =>
-        retransmitResponse.to
-      case retransmitRequest: RetransmitRequest =>
-        retransmitRequest.to
-      case x =>
-        log.error("unknown message {}", x)
-        0
-    }
-    log.debug("routing to {} message {}", nodeId, msg)
-    peers(nodeId)
-  }
-}

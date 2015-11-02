@@ -337,3 +337,47 @@ class TypedActorPaxosEndpoint(config: PaxosActor.Configuration, broadcastReferen
       result.get
   }
 }
+
+class TrexServer(cluster: Cluster, config: PaxosActor.Configuration, nodeUniqueId: Int, journal: Journal, target: AnyRef) extends Actor with ActorLogging {
+  val selfNode = cluster.nodeMap(nodeUniqueId)
+
+  val peerNodes = cluster.nodes.filterNot(_.id == nodeUniqueId)
+
+  val peers: Map[Int, ActorRef] = Cluster.senders(context.system, peerNodes)
+
+  val broadcast = context.system.actorOf(Props(classOf[Broadcast], peers.values.toSeq), "broadcast")
+
+  val targetActor = context.system.actorOf(Props(classOf[TypedActorPaxosEndpoint], config, broadcast, nodeUniqueId, journal, target), "PaxosActor")
+
+  val listener = context.system.actorOf(Props(classOf[UdpListener], new InetSocketAddress(selfNode.host, selfNode.nodePort), self), "UdpListener")
+
+  override def receive: Receive = {
+    case outbound: AnyRef if sender == targetActor =>
+      route(outbound) ! outbound
+    case inbound: AnyRef if sender == listener =>
+      targetActor ! inbound
+    case t: Terminated =>
+      // TODO handle this
+      log.warning(s"Termination notice $t")
+    case unknown =>
+      log.warning("{} unknown message {} from {}", this.getClass.getCanonicalName, unknown, sender())
+  }
+
+  def route(msg: AnyRef): ActorRef = {
+    val nodeId = msg match {
+      case acceptResponse: AcceptResponse =>
+        acceptResponse.requestId.from
+      case prepareResponse: PrepareResponse =>
+        prepareResponse.requestId.from
+      case retransmitResponse: RetransmitResponse =>
+        retransmitResponse.to
+      case retransmitRequest: RetransmitRequest =>
+        retransmitRequest.to
+      case x =>
+        log.error("unknown message {}", x)
+        0
+    }
+    log.debug("routing to {} message {}", nodeId, msg)
+    peers(nodeId)
+  }
+}
