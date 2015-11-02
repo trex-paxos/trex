@@ -1,0 +1,646 @@
+package com.github.trex_paxos.internals
+
+import akka.actor.ActorSystem
+import akka.testkit.{DefaultTimeout, ImplicitSender, TestActorRef, TestKit}
+import com.github.trex_paxos.library._
+import com.typesafe.config.{Config, ConfigFactory}
+import org.scalamock.scalatest.MockFactory
+import org.scalatest._
+
+import scala.collection.immutable.SortedMap
+import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.duration._
+import scala.language.postfixOps
+
+object FollowerSpec {
+  val config = ConfigFactory.parseString("trex.leader-timeout-min=10\ntrex.leader-timeout-max=20\nakka.loglevel = \"DEBUG\"")
+}
+
+class FollowerSpec
+  extends TestKit(ActorSystem("FollowerSpec", FollowerSpec.config))
+  with DefaultTimeout with ImplicitSender
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with AllStateSpec with NotLeaderSpec {
+
+  import AllStateSpec._
+  import Ordering._
+  import PaxosActor.Configuration
+
+  override def afterAll() {
+    shutdown()
+  }
+
+  "Follower" should {
+    "respond to client data by saying that it is not the leader" in {
+      respondsToClientDataBySayingNotTheLeader(Follower)
+      checkForLeakedMessages
+    }
+    "not commit non contiguous retransmission response" in {
+      journalsButDoesNotCommitIfNotContiguousRetransmissionResponse(Follower)
+      checkForLeakedMessages
+    }
+    "journals accept messages and sets higher promise" in {
+      journalsAcceptMessagesAndSetsHigherPromise(Follower)
+      checkForLeakedMessages
+    }
+    "bootstrap from retransmit response" in {
+      // given some retransmitted committed values
+      val v1 = ClientRequestCommandValue(0, Array[Byte] {
+        0
+      })
+      val v2 = ClientRequestCommandValue(1, Array[Byte] {
+        1
+      })
+      val v3 = ClientRequestCommandValue(2, Array[Byte] {
+        2
+      })
+      val a1 =
+        Accept(Identifier(1, BallotNumber(1, 1), 1L), v1)
+      val a2 =
+        Accept(Identifier(2, BallotNumber(2, 2), 2L), v2)
+      val a3 =
+        Accept(Identifier(3, BallotNumber(3, 3), 3L), v3)
+      val retransmission = RetransmitResponse(1, 0, Seq(a1, a2, a3), Seq.empty)
+
+      // and an empty node
+      val fileJournal: FileJournal = AllStateSpec.tempRecordTimesFileJournal
+      val delivered = ArrayBuffer[CommandValue]()
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, fileJournal, delivered, None))
+
+      // when the retransmission is received
+      fsm ! retransmission
+
+      // it sends no messages
+      expectNoMsg(25 milliseconds)
+      // stays in state
+      assert(fsm.underlyingActor.role == Follower)
+      // updates its commit index
+      assert(fsm.underlyingActor.data.progress.highestCommitted == a3.id)
+
+      // delivered the committed values
+      delivered.size should be(3)
+      delivered(0) should be(v1)
+      delivered(1) should be(v2)
+      delivered(2) should be(v3)
+
+      // journaled the values so that it can retransmit itself
+      fileJournal.bounds should be(JournalBounds(1, 3))
+      fileJournal.accepted(1) match {
+        case Some(a) if a.id == a1.id => // good
+        case x => fail(x.toString)
+      }
+      fileJournal.accepted(2) match {
+        case Some(a) if a.id == a2.id => // good
+        case x => fail(x.toString)
+      }
+      fileJournal.accepted(3) match {
+        case Some(a) if a.id == a3.id => // good
+        case x => fail(x.toString)
+      }
+
+      // and journal the new progress
+      fileJournal.load() match {
+        case Progress(_, a3.id) => // good
+        case p => fail(s"got $p not ${Progress(a3.id.number, a3.id)}")
+      }
+      checkForLeakedMessages
+    }
+    "not switch to recoverer if it does not timeout" in {
+      val stubJournal: Journal = stub[Journal]
+      // when our node has a high timeout
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      fsm.underlyingActor.setAgent(Follower, initialData.copy(timeout = System.currentTimeMillis + minute))
+      // and we sent it a timeout check message
+      fsm ! CheckTimeout
+      // it sends no messages
+      expectNoMsg(25 millisecond)
+      // and does not change state
+      assert(fsm.underlyingActor.role == Follower)
+      checkForLeakedMessages
+    }
+    val timenow = 999L
+    "update its timeout when it sees a commit" in {
+      // given an initalized journal
+      val stubJournal: Journal = stub[Journal]
+      (stubJournal.load _) when() returns (Journal.minBookwork)
+      // given we control the clock
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+        override def clock() = timenow
+      })
+      fsm ! Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0L), 9999L)
+      // it sends no messages
+      expectNoMsg(25 millisecond)
+      // and sets a fresh timeout
+      assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
+      // and updates its heartbeat
+      fsm.underlyingActor.data.leaderHeartbeat should be(9999L)
+      checkForLeakedMessages
+    }
+    "update its heartbeat when it sees a commit" in {
+      val stubJournal: Journal = stub[Journal]
+      // given we control the clock
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+        override def clock() = timenow
+      })
+      fsm.underlyingActor.setAgent(Follower, initialData.copy(leaderHeartbeat = 88L))
+      fsm ! Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0), 99L)
+      // it sends no messages
+      expectNoMsg(25 millisecond)
+      // and updates the heartbeat
+      assert(fsm.underlyingActor.data.leaderHeartbeat == 99L)
+      checkForLeakedMessages
+    }
+    "commit next slot if same number as previous commit" in {
+      // given an initialized journal
+      val stubJournal: Journal = stub[Journal]
+      (stubJournal.load _) when() returns (Journal.minBookwork)
+
+      // given slot 1 has been accepted under the same number as previously committed slot 0 shown in initialData
+      val identifier = Identifier(0, BallotNumber(lowValue, lowValue), 1L)
+      val accepted = Accept(identifier, ClientRequestCommandValue(0, expectedBytes))
+      (stubJournal.accepted _) when (1L) returns Some(accepted)
+
+      // when we commit that value
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+        override def clock() = timenow
+      })
+      fsm ! Commit(identifier)
+
+      // then it sends no messages
+      expectNoMsg(25 millisecond)
+      // and delivered that value
+      assert(fsm.underlyingActor.delivered.headOption == Some(ClientRequestCommandValue(0, expectedBytes)))
+      // and journal bookwork
+      (stubJournal.save _).verify(fsm.underlyingActor.data.progress)
+      // and sets a fresh timeout
+      assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
+      checkForLeakedMessages
+    }
+    "commit next slot on a different number as previous commit" in {
+      // given an initialized journal
+      val stubJournal: Journal = stub[Journal]
+      (stubJournal.load _) when() returns (Journal.minBookwork)
+
+      // given slot 1 has been accepted under a different number as previously committed slot 0 shown in initialData
+      val identifier = Identifier(0, BallotNumber(0, 0), 1L)
+      val accepted = Accept(identifier, ClientRequestCommandValue(0, expectedBytes))
+      (stubJournal.accepted _) when (1L) returns Some(accepted)
+
+      // when we commit that value
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+        override def clock() = timenow
+      })
+      fsm ! Commit(identifier)
+
+      // then it sends no messages
+      expectNoMsg(25 millisecond)
+      // and delivered that value
+      fsm.underlyingActor.delivered.headOption match {
+        case Some(ClientRequestCommandValue(0, expectedBytes)) => // good
+        case x => fail(x.toString)
+      }
+      // and journal bookwork
+      (stubJournal.save _).verify(fsm.underlyingActor.data.progress)
+      // and sets a fresh timeout
+      assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
+      checkForLeakedMessages
+    }
+    "request retranmission if commit of next in slot does not match value in slot" in {
+      // given an initalized journal
+      val stubJournal: Journal = stub[Journal]
+      (stubJournal.load _) when() returns (Journal.minBookwork)
+
+      // given slot 1 has been accepted under the same number as previously committed slot 0 shown in initialData
+      val identifierMin = Identifier(0, BallotNumber(lowValue, lowValue), 1L)
+      val accepted = Accept(identifierMin, ClientRequestCommandValue(0, expectedBytes))
+      (stubJournal.accepted _) when (1L) returns Some(accepted)
+
+      val otherNodeId = 1
+      // when we commit a value into that slot using a different number
+      val identifier99 = Identifier(otherNodeId, BallotNumber(0, 99), 1L)
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+        override def clock() = timenow
+      })
+      fsm ! Commit(identifier99)
+      // then it sends a retransmit request
+      expectMsg(100 millisecond, RetransmitRequest(0, otherNodeId, 0L))
+      // and did not commit
+      assert(fsm.underlyingActor.delivered.isEmpty)
+      // and sets a fresh timeout
+      assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
+      checkForLeakedMessages
+    }
+    "commit if three slots if previous accepts are from stable leader" in {
+      // given an initalized journal
+      val stubJournal: Journal = stub[Journal]
+      (stubJournal.load _) when() returns (Journal.minBookwork)
+
+      // given slots 1 thru 3 have been accepted under the same number as previously committed slot 0 shown in initialData
+
+      val id1 = Identifier(0, BallotNumber(lowValue, lowValue), 1L)
+      (stubJournal.accepted _) when (1L) returns Some(Accept(id1, ClientRequestCommandValue(0, expectedBytes)))
+
+      val id2 = Identifier(0, BallotNumber(lowValue, lowValue), 2L)
+      (stubJournal.accepted _) when (2L) returns Some(Accept(id2, ClientRequestCommandValue(0, expectedBytes)))
+
+      val id3 = Identifier(0, BallotNumber(lowValue, lowValue), 3L)
+      (stubJournal.accepted _) when (3L) returns Some(Accept(id3, ClientRequestCommandValue(0, expectedBytes)))
+
+      // when we commit slot 3
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+        override def clock() = timenow
+      })
+      fsm ! Commit(id3)
+
+      // then it sends no messages
+      expectNoMsg(25 millisecond)
+      // and delivered those values
+      assert(fsm.underlyingActor.delivered.size == 3)
+      // and updates its latest commit
+      assert(fsm.underlyingActor.data.progress.highestCommitted == id3)
+      // and journals progress
+      (stubJournal.save _).verify(fsm.underlyingActor.data.progress)
+      // and sets a fresh timeout
+      assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
+      checkForLeakedMessages
+    }
+    "request retransmission if it sees a gap in commit sequence" in {
+      // given an initalized journal
+      val stubJournal: Journal = stub[Journal]
+      (stubJournal.load _) when() returns (Journal.minBookwork)
+
+      // given slots 1 thru 3 have been accepted under the same number as previously committed slot 0 shown in initialData
+      val otherNodeId = 1
+
+      val id1 = Identifier(otherNodeId, BallotNumber(lowValue, 99), 1L)
+      (stubJournal.accepted _) when (1L) returns Some(Accept(id1, ClientRequestCommandValue(0, expectedBytes)))
+
+      val id2 = Identifier(otherNodeId, BallotNumber(lowValue, 99), 2L)
+      (stubJournal.accepted _) when (2L) returns None // gap
+
+      val id3 = Identifier(otherNodeId, BallotNumber(lowValue, 99), 3L)
+      (stubJournal.accepted _) when (3L) returns Some(Accept(id3, ClientRequestCommandValue(0, expectedBytes)))
+
+      // when we commit slot 3
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      fsm ! Commit(id3)
+
+      // it sends retransmission
+      expectMsg(100 milliseconds, RetransmitRequest(0, otherNodeId, 1L))
+      // commits up to the gap
+      assert(fsm.underlyingActor.delivered.size == 1)
+      // and updates its latest commit
+      assert(fsm.underlyingActor.data.progress.highestCommitted == id1)
+      // and journals progress
+      (stubJournal.save _).verify(fsm.underlyingActor.data.progress)
+      checkForLeakedMessages
+    }
+    "request retransmission if it sees value under a different number in a commit sequence" in {
+      // given an journal with a promise to node1 and committed up to last from node2
+      val node1 = 1
+      val node2 = 2
+      val stubJournal: Journal = stub[Journal]
+      (stubJournal.load _) when() returns (Progress(BallotNumber(99, node1), Identifier(node2, BallotNumber(98, node2), 0L)))
+
+      // given slots 1 and 3 match the promise but slot 2 has old value from failed leader.
+
+      val id1 = Identifier(node1, BallotNumber(99, node1), 1L)
+      (stubJournal.accepted _) when (1L) returns Some(Accept(id1, ClientRequestCommandValue(0, expectedBytes)))
+
+      val id2other = Identifier(node2, BallotNumber(98, node2), 2L)
+      (stubJournal.accepted _) when (2L) returns Some(Accept(id2other, ClientRequestCommandValue(0, expectedBytes)))
+
+      val id3 = Identifier(node1, BallotNumber(99, node1), 3L)
+      (stubJournal.accepted _) when (3L) returns Some(Accept(id3, ClientRequestCommandValue(0, expectedBytes)))
+
+      // when we commit slot 3
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      fsm ! Commit(id3)
+
+      // it sends retransmission
+      expectMsg(100 milliseconds, RetransmitRequest(0, node1, 1L))
+      // commits up to the gap
+      assert(fsm.underlyingActor.delivered.size == 1)
+      // and updates its latest commit
+      assert(fsm.underlyingActor.data.progress.highestCommitted == id1)
+      // and journals progress
+      (stubJournal.save _).verify(fsm.underlyingActor.data.progress)
+      checkForLeakedMessages
+    }
+    "request retransmission and does not commit if it has wrong values in slots" in {
+      // given slots 1 thru 3 have been accepted under a different as previously committed slot 0 shown in initialData
+
+      val otherNodeId = 1
+
+      val id1other = Identifier(otherNodeId, BallotNumber(0, 0), 1L)
+      val stubJournal: Journal = stub[Journal]
+      (stubJournal.accepted _) when (1L) returns Some(Accept(id1other, ClientRequestCommandValue(0, expectedBytes)))
+
+      val id2other = Identifier(otherNodeId, BallotNumber(0, 0), 2L)
+      (stubJournal.accepted _) when (2L) returns Some(Accept(id2other, ClientRequestCommandValue(0, expectedBytes)))
+
+      val id3other = Identifier(otherNodeId, BallotNumber(0, 0), 3L)
+      (stubJournal.accepted _) when (3L) returns Some(Accept(id3other, ClientRequestCommandValue(0, expectedBytes)))
+
+      // when we commit slot 3
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      fsm.underlyingActor.setAgent(Follower, initialData)
+
+      fsm ! Commit(Identifier(otherNodeId, BallotNumber(lowValue, lowValue), 3L))
+
+      // it sends retransmission
+      expectMsg(100 milliseconds, RetransmitRequest(0, otherNodeId, fsm.underlyingActor.data.progress.highestCommitted.logIndex))
+      // commits up to the gap
+      assert(fsm.underlyingActor.delivered.size == 0)
+      // and updates its latest commit
+      assert(fsm.underlyingActor.data.progress.highestCommitted == initialData.progress.highestCommitted)
+      checkForLeakedMessages
+    }
+
+    val minPrepare = Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
+
+    "times-out and issues a single low prepare" in {
+      val stubJournal: Journal = stub[Journal]
+      // given that we control the clock
+      val timenow = 999L
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+        override def clock() = timenow
+      })
+      // and no uncommitted values in journal
+      val bounds = JournalBounds(0L, 0L)
+      (stubJournal.bounds _) when() returns (bounds)
+      // when our node gets a timeout
+      fsm ! CheckTimeout
+      // it sends out a single low prepare
+      expectMsg(100 millisecond, minPrepare)
+      // and stays as follower
+      assert(fsm.underlyingActor.role == Follower)
+      // and sets a fresh timeout
+      assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
+      // and is tracking reponses to its low prepare
+      assert(fsm.underlyingActor.data.prepareResponses != None)
+      // and has responded itself
+      fsm.underlyingActor.data.prepareResponses.get(minPrepare.id) match {
+        case Some(map) if map.size == 1 => // good
+        case x => fail(x.toString)
+      }
+      checkForLeakedMessages
+    }
+    "re-issues a low prepare on subsequent time-outs when it has not recieved any responses" in {
+      val stubJournal: Journal = stub[Journal]
+      // given that we control the clock
+      var timenow = 999L
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+        override def clock() = timenow
+      })
+      // and no uncommitted values in journal
+      val bounds = JournalBounds(0L, 0L)
+      (stubJournal.bounds _) when() returns (bounds)
+      // when our node gets a timeout
+      fsm ! CheckTimeout
+      // it sends out a single low prepare
+      expectMsg(100 millisecond, minPrepare)
+      // which repeats on subsequent time outs
+      timenow = timenow + fsm.underlyingActor.data.timeout + 1
+      fsm ! CheckTimeout
+      expectMsg(100 millisecond, minPrepare)
+      timenow = timenow + fsm.underlyingActor.data.timeout + 1
+      fsm ! CheckTimeout
+      expectMsg(100 millisecond, minPrepare)
+      timenow = timenow + fsm.underlyingActor.data.timeout + 1
+      fsm ! CheckTimeout
+      expectMsg(100 millisecond, minPrepare)
+      // and stays as follower
+      assert(fsm.underlyingActor.role == Follower)
+      // and is tracking responses to its low prepare
+      assert(fsm.underlyingActor.data.prepareResponses != None)
+      // and has responded itself
+      assert(fsm.underlyingActor.data.prepareResponses.get(minPrepare.id) != None)
+      assert(fsm.underlyingActor.data.prepareResponses.get(minPrepare.id).getOrElse(fail).size == 1)
+      checkForLeakedMessages
+    }
+    "backdown from a low prepare on receiving a fresh heartbeat commit from the same leader and request a retransmit" in {
+      // given an initalized journal
+      val stubJournal: Journal = stub[Journal]
+      (stubJournal.load _) when() returns (Journal.minBookwork)
+
+      // given that we control the clock
+      val timenow = 999L
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+        override def clock() = timenow
+      })
+      // and no uncommitted values in journal
+      val bounds = JournalBounds(0L, 0L)
+      (stubJournal.bounds _) when() returns (bounds)
+      // when our node gets a timeout
+      fsm ! CheckTimeout
+      // it sends out a single low prepare
+      expectMsg(100 millisecond, minPrepare)
+      // then when it receives a fresh heartbeat commit with a higher committed slow
+      val freshCommit = Commit(Identifier(1, BallotNumber(lowValue, lowValue), 10L))
+      fsm ! freshCommit
+      // it responds with a retransmit
+      expectMsg(100 millisecond, RetransmitRequest(0, 1, initialData.progress.highestCommitted.logIndex))
+      // and has set the new heartbeat value
+      assert(fsm.underlyingActor.data.leaderHeartbeat == freshCommit.heartbeat)
+      // and has cleared the low prepare tracking map
+      assert(fsm.underlyingActor.data.prepareResponses.isEmpty)
+      // and sets a fresh timeout
+      assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
+      checkForLeakedMessages
+    }
+    "backdown from a low prepare on receiving a low heartbeat commit from a new leader" in {
+
+      // given a follower in a cluster size of three
+      val fsm = followerNoResponsesInClusterOfSize(3)
+      // then when it receives a fresh heartbeat commit (we bump the slot number to induce a retransmit)
+      val freshCommit = Commit(Identifier(1, BallotNumber(lowValue + 1, lowValue), 10L), -10L)
+      fsm ! freshCommit
+      // it responds with a retransmit
+      expectMsg(100 millisecond, RetransmitRequest(0, 1, initialData.progress.highestCommitted.logIndex))
+      // and has set the new heartbeat value
+      assert(fsm.underlyingActor.data.leaderHeartbeat == freshCommit.heartbeat)
+      // and has cleared the low prepare tracking map
+      assert(fsm.underlyingActor.data.prepareResponses.isEmpty)
+      checkForLeakedMessages
+    }
+    "backdown from a low prepare if other follower has a higher heartbeat" in {
+      // given a follower in a cluster size of three
+      val fsm = followerNoResponsesInClusterOfSize(3)
+
+      // when it hears back that the other follower has seen a higher heartbeat
+      fsm ! PrepareNack(minPrepare.id, 2, initialData.progress, initialData.progress.highestCommitted.logIndex, Long.MaxValue)
+
+      // and backs down
+      fsm.underlyingActor.role should be(Follower)
+      fsm.underlyingActor.data.prepareResponses.size should be(0)
+      // and updates its the known leader heartbeat so that if the leader dies it can take over
+      fsm.underlyingActor.data.leaderHeartbeat should be(Long.MaxValue)
+      checkForLeakedMessages
+    }
+    "backdown from a low prepare if other follower has committed a higher slot" in {
+      // given a follower in a cluster size of three
+      val fsm = followerNoResponsesInClusterOfSize(3)
+
+      val otherFollowerId = 2
+
+      // when it hears back that the other follower has committed a higher slot
+      fsm ! PrepareNack(minPrepare.id, otherFollowerId, Progress.highestCommittedLens.set(initialData.progress, initialData.progress.highestCommitted.copy(logIndex = 99L)), initialData.progress.highestCommitted.logIndex + 1, Long.MaxValue)
+
+      // it responds with a retransmit
+      expectMsg(100 millisecond, RetransmitRequest(0, otherFollowerId, initialData.progress.highestCommitted.logIndex))
+
+      // and backs down
+      fsm.underlyingActor.role should be(Follower)
+      fsm.underlyingActor.data.prepareResponses.size should be(0)
+      checkForLeakedMessages
+    }
+
+    def followerNoResponsesInClusterOfSize(numberOfNodes: Int, highestAccepted: Long = 0L, cfg: Config = AllStateSpec.config) = {
+      val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
+        Seq((minPrepare.id -> Map(0 -> PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None))))
+
+      val state = initialData.copy(clusterSize = numberOfNodes, epoch = Some(minPrepare.id.number), prepareResponses = prepareSelfVotes)
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(cfg, numberOfNodes), 0, self, new TestAcceptMapJournal, ArrayBuffer.empty, None) {
+        override def highestAcceptedIndex = highestAccepted
+      })
+      fsm.underlyingActor.setAgent(Follower, state)
+      fsm
+    }
+
+    "ignores an accept response" in {
+      // given a follower in a cluster size of three
+      val fsm = followerNoResponsesInClusterOfSize(3)
+      val startData = fsm.underlyingActor.data
+
+      // when it get an accept response
+      fsm ! AcceptAck(minPrepare.id, 0, initialData.progress)
+
+      // then it does nothing
+      expectNoMsg(25 milliseconds)
+      assert(fsm.underlyingActor.data == startData)
+      checkForLeakedMessages
+    }
+
+    "switch to recoverer if in a five node cluster it sees a majority response with no heartbeats" in {
+      // given a follower in a cluster size of five
+      val fsm = followerNoResponsesInClusterOfSize(5)
+      // when it receives two responses with no new heartbeat
+      fsm ! PrepareNack(minPrepare.id, 1, initialData.progress, initialData.progress.highestCommitted.logIndex, initialData.leaderHeartbeat)
+      fsm ! PrepareNack(minPrepare.id, 2, initialData.progress, initialData.progress.highestCommitted.logIndex, initialData.leaderHeartbeat)
+      // then it promotes to be a recoverer
+      fsm.underlyingActor.role should be(Recoverer)
+      // and issues a higher prepare to the next slot
+      expectMsg(100 millisecond, Prepare(Identifier(0, BallotNumber(lowValue + 1, 0), 1)))
+      checkForLeakedMessages
+    }
+
+    "default to aggressive failover and promote to recoverer if in a five node cluster it sees a majority response and only one has a fresh heartbeats" in {
+      // given a follower in a cluster size of five
+      val fsm = followerNoResponsesInClusterOfSize(5)
+      // when it receives two responses with no new heartbeat
+      fsm ! PrepareNack(minPrepare.id, 1, initialData.progress, initialData.progress.highestCommitted.logIndex, initialData.leaderHeartbeat)
+      fsm ! PrepareNack(minPrepare.id, 2, initialData.progress, initialData.progress.highestCommitted.logIndex, initialData.leaderHeartbeat + 1)
+      // then it promotes to be a recoverer
+      fsm.underlyingActor.role should be(Recoverer)
+      // and issues a higher prepare to the next slot
+      expectMsg(100 millisecond, Prepare(Identifier(0, BallotNumber(lowValue + 1, 0), 1)))
+      checkForLeakedMessages
+    }
+
+    "switch to recoverer and issue multiple prepare messages if there are slots to recover and no leader" in {
+      // given that we control the clock
+      val timenow = 999L
+      var saveTime = 0L
+      // and a journal which records the save time
+      val stubJournal: Journal = stub[Journal]
+      val delegatingJournal = new DelegatingJournal(stubJournal) {
+        override def save(progress: Progress): Unit = {
+          saveTime = System.nanoTime()
+          super.save(progress)
+        }
+      }
+
+      // and that we record the send time
+      var sendTime = 0L
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, delegatingJournal, ArrayBuffer.empty, None) {
+        override def clock() = timenow
+
+        override def broadcast(msg: PaxosMessage): Unit = {
+          sendTime = System.nanoTime()
+          super.broadcast(msg)
+        }
+      })
+      fsm.underlyingActor.setAgent(Follower, initialData)
+
+      // and three uncommitted values in journal
+      val bounds = JournalBounds(0L, 3L)
+      (stubJournal.bounds _) when() returns (bounds)
+
+      val id1 = Identifier(0, BallotNumber(lowValue + 1, 0), 1)
+      (stubJournal.accepted _) when (1L) returns Some(Accept(id1, ClientRequestCommandValue(0, expectedBytes)))
+
+      val id2 = Identifier(0, BallotNumber(lowValue + 1, 0), 2)
+      (stubJournal.accepted _) when (2L) returns Some(Accept(id2, ClientRequestCommandValue(0, expectedBytes)))
+
+      val id3 = Identifier(0, BallotNumber(lowValue + 1, 0), 3)
+      (stubJournal.accepted _) when (3L) returns Some(Accept(id3, ClientRequestCommandValue(0, expectedBytes)))
+
+      val id4 = Identifier(0, BallotNumber(lowValue + 1, 0), 4)
+
+      // when our node gets a timeout
+      fsm ! CheckTimeout
+
+      // it sends out a single low prepare
+      expectMsg(100 millisecond, minPrepare)
+
+      // when it hears back that the other follower does not have a fresh heartbeat
+      fsm ! PrepareNack(minPrepare.id, 2, initialData.progress, initialData.progress.highestCommitted.logIndex, initialData.leaderHeartbeat)
+
+      // it sends out four prepares for each uncommitted slot plus an extra slot
+      val prepare1 = Prepare(id1)
+      expectMsg(100 millisecond, prepare1)
+
+      val prepare2 = Prepare(id2)
+      expectMsg(100 millisecond, prepare2)
+
+      val prepare3 = Prepare(id3)
+      expectMsg(100 millisecond, prepare3)
+
+      val prepare4 = Prepare(id4)
+      expectMsg(100 millisecond, prepare4)
+
+      // and promotes to candidate
+      assert(fsm.underlyingActor.role == Recoverer)
+      // and sets a fresh timeout
+      assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
+      // and make a promise to self
+      assert(fsm.underlyingActor.data.progress.highestPromised == prepare1.id.number)
+      // and votes for its own prepares
+      assert(!fsm.underlyingActor.data.prepareResponses.isEmpty)
+      val prapareIds = fsm.underlyingActor.data.prepareResponses map {
+        case (id, map) if map.keys.headOption == Some(0) && map.values.headOption.getOrElse(fail).requestId == id =>
+          id
+        case x => fail(x.toString)
+      }
+      assert(true == prapareIds.toSet.contains(prepare1.id))
+      assert(true == prapareIds.toSet.contains(prepare2.id))
+      assert(true == prapareIds.toSet.contains(prepare3.id))
+
+      // and has no accepts
+      assert(fsm.underlyingActor.data.acceptResponses.isEmpty)
+
+      // and it sent out the messages only after having journalled its own promise
+      assert(saveTime != 0)
+      assert(sendTime != 0)
+      assert(saveTime < sendTime)
+      checkForLeakedMessages
+    }
+
+    // TODO should check that it ignores commits less than or equal to last committed logIndex (both of them)
+  }
+
+  // TODO ensure that when we leave a given state we gc any state not needed for the state we are jumping to. suggests one long lens for all the optional stuff
+
+  // TODO get the underlying actor ref and check its illegal argument states
+}
+

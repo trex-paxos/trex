@@ -2,8 +2,8 @@ package com.github.simbo1905.trexdemo
 
 import akka.actor._
 import akka.testkit.{DefaultTimeout, ImplicitSender, TestKit}
-import com.github.simbo1905.trex._
-import com.github.simbo1905.trex.library.{JournalBounds, Journal, Accept, Progress}
+import com.github.trex_paxos.demo.{MapDBConsistentKVStore, ConsistentKVStore}
+import com.github.trex_paxos.library.{Journal, JournalBounds, Accept, Progress}
 import com.typesafe.config.ConfigFactory
 import org.mapdb.{DB, DBMaker}
 import org.scalatest._
