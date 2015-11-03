@@ -7,7 +7,7 @@ import org.scalamock.scalatest.MockFactory
 
 import scala.collection.mutable.ArrayBuffer
 
-trait NotLeaderSpec { self: TestKit with MockFactory with AllStateSpec =>
+trait NotLeaderSpec { self: TestKit with MockFactory  =>
   import AllStateSpec._
   import PaxosActor.Configuration
 
@@ -15,7 +15,7 @@ trait NotLeaderSpec { self: TestKit with MockFactory with AllStateSpec =>
     require(state == Follower || state == Recoverer)
     val stubJournal: Journal = stub[Journal]
     // given a node in the prescribed state
-    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, sender, stubJournal, ArrayBuffer.empty, None))
     fsm.underlyingActor.setAgent(state, initialData)
     // when it gets arbitrary client data
     val value = ClientRequestCommandValue(0, "hello world".getBytes("UTF8"))

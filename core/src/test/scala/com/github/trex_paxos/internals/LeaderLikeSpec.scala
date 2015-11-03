@@ -12,7 +12,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 trait LeaderLikeSpec {
-  self: TestKit with MockFactory with AllStateSpec with Matchers with PaxosLenses =>
+  self: TestKit with MockFactory with Matchers with PaxosLenses =>
 
   import AllStateSpec._
   import Ordering._
@@ -25,7 +25,7 @@ trait LeaderLikeSpec {
     val identifier = Identifier(0, BallotNumber(lowValue + 1, 0), 1L)
     val lessThan = Identifier(0, BallotNumber(lowValue, 0), 0L)
     val data = initialData.copy(clusterSize = 3, progress = initialData.progress.copy(highestCommitted = identifier))
-    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None))
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, sender, stubJournal, ArrayBuffer.empty, None))
     fsm.underlyingActor.setAgent(role, data)
     // when it gets commit
     val commit = Commit(lessThan)
@@ -41,7 +41,7 @@ trait LeaderLikeSpec {
     val stubJournal: Journal = stub[Journal]
     // given
     val node2slot1Identifier = Identifier(2, BallotNumber(lowValue + 1, 2), 1L)
-    val node2 = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 2, sender, stubJournal, ArrayBuffer.empty, None))
+    val node2 = TestActorRef(new TestPaxosActor(Configuration(config, 3), 2, sender, stubJournal, ArrayBuffer.empty, None))
     node2.underlyingActor.setAgent(role, initialData.copy(epoch = Some(node2slot1Identifier.number), clusterSize = 3, progress = initialData.progress.copy(highestCommitted = node2slot1Identifier)))
     // when node2 it gets commit for same slot but lower nodeIdentifier
     val node0slot1Identifier = Identifier(0, BallotNumber(lowValue + 1, 0), 1L)
@@ -59,7 +59,7 @@ trait LeaderLikeSpec {
     // given
     val node2slot1Identifier = Identifier(2, BallotNumber(lowValue + 1, 2), 1L)
     val timenow = 999L
-    val node2 = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 2, sender, stubJournal, ArrayBuffer.empty, None){
+    val node2 = TestActorRef(new TestPaxosActor(Configuration(config, 3), 2, sender, stubJournal, ArrayBuffer.empty, None){
       override def clock() = timenow
     })
     node2.underlyingActor.setAgent(role, initialData.copy(epoch = Some(node2slot1Identifier.number), clusterSize = 3, progress = initialData.progress.copy(highestCommitted = node2slot1Identifier)))
@@ -86,7 +86,7 @@ trait LeaderLikeSpec {
     val identifier = Identifier(1, BallotNumber(lowValue + 1, 0), 1L)
     val greaterThan = Identifier(1, BallotNumber(lowValue + 2, 2), 2L)
     val timenow = 999L
-    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None){
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, sender, stubJournal, ArrayBuffer.empty, None){
       override def clock() = timenow
     })
     val epoch = Some(identifier.number)
@@ -121,7 +121,7 @@ trait LeaderLikeSpec {
     (stubJournal.accepted _) when (1L) returns Some(accepted)
 
     // when we have a leader-like which could commit
-    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
       override def clock() = timenow
     })
 
@@ -160,7 +160,7 @@ trait LeaderLikeSpec {
     val responses = acceptResponsesLens.set(initialData, votes)
     val oldProgress = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
     val timenow = 999L
-    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
       override def clock() = timenow
     })
     fsm.underlyingActor.setAgent(role, responses.copy(epoch = Some(BallotNumber(1, 0)), progress = oldProgress))
@@ -192,7 +192,7 @@ trait LeaderLikeSpec {
     val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
     val timenow = 999L
     var sendTime = 0L
-    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, tempJournal, ArrayBuffer.empty, None) {
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, sender, tempJournal, ArrayBuffer.empty, None) {
       override def clock() = timenow
       override def broadcast(msg: PaxosMessage): Unit = {
         sendTime = System.nanoTime()
@@ -237,7 +237,7 @@ trait LeaderLikeSpec {
     val responses = acceptResponsesLens.set(initialData, votes)
     val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (BallotNumber(22, 2), lastCommitted))
     val timenow = 999L
-    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
+    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, sender, stubJournal, ArrayBuffer.empty, None) {
       override def clock() = timenow
       override def freshTimeout(interval: Long): Long = 1234L
     })

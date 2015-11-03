@@ -19,7 +19,7 @@ object FollowerSpec {
 class FollowerSpec
   extends TestKit(ActorSystem("FollowerSpec", FollowerSpec.config))
   with DefaultTimeout with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with AllStateSpec with NotLeaderSpec {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with NotLeaderSpec {
 
   import AllStateSpec._
   import Ordering._
@@ -32,15 +32,6 @@ class FollowerSpec
   "Follower" should {
     "respond to client data by saying that it is not the leader" in {
       respondsToClientDataBySayingNotTheLeader(Follower)
-      checkForLeakedMessages
-    }
-    "not commit non contiguous retransmission response" in {
-      journalsButDoesNotCommitIfNotContiguousRetransmissionResponse(Follower)
-      checkForLeakedMessages
-    }
-    "journals accept messages and sets higher promise" in {
-      journalsAcceptMessagesAndSetsHigherPromise(Follower)
-      checkForLeakedMessages
     }
     "bootstrap from retransmit response" in {
       // given some retransmitted committed values
@@ -64,7 +55,7 @@ class FollowerSpec
       // and an empty node
       val fileJournal: FileJournal = AllStateSpec.tempRecordTimesFileJournal
       val delivered = ArrayBuffer[CommandValue]()
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, fileJournal, delivered, None))
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, fileJournal, delivered, None))
 
       // when the retransmission is received
       fsm ! retransmission
@@ -102,12 +93,11 @@ class FollowerSpec
         case Progress(_, a3.id) => // good
         case p => fail(s"got $p not ${Progress(a3.id.number, a3.id)}")
       }
-      checkForLeakedMessages
     }
     "not switch to recoverer if it does not timeout" in {
       val stubJournal: Journal = stub[Journal]
       // when our node has a high timeout
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None))
       fsm.underlyingActor.setAgent(Follower, initialData.copy(timeout = System.currentTimeMillis + minute))
       // and we sent it a timeout check message
       fsm ! CheckTimeout
@@ -115,7 +105,6 @@ class FollowerSpec
       expectNoMsg(25 millisecond)
       // and does not change state
       assert(fsm.underlyingActor.role == Follower)
-      checkForLeakedMessages
     }
     val timenow = 999L
     "update its timeout when it sees a commit" in {
@@ -123,7 +112,7 @@ class FollowerSpec
       val stubJournal: Journal = stub[Journal]
       (stubJournal.load _) when() returns (Journal.minBookwork)
       // given we control the clock
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
       })
       fsm ! Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0L), 9999L)
@@ -133,12 +122,11 @@ class FollowerSpec
       assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
       // and updates its heartbeat
       fsm.underlyingActor.data.leaderHeartbeat should be(9999L)
-      checkForLeakedMessages
     }
     "update its heartbeat when it sees a commit" in {
       val stubJournal: Journal = stub[Journal]
       // given we control the clock
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
       })
       fsm.underlyingActor.setAgent(Follower, initialData.copy(leaderHeartbeat = 88L))
@@ -147,7 +135,6 @@ class FollowerSpec
       expectNoMsg(25 millisecond)
       // and updates the heartbeat
       assert(fsm.underlyingActor.data.leaderHeartbeat == 99L)
-      checkForLeakedMessages
     }
     "commit next slot if same number as previous commit" in {
       // given an initialized journal
@@ -160,7 +147,7 @@ class FollowerSpec
       (stubJournal.accepted _) when (1L) returns Some(accepted)
 
       // when we commit that value
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
       })
       fsm ! Commit(identifier)
@@ -173,7 +160,6 @@ class FollowerSpec
       (stubJournal.save _).verify(fsm.underlyingActor.data.progress)
       // and sets a fresh timeout
       assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
-      checkForLeakedMessages
     }
     "commit next slot on a different number as previous commit" in {
       // given an initialized journal
@@ -186,7 +172,7 @@ class FollowerSpec
       (stubJournal.accepted _) when (1L) returns Some(accepted)
 
       // when we commit that value
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
       })
       fsm ! Commit(identifier)
@@ -202,7 +188,6 @@ class FollowerSpec
       (stubJournal.save _).verify(fsm.underlyingActor.data.progress)
       // and sets a fresh timeout
       assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
-      checkForLeakedMessages
     }
     "request retranmission if commit of next in slot does not match value in slot" in {
       // given an initalized journal
@@ -217,7 +202,7 @@ class FollowerSpec
       val otherNodeId = 1
       // when we commit a value into that slot using a different number
       val identifier99 = Identifier(otherNodeId, BallotNumber(0, 99), 1L)
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
       })
       fsm ! Commit(identifier99)
@@ -227,7 +212,6 @@ class FollowerSpec
       assert(fsm.underlyingActor.delivered.isEmpty)
       // and sets a fresh timeout
       assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
-      checkForLeakedMessages
     }
     "commit if three slots if previous accepts are from stable leader" in {
       // given an initalized journal
@@ -246,7 +230,7 @@ class FollowerSpec
       (stubJournal.accepted _) when (3L) returns Some(Accept(id3, ClientRequestCommandValue(0, expectedBytes)))
 
       // when we commit slot 3
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
       })
       fsm ! Commit(id3)
@@ -261,7 +245,6 @@ class FollowerSpec
       (stubJournal.save _).verify(fsm.underlyingActor.data.progress)
       // and sets a fresh timeout
       assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
-      checkForLeakedMessages
     }
     "request retransmission if it sees a gap in commit sequence" in {
       // given an initalized journal
@@ -281,7 +264,7 @@ class FollowerSpec
       (stubJournal.accepted _) when (3L) returns Some(Accept(id3, ClientRequestCommandValue(0, expectedBytes)))
 
       // when we commit slot 3
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None))
       fsm ! Commit(id3)
 
       // it sends retransmission
@@ -292,7 +275,6 @@ class FollowerSpec
       assert(fsm.underlyingActor.data.progress.highestCommitted == id1)
       // and journals progress
       (stubJournal.save _).verify(fsm.underlyingActor.data.progress)
-      checkForLeakedMessages
     }
     "request retransmission if it sees value under a different number in a commit sequence" in {
       // given an journal with a promise to node1 and committed up to last from node2
@@ -313,7 +295,7 @@ class FollowerSpec
       (stubJournal.accepted _) when (3L) returns Some(Accept(id3, ClientRequestCommandValue(0, expectedBytes)))
 
       // when we commit slot 3
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None))
       fsm ! Commit(id3)
 
       // it sends retransmission
@@ -324,7 +306,6 @@ class FollowerSpec
       assert(fsm.underlyingActor.data.progress.highestCommitted == id1)
       // and journals progress
       (stubJournal.save _).verify(fsm.underlyingActor.data.progress)
-      checkForLeakedMessages
     }
     "request retransmission and does not commit if it has wrong values in slots" in {
       // given slots 1 thru 3 have been accepted under a different as previously committed slot 0 shown in initialData
@@ -342,7 +323,7 @@ class FollowerSpec
       (stubJournal.accepted _) when (3L) returns Some(Accept(id3other, ClientRequestCommandValue(0, expectedBytes)))
 
       // when we commit slot 3
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None))
       fsm.underlyingActor.setAgent(Follower, initialData)
 
       fsm ! Commit(Identifier(otherNodeId, BallotNumber(lowValue, lowValue), 3L))
@@ -353,7 +334,6 @@ class FollowerSpec
       assert(fsm.underlyingActor.delivered.size == 0)
       // and updates its latest commit
       assert(fsm.underlyingActor.data.progress.highestCommitted == initialData.progress.highestCommitted)
-      checkForLeakedMessages
     }
 
     val minPrepare = Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
@@ -362,7 +342,7 @@ class FollowerSpec
       val stubJournal: Journal = stub[Journal]
       // given that we control the clock
       val timenow = 999L
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
       })
       // and no uncommitted values in journal
@@ -383,13 +363,12 @@ class FollowerSpec
         case Some(map) if map.size == 1 => // good
         case x => fail(x.toString)
       }
-      checkForLeakedMessages
     }
     "re-issues a low prepare on subsequent time-outs when it has not recieved any responses" in {
       val stubJournal: Journal = stub[Journal]
       // given that we control the clock
       var timenow = 999L
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
       })
       // and no uncommitted values in journal
@@ -416,7 +395,6 @@ class FollowerSpec
       // and has responded itself
       assert(fsm.underlyingActor.data.prepareResponses.get(minPrepare.id) != None)
       assert(fsm.underlyingActor.data.prepareResponses.get(minPrepare.id).getOrElse(fail).size == 1)
-      checkForLeakedMessages
     }
     "backdown from a low prepare on receiving a fresh heartbeat commit from the same leader and request a retransmit" in {
       // given an initalized journal
@@ -425,7 +403,7 @@ class FollowerSpec
 
       // given that we control the clock
       val timenow = 999L
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
       })
       // and no uncommitted values in journal
@@ -446,7 +424,6 @@ class FollowerSpec
       assert(fsm.underlyingActor.data.prepareResponses.isEmpty)
       // and sets a fresh timeout
       assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
-      checkForLeakedMessages
     }
     "backdown from a low prepare on receiving a low heartbeat commit from a new leader" in {
 
@@ -461,7 +438,6 @@ class FollowerSpec
       assert(fsm.underlyingActor.data.leaderHeartbeat == freshCommit.heartbeat)
       // and has cleared the low prepare tracking map
       assert(fsm.underlyingActor.data.prepareResponses.isEmpty)
-      checkForLeakedMessages
     }
     "backdown from a low prepare if other follower has a higher heartbeat" in {
       // given a follower in a cluster size of three
@@ -475,7 +451,6 @@ class FollowerSpec
       fsm.underlyingActor.data.prepareResponses.size should be(0)
       // and updates its the known leader heartbeat so that if the leader dies it can take over
       fsm.underlyingActor.data.leaderHeartbeat should be(Long.MaxValue)
-      checkForLeakedMessages
     }
     "backdown from a low prepare if other follower has committed a higher slot" in {
       // given a follower in a cluster size of three
@@ -492,7 +467,6 @@ class FollowerSpec
       // and backs down
       fsm.underlyingActor.role should be(Follower)
       fsm.underlyingActor.data.prepareResponses.size should be(0)
-      checkForLeakedMessages
     }
 
     def followerNoResponsesInClusterOfSize(numberOfNodes: Int, highestAccepted: Long = 0L, cfg: Config = AllStateSpec.config) = {
@@ -518,7 +492,6 @@ class FollowerSpec
       // then it does nothing
       expectNoMsg(25 milliseconds)
       assert(fsm.underlyingActor.data == startData)
-      checkForLeakedMessages
     }
 
     "switch to recoverer if in a five node cluster it sees a majority response with no heartbeats" in {
@@ -531,7 +504,6 @@ class FollowerSpec
       fsm.underlyingActor.role should be(Recoverer)
       // and issues a higher prepare to the next slot
       expectMsg(100 millisecond, Prepare(Identifier(0, BallotNumber(lowValue + 1, 0), 1)))
-      checkForLeakedMessages
     }
 
     "default to aggressive failover and promote to recoverer if in a five node cluster it sees a majority response and only one has a fresh heartbeats" in {
@@ -544,7 +516,6 @@ class FollowerSpec
       fsm.underlyingActor.role should be(Recoverer)
       // and issues a higher prepare to the next slot
       expectMsg(100 millisecond, Prepare(Identifier(0, BallotNumber(lowValue + 1, 0), 1)))
-      checkForLeakedMessages
     }
 
     "switch to recoverer and issue multiple prepare messages if there are slots to recover and no leader" in {
@@ -562,7 +533,7 @@ class FollowerSpec
 
       // and that we record the send time
       var sendTime = 0L
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, delegatingJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, delegatingJournal, ArrayBuffer.empty, None) {
         override def clock() = timenow
 
         override def broadcast(msg: PaxosMessage): Unit = {
@@ -633,7 +604,6 @@ class FollowerSpec
       assert(saveTime != 0)
       assert(sendTime != 0)
       assert(saveTime < sendTime)
-      checkForLeakedMessages
     }
 
     // TODO should check that it ignores commits less than or equal to last committed logIndex (both of them)

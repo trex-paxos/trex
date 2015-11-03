@@ -14,7 +14,7 @@ import scala.language.postfixOps
 class LeaderSpec
   extends TestKit(ActorSystem("LeaderSpec", AllStateSpec.config))
   with DefaultTimeout with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with AllStateSpec with LeaderLikeSpec with PaxosLenses {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with LeaderLikeSpec with PaxosLenses {
 
   import AllStateSpec._
   import Ordering._
@@ -36,12 +36,6 @@ class LeaderSpec
   val expectedBytes3 = expectedString2.getBytes
 
   "Leader" should {
-    "not commit non contiguous retransmission response" in {
-      journalsButDoesNotCommitIfNotContiguousRetransmissionResponse(Leader)
-    }
-    "journals accept messages and sets higher promise" in {
-      journalsAcceptMessagesAndSetsHigherPromise(Leader)
-    }
     "ignore commit message for lower log index" in {
       ignoreCommitMessageLogIndexLessThanLastCommit(Leader)
     }
@@ -63,7 +57,7 @@ class LeaderSpec
     "ignores a late prepare response" in {
       val stubJournal: Journal = stub[Journal]
       // given a leader
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None))
       fsm.underlyingActor.setAgent(Leader, initailLeaderData)
       // when we sent it a late prepare nack
       fsm ! PrepareNack(minPrepare.id, 2, initialData.progress, initialData.progress.highestCommitted.logIndex, Long.MaxValue)
@@ -77,7 +71,7 @@ class LeaderSpec
       expectNoMsg(10 millisecond)
       val stubJournal: Journal = stub[Journal]
       // given a leader
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None))
       fsm.underlyingActor.setAgent(Leader, initailLeaderData)
       // when we sent it three log entries 
       fsm ! ClientRequestCommandValue(0, expectedBytes)
@@ -129,7 +123,7 @@ class LeaderSpec
       val responses = acceptResponsesLens.set(initialData, votes)
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
       var sendTime = 0L
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, delegatingJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, delegatingJournal, ArrayBuffer.empty, None) {
         override def broadcast(msg: PaxosMessage): Unit = {
           sendTime = System.nanoTime()
           super.broadcast(msg)}
@@ -191,7 +185,7 @@ class LeaderSpec
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
       val data = acceptResponsesClientCommandsLens.set(initialData, (votes, Map.empty))
       val committed = Progress.highestPromisedHighestCommitted.set(data.progress, (lastCommitted.number, lastCommitted))
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None) {
         override def freshTimeout(interval: Long): Long = 1234L
       })
 
@@ -247,7 +241,7 @@ class LeaderSpec
 
       // and an actor which records the send time
       var sendTime = 0L
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, delgatingJournal, ArrayBuffer.empty, None) {
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, delgatingJournal, ArrayBuffer.empty, None) {
         override def broadcast(msg: PaxosMessage): Unit = {
           sendTime = System.nanoTime()
           super.broadcast(msg)
@@ -306,7 +300,7 @@ class LeaderSpec
       // and we have committed up to 97
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
 
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None))
       fsm.underlyingActor.setAgent(Leader, responses.copy(progress = committed))
 
       // when it gets one accept giving it a majority on 100 but showing a higher commit mark
@@ -323,7 +317,7 @@ class LeaderSpec
     "rebroadcasts its commit with a fresh heartbeat when it gets a prompt from the scheduler" in {
       val stubJournal: Journal = stub[Journal]
       // given a leader
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, clusterSize3), 0, self, stubJournal, ArrayBuffer.empty, None))
+      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None))
       fsm.underlyingActor.setAgent(Leader, initialData)
       // when it gets a tick
       fsm ! HeartBeat
@@ -355,6 +349,10 @@ class LeaderSpec
     "reissues higher accept message upon having made a higher promise itself by the timeout" in {
       resendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(Leader)
     }
+
+    val leaderHeartbeat2 = 2
+    val timeout4 = 4
+    val clusterSize5 = 5
 
     "backs down to be a follower when it makes a higher promise to another node" in {
       expectNoMsg(10 millisecond)
