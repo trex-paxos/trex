@@ -2,6 +2,7 @@ package com.github.trex_paxos
 
 import akka.actor.TypedActor.MethodCall
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props, TypedActor, TypedProps}
+import akka.serialization.SerializationExtension
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
@@ -20,10 +21,21 @@ class MethodCallTestClass extends MethodCallTestTrait {
 
 class MethodCallInvokingActor(target: Any) extends Actor with ActorLogging {
 
+  val serialization = SerializationExtension(context.system)
+  val serializer = serialization.serializerFor(classOf[MethodCall])
+
+  def serialize(methodCall: MethodCall): Array[Byte] = {
+    serializer.toBinary(methodCall)
+  }
+
+  def deserialize(bytes: Array[Byte]): MethodCall = {
+    serializer.fromBinary(bytes, manifest = None).asInstanceOf[MethodCall]
+  }
+
   override def receive: Receive = {
     case mc: MethodCall =>
-      val bytes = TrexExtension(context.system).serialize(mc)
-      val methodCall = TrexExtension(context.system).deserialize(bytes)
+      val bytes = serialize(mc)
+      val methodCall = deserialize(bytes)
       log.debug(s"$methodCall")
       val method = methodCall.method
       val parameters = methodCall.parameters

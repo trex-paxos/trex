@@ -20,27 +20,6 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Try
 
-// TODO do we really need a custom extension can we not use SerializationExtension directly
-class Trex(system: ExtendedActorSystem) extends Extension {
-  val serialization = SerializationExtension(system)
-  val serializer = serialization.serializerFor(classOf[MethodCall])
-
-  def serialize(methodCall: MethodCall): Array[Byte] = {
-    serializer.toBinary(methodCall)
-  }
-
-  def deserialize(bytes: Array[Byte]): MethodCall = {
-    serializer.fromBinary(bytes, manifest = None).asInstanceOf[MethodCall]
-  }
-
-}
-
-object TrexExtension extends ExtensionId[Trex] with ExtensionIdProvider {
-  override def createExtension(system: ExtendedActorSystem): Trex = new Trex(system)
-
-  override def lookup(): ExtensionId[_ <: Extension] = TrexExtension
-}
-
 class UdpSender(remote: InetSocketAddress) extends Actor with ActorLogging {
 
   import context.system
@@ -321,9 +300,16 @@ class TypedActorPaxosEndpoint(config: PaxosActor.Configuration, broadcastReferen
 
   def broadcast(msg: Any): Unit = send(broadcastReference, msg)
 
+  val serialization = SerializationExtension(context.system)
+  val serializer = serialization.serializerFor(classOf[MethodCall])
+
+  def deserialize(bytes: Array[Byte]): MethodCall = {
+    serializer.fromBinary(bytes, manifest = None).asInstanceOf[MethodCall]
+  }
+
   override val deliverClient: PartialFunction[CommandValue, AnyRef] = {
     case ClientRequestCommandValue(id, bytes) =>
-      val mc@TypedActor.MethodCall(method, parameters) = TrexExtension(context.system).deserialize(bytes)
+      val mc@TypedActor.MethodCall(method, parameters) = deserialize(bytes)
       log.debug("delivering {}", mc)
       val result = Try {
         val response = Option(method.invoke(target, parameters: _*))

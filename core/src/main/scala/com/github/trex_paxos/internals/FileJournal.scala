@@ -48,7 +48,7 @@ class FileJournal(storeFile: File, retained: Int) extends Journal with Closeable
   def save(progress: Progress): Unit = {
     // save the bookwork
     val bytes = Pickle.pickle(progress)
-    bookworkMap.put(this.getClass.getCanonicalName, bytes.toArray)
+    bookworkMap.put("FileJournal", bytes.toArray)
     db.commit() // eager commit
     // lazy gc of some old values as dont commit until next update
     val Progress(_, Identifier(_, _, logIndex)) = progress
@@ -63,7 +63,7 @@ class FileJournal(storeFile: File, retained: Int) extends Journal with Closeable
   }
 
   def load(): Progress = {
-    val bytes = bookworkMap.get(this.getClass.getCanonicalName)
+    val bytes = bookworkMap.get("FileJournal")
     Pickle.unpickleProgress(ByteString(bytes))
   }
 
