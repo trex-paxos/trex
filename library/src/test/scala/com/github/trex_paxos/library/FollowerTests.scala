@@ -4,6 +4,7 @@ import TestHelpers._
 import Ordering._
 
 import scala.collection.immutable.TreeMap
+import scala.collection.mutable.ArrayBuffer
 
 class FollowerTests extends AllRolesTests {
 
@@ -174,6 +175,26 @@ class FollowerTests extends AllRolesTests {
   object `A Follower` {
     def `should use prepare handler` {
       usesPrepareHandler(Follower)
+    }
+    def `should not change state if not timed out` {
+      val agent = PaxosAgent(0, Follower, initialData)
+      val notTimedOutEvent = PaxosEvent(negativeClockIO, agent, CheckTimeout)
+      val PaxosAgent(_, role, data) = paxosAlgorithm(notTimedOutEvent)
+      assert( role == agent.role && data == agent.data)
+    }
+    def `update its timeout and observed heartbeat when it sees a commit` {
+
+      val timeout = 123L
+      val heartbeat = 9999L
+
+      val timeoutIO = new UndefinedIO {
+        override def randomTimeout: Long = timeout
+      }
+
+      val agent = PaxosAgent(0, Follower, initialData)
+      val event = PaxosEvent(timeoutIO, agent, Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0L), heartbeat))
+      val PaxosAgent(_, role, data) = paxosAlgorithm(event)
+      assert( role == Follower && data == agent.data.copy(timeout = timeout, leaderHeartbeat = heartbeat))
     }
 
   }

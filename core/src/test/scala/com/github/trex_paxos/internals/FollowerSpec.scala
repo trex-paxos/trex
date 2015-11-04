@@ -94,48 +94,7 @@ class FollowerSpec
         case p => fail(s"got $p not ${Progress(a3.id.number, a3.id)}")
       }
     }
-    "not switch to recoverer if it does not timeout" in {
-      val stubJournal: Journal = stub[Journal]
-      // when our node has a high timeout
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None))
-      fsm.underlyingActor.setAgent(Follower, initialData.copy(timeout = System.currentTimeMillis + minute))
-      // and we sent it a timeout check message
-      fsm ! CheckTimeout
-      // it sends no messages
-      expectNoMsg(25 millisecond)
-      // and does not change state
-      assert(fsm.underlyingActor.role == Follower)
-    }
     val timenow = 999L
-    "update its timeout when it sees a commit" in {
-      // given an initalized journal
-      val stubJournal: Journal = stub[Journal]
-      (stubJournal.load _) when() returns (Journal.minBookwork)
-      // given we control the clock
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None) {
-        override def clock() = timenow
-      })
-      fsm ! Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0L), 9999L)
-      // it sends no messages
-      expectNoMsg(25 millisecond)
-      // and sets a fresh timeout
-      assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
-      // and updates its heartbeat
-      fsm.underlyingActor.data.leaderHeartbeat should be(9999L)
-    }
-    "update its heartbeat when it sees a commit" in {
-      val stubJournal: Journal = stub[Journal]
-      // given we control the clock
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None) {
-        override def clock() = timenow
-      })
-      fsm.underlyingActor.setAgent(Follower, initialData.copy(leaderHeartbeat = 88L))
-      fsm ! Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0), 99L)
-      // it sends no messages
-      expectNoMsg(25 millisecond)
-      // and updates the heartbeat
-      assert(fsm.underlyingActor.data.leaderHeartbeat == 99L)
-    }
     "commit next slot if same number as previous commit" in {
       // given an initialized journal
       val stubJournal: Journal = stub[Journal]
