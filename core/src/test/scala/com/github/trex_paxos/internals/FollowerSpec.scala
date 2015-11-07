@@ -35,64 +35,6 @@ class FollowerSpec
 
     val minPrepare = Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
 
-    "times-out and issues a single low prepare" in {
-      val stubJournal: Journal = stub[Journal]
-      // given that we control the clock
-      val timenow = 999L
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None) {
-        override def clock() = timenow
-      })
-      // and no uncommitted values in journal
-      val bounds = JournalBounds(0L, 0L)
-      (stubJournal.bounds _) when() returns (bounds)
-      // when our node gets a timeout
-      fsm ! CheckTimeout
-      // it sends out a single low prepare
-      expectMsg(100 millisecond, minPrepare)
-      // and stays as follower
-      assert(fsm.underlyingActor.role == Follower)
-      // and sets a fresh timeout
-      assert(fsm.underlyingActor.data.timeout > 0 && fsm.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
-      // and is tracking reponses to its low prepare
-      assert(fsm.underlyingActor.data.prepareResponses != None)
-      // and has responded itself
-      fsm.underlyingActor.data.prepareResponses.get(minPrepare.id) match {
-        case Some(map) if map.size == 1 => // good
-        case x => fail(x.toString)
-      }
-    }
-    "re-issues a low prepare on subsequent time-outs when it has not recieved any responses" in {
-      val stubJournal: Journal = stub[Journal]
-      // given that we control the clock
-      var timenow = 999L
-      val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, self, stubJournal, ArrayBuffer.empty, None) {
-        override def clock() = timenow
-      })
-      // and no uncommitted values in journal
-      val bounds = JournalBounds(0L, 0L)
-      (stubJournal.bounds _) when() returns (bounds)
-      // when our node gets a timeout
-      fsm ! CheckTimeout
-      // it sends out a single low prepare
-      expectMsg(100 millisecond, minPrepare)
-      // which repeats on subsequent time outs
-      timenow = timenow + fsm.underlyingActor.data.timeout + 1
-      fsm ! CheckTimeout
-      expectMsg(100 millisecond, minPrepare)
-      timenow = timenow + fsm.underlyingActor.data.timeout + 1
-      fsm ! CheckTimeout
-      expectMsg(100 millisecond, minPrepare)
-      timenow = timenow + fsm.underlyingActor.data.timeout + 1
-      fsm ! CheckTimeout
-      expectMsg(100 millisecond, minPrepare)
-      // and stays as follower
-      assert(fsm.underlyingActor.role == Follower)
-      // and is tracking responses to its low prepare
-      assert(fsm.underlyingActor.data.prepareResponses != None)
-      // and has responded itself
-      assert(fsm.underlyingActor.data.prepareResponses.get(minPrepare.id) != None)
-      assert(fsm.underlyingActor.data.prepareResponses.get(minPrepare.id).getOrElse(fail).size == 1)
-    }
     "backdown from a low prepare on receiving a fresh heartbeat commit from the same leader and request a retransmit" in {
       // given an initalized journal
       val stubJournal: Journal = stub[Journal]
@@ -136,35 +78,6 @@ class FollowerSpec
       // and has cleared the low prepare tracking map
       assert(fsm.underlyingActor.data.prepareResponses.isEmpty)
     }
-    "backdown from a low prepare if other follower has a higher heartbeat" in {
-      // given a follower in a cluster size of three
-      val fsm = followerNoResponsesInClusterOfSize(3)
-
-      // when it hears back that the other follower has seen a higher heartbeat
-      fsm ! PrepareNack(minPrepare.id, 2, initialData.progress, initialData.progress.highestCommitted.logIndex, Long.MaxValue)
-
-      // and backs down
-      fsm.underlyingActor.role should be(Follower)
-      fsm.underlyingActor.data.prepareResponses.size should be(0)
-      // and updates its the known leader heartbeat so that if the leader dies it can take over
-      fsm.underlyingActor.data.leaderHeartbeat should be(Long.MaxValue)
-    }
-    "backdown from a low prepare if other follower has committed a higher slot" in {
-      // given a follower in a cluster size of three
-      val fsm = followerNoResponsesInClusterOfSize(3)
-
-      val otherFollowerId = 2
-
-      // when it hears back that the other follower has committed a higher slot
-      fsm ! PrepareNack(minPrepare.id, otherFollowerId, Progress.highestCommittedLens.set(initialData.progress, initialData.progress.highestCommitted.copy(logIndex = 99L)), initialData.progress.highestCommitted.logIndex + 1, Long.MaxValue)
-
-      // it responds with a retransmit
-      expectMsg(100 millisecond, RetransmitRequest(0, otherFollowerId, initialData.progress.highestCommitted.logIndex))
-
-      // and backs down
-      fsm.underlyingActor.role should be(Follower)
-      fsm.underlyingActor.data.prepareResponses.size should be(0)
-    }
 
     def followerNoResponsesInClusterOfSize(numberOfNodes: Int, highestAccepted: Long = 0L, cfg: Config = AllStateSpec.config) = {
       val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
@@ -176,19 +89,6 @@ class FollowerSpec
       })
       fsm.underlyingActor.setAgent(Follower, state)
       fsm
-    }
-
-    "ignores an accept response" in {
-      // given a follower in a cluster size of three
-      val fsm = followerNoResponsesInClusterOfSize(3)
-      val startData = fsm.underlyingActor.data
-
-      // when it get an accept response
-      fsm ! AcceptAck(minPrepare.id, 0, initialData.progress)
-
-      // then it does nothing
-      expectNoMsg(25 milliseconds)
-      assert(fsm.underlyingActor.data == startData)
     }
 
     "switch to recoverer if in a five node cluster it sees a majority response with no heartbeats" in {

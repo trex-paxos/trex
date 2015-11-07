@@ -225,12 +225,17 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
         timeoutPrepareResponsesLens.set(initialData, (Long.MinValue,
           TreeMap(minPrepare.id -> votes)))
       val agent = PaxosAgent(0, Follower, data.copy(leaderHeartbeat = 888))
+      // and io with some timeout
+      val io = new UndefinedIO with SilentLogging{
+        override def randomTimeout: Long = 12345L
+      }
       // when
       val handler = new Object with FollowerHandler
-      val PaxosAgent(_, _, newData) = handler.handleMajorityResponse(undefinedIOwithNoopLogging, agent, votes)
+      val PaxosAgent(_, _, newData) = handler.handleMajorityResponse(io, agent, votes)
       // then
       newData.prepareResponses.isEmpty shouldBe true
       newData.leaderHeartbeat shouldBe 999
+      newData.timeout shouldBe 12345L
     }
   }
 

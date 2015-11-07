@@ -4,8 +4,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import TestHelpers._
 import Ordering._
+import com.github.trex_paxos.library.CommitHandlerTests._
 
-import scala.collection.immutable.TreeMap
+import scala.collection.immutable.{SortedMap, TreeMap}
+import scala.collection.mutable.ArrayBuffer
 
 class FollowerTests extends AllRolesTests {
 
@@ -217,6 +219,102 @@ class FollowerTests extends AllRolesTests {
       val event = PaxosEvent(timeoutIO, agent, Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0L), heartbeat))
       val PaxosAgent(_, role, data) = paxosAlgorithm(event)
       assert( role == Follower && data == agent.data.copy(timeout = timeout, leaderHeartbeat = heartbeat))
+    }
+    def `should ignore an accept response`  {
+      // given
+      val agent = PaxosAgent(0, Follower, initialData)
+      val message = AcceptAck(initialData.progress.highestCommitted, 0, initialData.progress)
+      val event = new PaxosEvent(new UndefinedIO, agent, message)
+      val paxosAlgorithm = new PaxosAlgorithm
+      // when
+      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      // then
+      newRole shouldBe Follower
+      newData shouldBe initialData
+    }
+    def `should time-out and send a low prepare` {
+      val paxosAlgorithm = new PaxosAlgorithm
+      // given an empty journal
+      val stubJournal: Journal = stub[Journal]
+      val bounds = JournalBounds(0L, 0L)
+      (stubJournal.bounds _) when() returns (bounds)
+      // and an io which has a high clock and checks the sent messages
+      val messages: ArrayBuffer[PaxosMessage] = ArrayBuffer.empty
+      val io = new UndefinedIO with SilentLogging {
+        override def clock: Long = Long.MaxValue
+
+        override def minPrepare: Prepare = TestHelpers.minPrepare
+
+        override def send(msg: PaxosMessage): Unit = messages += msg
+
+        override def randomTimeout: Long = 987654L
+
+        override def journal: Journal = stubJournal
+      }
+      // and a check timeout event
+      val message = CheckTimeout
+      val agent = PaxosAgent(0, Follower, initialData)
+      val event = new PaxosEvent(io, agent, message)
+      // when we process the event
+      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      // then
+      messages.headOption.value match {
+        case p: Prepare if p == minPrepare => // good
+        case f => fail(f.toString)
+      }
+      newRole shouldBe Follower
+      newData.timeout shouldBe 987654L
+      newData.prepareResponses.get(minPrepare.id) match {
+        case Some(map) if map.size == 1 => // good
+        case x => fail(x.toString)
+      }
+    }
+    def `should backdown and issue retransmit response if another node has committed a higher slot` {
+      val paxosAlgorithm = new PaxosAlgorithm
+      // given a follower that has issued a min prepare
+      val selfAck = PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None)
+      val prepareResponses = initialData.prepareResponses + (minPrepare.id -> Map(0 -> selfAck))
+      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareResponses))
+      // and an io that captures messages
+      val messages: ArrayBuffer[PaxosMessage] = ArrayBuffer.empty
+      val io = new UndefinedIO with SilentLogging{
+        override def send(msg: PaxosMessage): Unit = messages += msg
+        override def randomTimeout: Long = 987654L
+      }
+
+      // and a higher committed slot nack to the min prepare
+      val message = PrepareNack(minPrepare.id, 2, Progress.highestCommittedLens.set(initialData.progress, initialData.progress.highestCommitted.copy(logIndex = Long.MaxValue)), 0, Long.MinValue)
+      val event = new PaxosEvent(io, agent, message)
+      // when
+      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      // then
+      newRole shouldBe Follower
+      newData.prepareResponses.isEmpty shouldBe true
+      newData.timeout shouldBe 987654L
+    }
+    def `should backdown if another node has seen a higher leader heartbeat where leader has majority` {
+      val paxosAlgorithm = new PaxosAlgorithm
+      // given a follower in a cluster sized 3 that has issued a min prepare
+      val selfAck = PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None)
+      val prepareResponses = initialData.prepareResponses + (minPrepare.id -> Map(0 -> selfAck))
+      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareResponses))
+      // and an io that captures messages
+      val messages: ArrayBuffer[PaxosMessage] = ArrayBuffer.empty
+      val io = new UndefinedIO with SilentLogging{
+        override def send(msg: PaxosMessage): Unit = messages += msg
+        override def randomTimeout: Long = 987654L
+      }
+
+      // and a nack that indicates a leader behind a network partition
+      val message = PrepareNack(minPrepare.id, 2, initialData.progress, 0, Long.MaxValue)
+      val event = new PaxosEvent(io, agent, message)
+      // when
+      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      // then
+      newRole shouldBe Follower
+      newData.prepareResponses.isEmpty shouldBe true
+      newData.timeout shouldBe 987654L
+      newData.leaderHeartbeat shouldBe Long.MaxValue
     }
 
   }

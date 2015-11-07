@@ -112,7 +112,8 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
         io.plog.debug(s"Node {} {} sees evidence of a leader is not failing over. ", agent.nodeUniqueId, agent.role)
         // other nodes are showing a leader behind a partial network partition so we backdown.
         // we update the local known heartbeat in case that leader dies causing a new scenario were only this node can form a majority.
-        agent.copy(role = Follower, data = agent.data.copy(prepareResponses = SortedMap.empty, leaderHeartbeat = maxHeartbeat)) // TODO lens
+        val a@PaxosAgent(_, _, data) = backdownAgent(io, agent)
+        a.copy(data = data.copy(leaderHeartbeat = maxHeartbeat))
       case x => throw new AssertionError(s"unreachable code $x")
     }
   }

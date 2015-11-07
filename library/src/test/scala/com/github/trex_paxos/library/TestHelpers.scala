@@ -86,6 +86,9 @@ class UndefinedAcceptResponse extends AcceptResponse {
 case class TimeAndParameter(time: Long, parameter: Any)
 
 object TestHelpers extends PaxosLenses{
+
+  val minPrepare = Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
+
   val undefinedIO = new UndefinedIO
 
   val undefinedSilentIO = new UndefinedIO with SilentLogging
