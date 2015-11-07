@@ -4,9 +4,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import TestHelpers._
 import Ordering._
-import com.github.trex_paxos.library.CommitHandlerTests._
 
-import scala.collection.immutable.{SortedMap, TreeMap}
+import scala.collection.immutable.TreeMap
 import scala.collection.mutable.ArrayBuffer
 
 class FollowerTests extends AllRolesTests {

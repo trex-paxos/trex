@@ -36,12 +36,7 @@ class LeaderSpec
   val expectedBytes3 = expectedString2.getBytes
 
   "Leader" should {
-    "backdown to follower and request retransmission on commit higher than last committed" in {
-      backdownToFollowerAndRequestRetransmissionOnCommitHigherThanLastCommitted(Leader)
-    }
-    "backdown to follower and perform commit" in {
-      backdownToFollowerAndCommitOnCommitHigherThanLastCommitted(Leader)
-    }
+
 
     val minPrepare = Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
 

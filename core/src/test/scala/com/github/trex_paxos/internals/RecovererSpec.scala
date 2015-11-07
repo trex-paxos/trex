@@ -26,12 +26,7 @@ class RecovererSpec
   val otherHigherPrepare = Prepare(Identifier(2, BallotNumber(lowValue + 1, 2), 1L))
 
   "Recoverer" should {
-    "backdown to follower and request retransmission on commit higher than last committed" in {
-      backdownToFollowerAndRequestRetransmissionOnCommitHigherThanLastCommitted(Recoverer)
-    }
-    "backdown to follower and perform commit" in {
-      backdownToFollowerAndCommitOnCommitHigherThanLastCommitted(Recoverer)
-    }
+
 
     var sendTime = 0L
     var saveTime = 0L

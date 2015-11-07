@@ -149,6 +149,12 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
     def `should backdown on commit same slot higher node number` {
       shouldBackdownOnCommitSameSlotHigherNodeId(Recoverer)
     }
+    def `should backdown on higher slot commit` {
+      shouldBackdownOnHigherSlotCommit(Recoverer)
+    }
+    def `should backdown and commit on higher slot commit` {
+      shouldBackdownAndCommitOnHigherSlotCommit(Recoverer)
+    }
   }
 
 }
