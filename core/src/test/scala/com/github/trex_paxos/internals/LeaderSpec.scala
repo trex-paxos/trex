@@ -36,15 +36,6 @@ class LeaderSpec
   val expectedBytes3 = expectedString2.getBytes
 
   "Leader" should {
-    "ignore commit message for lower log index" in {
-      ignoreCommitMessageLogIndexLessThanLastCommit(Leader)
-    }
-    "ignore commit message equal than last committed lower nodeIdentifier" in {
-      ignoreCommitMessageSameSlotLowerNodeIdentifier(Leader)
-    }
-    "backdown to follower on a commit of same slot but with higher node number" in {
-      backdownToFollowerOnCommitSameSlotHigherNodeIdentifier(Leader)
-    }
     "backdown to follower and request retransmission on commit higher than last committed" in {
       backdownToFollowerAndRequestRetransmissionOnCommitHigherThanLastCommitted(Leader)
     }

@@ -5,7 +5,7 @@ import TestHelpers._
 import scala.collection.immutable.TreeMap
 import Ordering._
 
-class LeaderTests extends AllRolesTests {
+class LeaderTests extends AllRolesTests with LeaderLikeTests {
   val initialDataAgent = PaxosAgent(0, Leader, initialData)
 
   object `The Leader Function` {
@@ -140,7 +140,15 @@ class LeaderTests extends AllRolesTests {
     def `should use prepare handler` {
       usesPrepareHandler(Leader)
     }
-
+    def `should ignore a lower commit` {
+      shouldIngoreLowerCommit(Leader)
+    }
+    def `should ingore a commit for same slot from lower numered node` {
+      shouldIngoreCommitMessageSameSlotLowerNodeId(Leader)
+    }
+    def `should backdown on commit same slot higher node number` {
+      shouldBackdownOnCommitSameSlotHigherNodeId(Recoverer)
+    }
   }
 
 }

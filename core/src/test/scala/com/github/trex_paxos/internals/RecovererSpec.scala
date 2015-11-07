@@ -26,15 +26,6 @@ class RecovererSpec
   val otherHigherPrepare = Prepare(Identifier(2, BallotNumber(lowValue + 1, 2), 1L))
 
   "Recoverer" should {
-    "ignore commit message for lower log index" in {
-      ignoreCommitMessageLogIndexLessThanLastCommit(Recoverer)
-    }
-    "ignore commit message equal than last committed lower nodeIdentifier" in {
-      ignoreCommitMessageSameSlotLowerNodeIdentifier(Recoverer)
-    }
-    "backdown to follower on a commit of same slot but with higher node number" in {
-      backdownToFollowerOnCommitSameSlotHigherNodeIdentifier(Recoverer)
-    }
     "backdown to follower and request retransmission on commit higher than last committed" in {
       backdownToFollowerAndRequestRetransmissionOnCommitHigherThanLastCommitted(Recoverer)
     }

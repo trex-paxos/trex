@@ -18,67 +18,6 @@ trait LeaderLikeSpec {
   import Ordering._
   import PaxosActor.Configuration
 
-  def ignoreCommitMessageLogIndexLessThanLastCommit(role: PaxosRole)(implicit sender: ActorRef) {
-    require(role == Leader || role == Recoverer)
-    val stubJournal: Journal = stub[Journal]
-    // given a leaderlike with no responses
-    val identifier = Identifier(0, BallotNumber(lowValue + 1, 0), 1L)
-    val lessThan = Identifier(0, BallotNumber(lowValue, 0), 0L)
-    val data = initialData.copy(clusterSize = 3, progress = initialData.progress.copy(highestCommitted = identifier))
-    val fsm = TestActorRef(new TestPaxosActor(Configuration(config, 3), 0, sender, stubJournal, ArrayBuffer.empty, None))
-    fsm.underlyingActor.setAgent(role, data)
-    // when it gets commit
-    val commit = Commit(lessThan)
-    fsm ! commit
-    // it sends no messages
-    expectNoMsg(25 millisecond)
-    // and stays a recoverer
-    assert(fsm.underlyingActor.role == role)
-  }
-
-  def ignoreCommitMessageSameSlotLowerNodeIdentifier(role: PaxosRole)(implicit sender: ActorRef) {
-    require(role == Leader || role == Recoverer)
-    val stubJournal: Journal = stub[Journal]
-    // given
-    val node2slot1Identifier = Identifier(2, BallotNumber(lowValue + 1, 2), 1L)
-    val node2 = TestActorRef(new TestPaxosActor(Configuration(config, 3), 2, sender, stubJournal, ArrayBuffer.empty, None))
-    node2.underlyingActor.setAgent(role, initialData.copy(epoch = Some(node2slot1Identifier.number), clusterSize = 3, progress = initialData.progress.copy(highestCommitted = node2slot1Identifier)))
-    // when node2 it gets commit for same slot but lower nodeIdentifier
-    val node0slot1Identifier = Identifier(0, BallotNumber(lowValue + 1, 0), 1L)
-    val commit = Commit(node0slot1Identifier)
-    node2 ! commit
-    // it sends no messages
-    expectNoMsg(25 millisecond)
-    // and stays a recoverer
-    assert(node2.underlyingActor.role == role)
-  }
-
-  def backdownToFollowerOnCommitSameSlotHigherNodeIdentifier(role: PaxosRole)(implicit sender: ActorRef) {
-    require(role == Leader || role == Recoverer)
-    val stubJournal: Journal = stub[Journal]
-    // given
-    val node2slot1Identifier = Identifier(2, BallotNumber(lowValue + 1, 2), 1L)
-    val timenow = 999L
-    val node2 = TestActorRef(new TestPaxosActor(Configuration(config, 3), 2, sender, stubJournal, ArrayBuffer.empty, None){
-      override def clock() = timenow
-    })
-    node2.underlyingActor.setAgent(role, initialData.copy(epoch = Some(node2slot1Identifier.number), clusterSize = 3, progress = initialData.progress.copy(highestCommitted = node2slot1Identifier)))
-    // when node2 it gets commit for same slot but lower nodeIdentifier
-    val node3slot1Identifier = Identifier(0, BallotNumber(lowValue + 1, 3), 1L)
-    val commit = Commit(node3slot1Identifier)
-    node2 ! commit
-    // it sends no messages
-    expectMsg(100 millisecond, RetransmitRequest(2,0,1))
-    // and returns to be follower
-    assert(node2.underlyingActor.role == Follower)
-    // and clears data
-    assert(node2.underlyingActor.data.acceptResponses.isEmpty)
-    assert(node2.underlyingActor.data.prepareResponses.isEmpty)
-    assert(node2.underlyingActor.data.epoch == None)
-    // and sets a fresh timeout
-    assert(node2.underlyingActor.data.timeout > 0 && node2.underlyingActor.data.timeout - timenow < config.getLong(PaxosActor.leaderTimeoutMaxKey))
-  }
-
   def backdownToFollowerAndRequestRetransmissionOnCommitHigherThanLastCommitted(role: PaxosRole)(implicit sender: ActorRef) {
     require(role == Leader || role == Recoverer)
     val stubJournal: Journal = stub[Journal]

@@ -6,7 +6,7 @@ import scala.collection.immutable.{TreeMap, SortedMap}
 
 import Ordering._
 
-class RecovererTests extends AllRolesTests {
+class RecovererTests extends AllRolesTests with LeaderLikeTests {
 
   val initialDataAgent = PaxosAgent(0, Recoverer, initialData)
 
@@ -170,7 +170,15 @@ class RecovererTests extends AllRolesTests {
     def `responds is not leader` {
       respondsIsNotLeader(Recoverer)
     }
-
+    def `should ignore a lower commit` {
+      shouldIngoreLowerCommit(Recoverer)
+    }
+    def `should ingore a commit for same slot from lower numbered node` {
+      shouldIngoreCommitMessageSameSlotLowerNodeId(Recoverer)
+    }
+    def `should backdown on commit same slot higher node number` {
+      shouldBackdownOnCommitSameSlotHigherNodeId(Recoverer)
+    }
   }
 
 }
