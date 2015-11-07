@@ -33,7 +33,6 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
         case MessageAndTimestamp(ack: PrepareAck, sendTs) =>
           journal.p.get() match {
             case (saveTs, _ ) if saveTs < sendTs => // good
-              println(s"$saveTs < $sendTs")
             case f => fail(f.toString)
           }
         case x => fail(x.toString)

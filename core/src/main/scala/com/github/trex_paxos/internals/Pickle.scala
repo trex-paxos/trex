@@ -2,6 +2,7 @@ package com.github.trex_paxos.internals
 
 import akka.util.ByteString
 import com.github.trex_paxos.library._
+import com.typesafe.scalalogging.LazyLogging
 
 import scala.annotation.tailrec
 
@@ -11,7 +12,7 @@ import scala.annotation.tailrec
  * have the responder connect back and stream it one accept over time over TCP. That would
  * fit in better with snapshotting.
  */
-object Pickle {
+object Pickle extends LazyLogging {
   @inline def unsigned(b: Byte): Int = if (b >= 0) {
     b
   } else {
@@ -314,7 +315,7 @@ object Pickle {
     case m: MembershipCommandValue => pickleMembershipValue(m)
     case m: Membership => pickleMembership(m)
     case x =>
-      System.err.println(x)
+      logger.warn(s"don't know how to pickle $x so returning empty ByteString")
       ByteString()
   }
 

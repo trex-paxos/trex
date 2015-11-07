@@ -206,7 +206,7 @@ class FollowerTests extends AllRolesTests {
       val PaxosAgent(_, role, data) = paxosAlgorithm(notTimedOutEvent)
       assert( role == agent.role && data == agent.data)
     }
-    def `update its timeout and observed heartbeat when it sees a commit` {
+    def `should update its timeout and observed heartbeat when it sees a commit` {
 
       val timeout = 123L
       val heartbeat = 9999L
@@ -220,6 +220,13 @@ class FollowerTests extends AllRolesTests {
       val PaxosAgent(_, role, data) = paxosAlgorithm(event)
       assert( role == Follower && data == agent.data.copy(timeout = timeout, leaderHeartbeat = heartbeat))
     }
+    def `should ignore a lower commit` {
+      val agent = PaxosAgent(0, Follower, initialDataCommittedSlotOne)
+      val event = PaxosEvent(undefinedIO, agent, Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0L), Long.MinValue))
+      val PaxosAgent(_, role, data) = paxosAlgorithm(event)
+      role shouldBe Follower
+      data shouldBe agent.data
+    }
     def `should ignore an accept response`  {
       // given
       val agent = PaxosAgent(0, Follower, initialData)
@@ -231,6 +238,21 @@ class FollowerTests extends AllRolesTests {
       // then
       newRole shouldBe Follower
       newData shouldBe initialData
+    }
+    def `should update timeout and hearbeat up repeated commit` {
+      // given
+      val agent = PaxosAgent(0, Follower, initialData)
+      val message = Commit(initialData.progress.highestCommitted, Long.MaxValue)
+      val io = new UndefinedIO{
+        override def randomTimeout: Long = 12345L
+      }
+      val event = new PaxosEvent(io, agent, message)
+      val paxosAlgorithm = new PaxosAlgorithm
+      // when
+      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      // then
+      newRole shouldBe Follower
+      newData shouldBe initialData.copy(timeout = 12345L, leaderHeartbeat = Long.MaxValue)
     }
     def `should time-out and send a low prepare` {
       val paxosAlgorithm = new PaxosAlgorithm
@@ -307,6 +329,53 @@ class FollowerTests extends AllRolesTests {
 
       // and a nack that indicates a leader behind a network partition
       val message = PrepareNack(minPrepare.id, 2, initialData.progress, 0, Long.MaxValue)
+      val event = new PaxosEvent(io, agent, message)
+      // when
+      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      // then
+      newRole shouldBe Follower
+      newData.prepareResponses.isEmpty shouldBe true
+      newData.timeout shouldBe 987654L
+      newData.leaderHeartbeat shouldBe Long.MaxValue
+    }
+    def `should backdown if sees a commit from another leader` {
+      val paxosAlgorithm = new PaxosAlgorithm
+      // given a follower in a cluster sized 3 that has issued a min prepare
+      val selfAck = PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None)
+      val prepareResponses = initialData.prepareResponses + (minPrepare.id -> Map(0 -> selfAck))
+      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareResponses))
+      // and an io that captures messages
+      val messages: ArrayBuffer[PaxosMessage] = ArrayBuffer.empty
+      val io = new UndefinedIO with SilentLogging{
+        override def send(msg: PaxosMessage): Unit = messages += msg
+        override def randomTimeout: Long = 987654L
+      }
+
+      // then when it receives a fresh heartbeat commit
+      val message = Commit(Identifier(1, BallotNumber(lowValue + 1, lowValue), 0), 0)
+      val event = new PaxosEvent(io, agent, message)
+      // when
+      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      // then
+      newRole shouldBe Follower
+      newData.prepareResponses.isEmpty shouldBe true
+      newData.timeout shouldBe 987654L
+    }
+    def `should backdown if it sees a commit from same leader with higher heartbeat` {
+      val paxosAlgorithm = new PaxosAlgorithm
+      // given a follower in a cluster sized 3 that has issued a min prepare
+      val selfAck = PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None)
+      val prepareResponses = initialData.prepareResponses + (minPrepare.id -> Map(0 -> selfAck))
+      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareResponses))
+      // and an io that captures messages
+      val messages: ArrayBuffer[PaxosMessage] = ArrayBuffer.empty
+      val io = new UndefinedIO with SilentLogging{
+        override def send(msg: PaxosMessage): Unit = messages += msg
+        override def randomTimeout: Long = 987654L
+      }
+
+      // then when it receives a fresh heartbeat commit
+      val message = Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0), Long.MaxValue)
       val event = new PaxosEvent(io, agent, message)
       // when
       val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
