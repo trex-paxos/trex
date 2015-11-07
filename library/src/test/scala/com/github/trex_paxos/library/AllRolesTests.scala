@@ -32,7 +32,7 @@ class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValue
   import TestHelpers._
 
   // TODO more of this type of test
-  def usesPrepareHandler(role: PaxosRole) = {
+  def usesPrepareHandler(role: PaxosRole) {
     // given
     val highestAccepted = 909L
     val highPromise = highestPromisedHighestCommittedLens.set(initialData, (BallotNumber(Int.MaxValue, Int.MaxValue), initialData.progress.highestCommitted))
@@ -57,5 +57,25 @@ class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValue
     val PaxosAgent(_, _, data) = paxosAlgorithm(event)
     // then
     invoked.get() shouldBe true
+  }
+
+  def respondsIsNotLeader(role: PaxosRole) {
+    require(role != Leader)
+    val agent = PaxosAgent(0, role, initialData)
+    val sent = ArrayBuffer[PaxosMessage]()
+    val io = new UndefinedIO {
+      override def send(msg: PaxosMessage): Unit = sent += msg
+    }
+    val event = new PaxosEvent(io, agent, ClientRequestCommandValue(0L, expectedBytes))
+    val paxosAlgorithm = new PaxosAlgorithm
+    // when
+    val PaxosAgent(_,newRole, newData) = paxosAlgorithm(event)
+    // then
+    assert(newData == initialData)
+    assert(newRole == role)
+    sent.headOption.value match {
+      case nl: NotLeader => // good
+      case f => fail(f.toString)
+    }
   }
 }

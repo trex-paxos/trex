@@ -226,7 +226,7 @@ case object CheckTimeout extends PaxosMessage
 case object HeartBeat extends PaxosMessage
 
 /**
-  * Response to a client when the node is not currently the leader. The client should retry the message to another node in the cluster. Note the leader may have crashed and the responding node may become the leader next.
+ * Response to a client when the node is not currently the leader. The client should retry the message to another node in the cluster. Note the leader may have crashed and the responding node may become the leader next.
  * @param nodeId The node replying that it is not the leader.
  * @param msgId The client message identifier which the node is responding to.
  */

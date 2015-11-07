@@ -1,10 +1,11 @@
 package com.github.trex_paxos.library
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 import TestHelpers._
 import Ordering._
 
 import scala.collection.immutable.TreeMap
-import scala.collection.mutable.ArrayBuffer
 
 class FollowerTests extends AllRolesTests {
 
@@ -173,8 +174,29 @@ class FollowerTests extends AllRolesTests {
   }
 
   object `A Follower` {
+
     def `should use prepare handler` {
       usesPrepareHandler(Follower)
+    }
+    def `responds is not leader` {
+      respondsIsNotLeader(Follower)
+    }
+    def `should use follower commit handler` {
+      import CommitHandlerTests.a14
+      // given
+      val agent = PaxosAgent(0, Follower, initialData)
+      val event = new PaxosEvent(new UndefinedIO, agent, Commit(a14.id, initialData.leaderHeartbeat))
+      val invoked = new AtomicBoolean(false)
+      val paxosAlgorithm = new PaxosAlgorithm {
+        override def handleFollowerCommit(io: PaxosIO, agent: PaxosAgent, c: Commit): PaxosAgent = {
+          invoked.set(true)
+          agent
+        }
+      }
+      // when
+      val PaxosAgent(_, _, data) = paxosAlgorithm(event)
+      // then
+      invoked.get() shouldBe true
     }
     def `should not change state if not timed out` {
       val agent = PaxosAgent(0, Follower, initialData)

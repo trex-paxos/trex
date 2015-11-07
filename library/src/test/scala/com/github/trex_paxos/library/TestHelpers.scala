@@ -226,7 +226,6 @@ object TestHelpers extends PaxosLenses{
     )
   val selfAckPrepares2 = initialData.copy(clusterSize = 5, epoch = highPrepareEpoch, prepareResponses = prepareSelfAck2, acceptResponses = SortedMap.empty)
 
-
   val initialData97 = PaxosData(
     progress = Progress(
       highestPromised = BallotNumber(lowValue, lowValue),
@@ -272,4 +271,7 @@ object TestHelpers extends PaxosLenses{
       (a99.id -> AcceptResponsesAndTimeout(Long.MaxValue, a99, Map.empty)))
 
   val initialDataClientCommand = Map(initialData.progress.highestCommitted -> (NoOperationCommandValue, DummyRemoteRef()))
+
+  val expectedString = "Knossos"
+  val expectedBytes = expectedString.getBytes
 }

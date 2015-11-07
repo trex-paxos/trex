@@ -59,31 +59,6 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
         999L,
         journaled98thru100) shouldBe Seq.empty[Accept]
     }
-    "should not deliver noop values" in {
-      // given we have a11 thru a14 in the journal
-      val stubJournal: Journal = new UndefinedJournal {
-        override def save(progress: Progress): Unit = ()
-
-        override def accepted(logIndex: Long): Option[Accept] = journaled11thru14(logIndex)
-      }
-      val handler = new TestableCommitHandler
-      // and we promised to a12 and have only committed up to a11
-      val oldProgress = Progress(a12.id.number, a11.id)
-      // when we commit to a14
-      val (newProgress, results) = handler.commit(new TestIO(stubJournal) {
-        override def deliver(value: CommandValue): Any = value.bytes
-      }, PaxosAgent(0, Follower,
-        initialData.copy(progress = oldProgress)),
-        accepts11thru14.lastOption.value.id
-      )
-      // then we will have committed
-      newProgress.highestCommitted shouldBe accepts11thru14.lastOption.value.id
-      results.size shouldBe 3
-      val resultsMap = results.toMap
-      resultsMap.get(a12.id) shouldBe Some(NoOperationCommandValue.bytes)
-      resultsMap.get(a13.id) shouldBe Some(a13.value.bytes)
-      resultsMap.get(a14.id) shouldBe Some(a14.value.bytes)
-    }
     "do nothing if no committable values" in {
       // given a handler
       val handler = new Object with CommitHandler
@@ -160,6 +135,104 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       data.progress shouldBe initialData.progress
       sent.headOption.value shouldBe RetransmitRequest(0, a98.id.from, initialData.progress.highestCommitted.logIndex)
     }
+    "sends a retransmit if it has wrong committable value in the journal" in {
+      // given a handler
+      val handler = new Object with CommitHandler
+      // and wrong values in journal
+      val identifierMin = Identifier(0, BallotNumber(lowValue, lowValue), 1L)
+      val accepted = Accept(identifierMin, ClientRequestCommandValue(0,  expectedBytes))
+      val stubJournal = stub[Journal]
+      (stubJournal.accepted _) when (*) returns Some(accepted)
+      // and an agent
+      val agent = PaxosAgent(0, Follower, initialData)
+      // when
+      val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val PaxosAgent(_, _, data) = handler.handleFollowerCommit(new UndefinedIO with SilentLogging {
+        override def journal: Journal = stubJournal
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage) = sent += msg
+      }, agent, Commit(a98.id))
+      // then
+      data.progress shouldBe initialData.progress
+      sent.headOption.value shouldBe RetransmitRequest(0, a98.id.from, initialData.progress.highestCommitted.logIndex)
+    }
+    "sends a retransmit if it sees a gap in committable sequence" in {
+      // given a handler
+      val handler = new Object with CommitHandler
+      // and a gap in the journal
+      val stubJournal: Journal = stub[Journal]
+      (stubJournal.load _) when() returns (Journal.minBookwork)
+
+      // given slots 1 thru 3 have been accepted under the same number as previously committed slot 0 shown in initialData
+      val otherNodeId = 1
+
+      val id1 = Identifier(otherNodeId, BallotNumber(lowValue, 99), 1L)
+      (stubJournal.accepted _) when (1L) returns Some(Accept(id1, ClientRequestCommandValue(0, expectedBytes)))
+
+      val id2 = Identifier(otherNodeId, BallotNumber(lowValue, 99), 2L)
+      (stubJournal.accepted _) when (2L) returns None // gap
+
+      val id3 = Identifier(otherNodeId, BallotNumber(lowValue, 99), 3L)
+      (stubJournal.accepted _) when (3L) returns Some(Accept(id3, ClientRequestCommandValue(0, expectedBytes)))
+      // and an agent
+      val agent = PaxosAgent(0, Follower, initialData)
+      // and an io
+      val sentMessages: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val io = new TestIO(stubJournal) {
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage) = sentMessages += msg
+
+        override def deliver(value: CommandValue): Any = {}
+      }
+      // when
+      val PaxosAgent(_, _, data) = handler.handleFollowerCommit(io, agent, Commit(id3))
+      // then
+      data.progress.highestCommitted shouldBe id1
+      sentMessages.headOption.value shouldBe RetransmitRequest(0, id3.from, id1.logIndex)
+    }
+    "sends a retransmit if it has and old value from a previous leader" in {
+      // given a handler
+      val handler = new Object with CommitHandler
+
+      // and a journal with a promise to node1 and committed up to last from node2
+      val node1 = 1
+      val node2 = 2
+      val stubJournal: Journal = stub[Journal]
+      (stubJournal.load _) when() returns (Progress(BallotNumber(99, node1), Identifier(node2, BallotNumber(98, node2), 0L)))
+
+      // given slots 1 and 3 match the promise but slot 2 has old value from failed leader.
+
+      val id1 = Identifier(node1, BallotNumber(99, node1), 1L)
+      (stubJournal.accepted _) when (1L) returns Some(Accept(id1, ClientRequestCommandValue(0, expectedBytes)))
+
+      val id2other = Identifier(node2, BallotNumber(98, node2), 2L)
+      (stubJournal.accepted _) when (2L) returns Some(Accept(id2other, ClientRequestCommandValue(0, expectedBytes)))
+
+      val id3 = Identifier(node1, BallotNumber(99, node1), 3L)
+      (stubJournal.accepted _) when (3L) returns Some(Accept(id3, ClientRequestCommandValue(0, expectedBytes)))
+
+      // and an agent
+      val agent = PaxosAgent(0, Follower, initialData)
+      // and an io
+      val sentMessages: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val io = new TestIO(stubJournal) {
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage) = sentMessages += msg
+
+        override def deliver(value: CommandValue): Any = {}
+      }
+      // when we commit up to slot 3
+      val PaxosAgent(_, _, data) = handler.handleFollowerCommit(io, agent, Commit(id3))
+      // then
+      data.progress.highestCommitted shouldBe id1
+      sentMessages.headOption.value shouldBe RetransmitRequest(0, id3.from, id1.logIndex)
+    }
     "ignore repeated commit" in {
       // given a handler
       val handler = new Object with CommitHandler
@@ -173,6 +246,54 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
         agent, Commit(initialData.progress.highestCommitted, initialData.leaderHeartbeat))
       // then
       data shouldBe initialData
+    }
+    "should commit next slow on different number and set new timeout" in {
+      // given we have a11 thru a14 in the journal
+      val stubJournal: Journal = new UndefinedJournal {
+        override def save(progress: Progress): Unit = ()
+
+        override def accepted(logIndex: Long): Option[Accept] = journaled11thru14(logIndex)
+      }
+      val handler = new TestableCommitHandler
+      // and we promised to a12 and have only committed up to a11
+      val oldProgress = Progress(a12.id.number, a11.id)
+      // and an agent
+      val agent = PaxosAgent(0, Follower, initialData.copy(progress = oldProgress))
+      // and a configured IO
+      val io = new TestIO(stubJournal) {
+        override def deliver(value: CommandValue): Any = value.bytes
+      }
+      // when we commit to a14
+      val PaxosAgent(_, _, data) = handler.handleFollowerCommit(io, agent, Commit(a12.id, initialData.leaderHeartbeat))
+
+      // then we will have made new progress
+      data.progress.highestCommitted shouldBe a12.id
+      // and set a new timeout
+      data.timeout shouldBe io.randomTimeout
+    }
+    "should perform a fast-forward commit and set new timeout" in {
+      // given we have a11 thru a14 in the journal
+      val stubJournal: Journal = new UndefinedJournal {
+        override def save(progress: Progress): Unit = ()
+
+        override def accepted(logIndex: Long): Option[Accept] = journaled11thru14(logIndex)
+      }
+      val handler = new TestableCommitHandler
+      // and we promised to a12 and have only committed up to a11
+      val oldProgress = Progress(a12.id.number, a11.id)
+      // and an agent
+      val agent = PaxosAgent(0, Follower, initialData.copy(progress = oldProgress))
+      // and a configured IO
+      val io = new TestIO(stubJournal) {
+        override def deliver(value: CommandValue): Any = value.bytes
+      }
+      // when we commit to a14
+      val PaxosAgent(_, _, data) = handler.handleFollowerCommit(io, agent, Commit(a14.id, initialData.leaderHeartbeat))
+
+      // then we will have made new progress
+      data.progress.highestCommitted shouldBe accepts11thru14.lastOption.value.id
+      // and set a new timeout
+      data.timeout shouldBe io.randomTimeout
     }
   }
 }

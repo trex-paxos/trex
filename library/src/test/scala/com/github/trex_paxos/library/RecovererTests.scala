@@ -167,6 +167,9 @@ class RecovererTests extends AllRolesTests {
     def `should use prepare handler` {
       usesPrepareHandler(Recoverer)
     }
+    def `responds is not leader` {
+      respondsIsNotLeader(Recoverer)
+    }
 
   }
 
