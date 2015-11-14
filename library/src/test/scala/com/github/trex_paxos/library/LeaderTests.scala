@@ -147,13 +147,22 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       shouldIngoreCommitMessageSameSlotLowerNodeId(Leader)
     }
     def `should backdown on commit same slot higher node number` {
-      shouldBackdownOnCommitSameSlotHigherNodeId(Recoverer)
+      shouldBackdownOnCommitSameSlotHigherNodeId(Leader)
     }
     def `should backdown on higher slot commit` {
-      shouldBackdownOnHigherSlotCommit(Recoverer)
+      shouldBackdownOnHigherSlotCommit(Leader)
     }
     def `should backdown and commit on higher slot commit` {
-      shouldBackdownAndCommitOnHigherSlotCommit(Recoverer)
+      shouldBackdownAndCommitOnHigherSlotCommit(Leader)
+    }
+    def `reissue same accept messages it gets a timeout and no challenge` {
+      shouldReissueSameAcceptMessageIfTimeoutNoChallenge(Leader)
+    }
+    def `reissue higher accept messages upon learning of another nodes higher promise in a nack` {
+      sendHigherAcceptOnLearningOtherNodeHigherPromise(Leader)
+    }
+    def `reissues higher accept message upon having made a higher promise itself by the timeout` {
+      sendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(Leader)
     }
   }
 

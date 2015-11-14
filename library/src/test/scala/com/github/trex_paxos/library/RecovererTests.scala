@@ -185,6 +185,15 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
     def `should backdown and commit on higher slot commit` {
       shouldBackdownAndCommitOnHigherSlotCommit(Recoverer)
     }
+    def `reissue same accept messages it gets a timeout and no challenge` {
+      shouldReissueSameAcceptMessageIfTimeoutNoChallenge(Recoverer)
+    }
+    def `reissue higher accept messages upon learning of another nodes higher promise in a nack` {
+      sendHigherAcceptOnLearningOtherNodeHigherPromise(Recoverer)
+    }
+    def `reissues higher accept message upon having made a higher promise itself by the timeout` {
+      sendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(Recoverer)
+    }
   }
 
 }

@@ -14,7 +14,7 @@ import scala.language.postfixOps
 class LeaderSpec
   extends TestKit(ActorSystem("LeaderSpec", AllStateSpec.config))
   with DefaultTimeout with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with LeaderLikeSpec with PaxosLenses {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfter with MockFactory with OptionValues with PaxosLenses {
 
   import AllStateSpec._
   import Ordering._
@@ -36,7 +36,6 @@ class LeaderSpec
   val expectedBytes3 = expectedString2.getBytes
 
   "Leader" should {
-
 
     val minPrepare = Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
 
@@ -324,17 +323,7 @@ class LeaderSpec
       assert(hb2 > hb1)
     }
 
-    "reissue same accept messages it gets a timeout and no challenge" in {
-      resendsSameAcceptOnTimeoutNoOtherInfo(Leader)
-    }
 
-    "reissue higher accept messages upon learning of another nodes higher promise in a nack" in {
-      resendsHigherAcceptOnLearningOtherNodeHigherPromise(Leader)
-    }
-
-    "reissues higher accept message upon having made a higher promise itself by the timeout" in {
-      resendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(Leader)
-    }
 
     val leaderHeartbeat2 = 2
     val timeout4 = 4

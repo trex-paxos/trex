@@ -15,7 +15,7 @@ import scala.language.postfixOps
 class RecovererSpec
   extends TestKit(ActorSystem("RecovererSpec", AllStateSpec.config))
   with DefaultTimeout with WordSpecLike with Matchers with MockFactory with ImplicitSender
-  with BeforeAndAfter with LeaderLikeSpec with OptionValues with PaxosLenses {
+  with BeforeAndAfter with OptionValues with PaxosLenses {
 
   import AllStateSpec._
   import Ordering._
@@ -26,7 +26,6 @@ class RecovererSpec
   val otherHigherPrepare = Prepare(Identifier(2, BallotNumber(lowValue + 1, 2), 1L))
 
   "Recoverer" should {
-
 
     var sendTime = 0L
     var saveTime = 0L
@@ -319,16 +318,5 @@ class RecovererSpec
       expectMsg(100 millisecond, recoverHighPrepare)
     }
 
-    "reissue same accept messages it gets a timeout and no challenge" in {
-      resendsSameAcceptOnTimeoutNoOtherInfo(Recoverer)
-    }
-
-    "reissue higher accept messages upon learning of another nodes higher promise in a nack" in {
-      resendsHigherAcceptOnLearningOtherNodeHigherPromise(Recoverer)
-    }
-
-    "reissues higher accept message upon having made a higher promise itself by the timeout" in {
-      resendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(Recoverer)
-    }
   }
 }
