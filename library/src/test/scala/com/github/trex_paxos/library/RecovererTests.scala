@@ -1,10 +1,15 @@
 package com.github.trex_paxos.library
 
-import TestHelpers._
+import java.util.concurrent.atomic.{AtomicReference, AtomicLong}
 
-import scala.collection.immutable.{TreeMap, SortedMap}
+import com.github.trex_paxos.library.TestHelpers._
+
+import scala.collection.immutable.{SortedMap}
 
 import Ordering._
+
+import scala.collection.mutable.ArrayBuffer
+import scala.compat.Platform
 
 class RecovererTests extends AllRolesTests with LeaderLikeTests {
 
@@ -163,6 +168,18 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
     }
   }
 
+  def recovererNoResponsesInClusterOfSize(numberOfNodes: Int) = {
+    val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
+      Seq((recoverHighPrepare.id -> Map(0 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None))))
+
+    val data = initialData.copy(clusterSize = numberOfNodes, epoch = Some(recoverHighPrepare.id.number),
+      prepareResponses = prepareSelfVotes, acceptResponses = SortedMap.empty)
+
+    val agent = PaxosAgent(0, Recoverer, data)
+
+    (agent, recoverHighPrepare.id)
+  }
+
   object `A Recoverer` {
     def `should use prepare handler` {
       usesPrepareHandler(Recoverer)
@@ -194,6 +211,476 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
     def `reissues higher accept message upon having made a higher promise itself by the timeout` {
       sendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(Recoverer)
     }
+    def `backs down if it has to make a higher promise` {
+      val (agent, _) = recovererNoResponsesInClusterOfSize(3)
+      val inMemoryJournal = new InMemoryJournal
+      val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val sentTime = new AtomicLong()
+      val io = new UndefinedIO with SilentLogging {
+        override def journal: Journal = inMemoryJournal
+
+        override def clock: Long = Platform.currentTime
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          sentTime.set(System.nanoTime())
+          sent += msg
+        }
+      }
+      // which makes a promise to another leader
+      val otherHigherPrepare = Prepare(Identifier(2, BallotNumber(lowValue + 1, 2), 1L))
+      val event = new PaxosEvent(io, agent, otherHigherPrepare)
+      // when we process the event
+      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      // then
+      sent.headOption.value match {
+        case a: PrepareAck => // good
+        case f => fail(f.toString)
+      }
+      // and backs down to a follower as it cannot accept client values under its own epoch it cannot journal them so cannot commit so cannot lead
+      newRole shouldBe Follower
+    }
+    def `backs down with a majority negative prepare response` {
+      // given a recoverer with no responses
+      val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
+      val inMemoryJournal = new InMemoryJournal
+      val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val sentTime = new AtomicLong()
+      val io = new UndefinedIO with SilentLogging {
+        override def journal: Journal = inMemoryJournal
+
+        override def clock: Long = Platform.currentTime
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          sentTime.set(System.nanoTime())
+          sent += msg
+        }
+      }
+      val agentNack1 = paxosAlgorithm(new PaxosEvent(io, agent, PrepareNack(prepareId, 1, initialData.progress, 0, 0)))
+      val PaxosAgent(_, role, data) =  paxosAlgorithm(new PaxosEvent(io, agentNack1, PrepareNack(prepareId, 2, initialData.progress, 0, 0)))
+      // then
+      role shouldBe Follower
+      data.prepareResponses.isEmpty shouldBe true
+      data.epoch shouldBe None
+    }
+    def `reboardcast prepares if it gets a timeout with no majority response` {
+      // given a recoverer with no responses
+      val (agent, prepareId) = recovererNoResponsesInClusterOfSize(5)
+      val inMemoryJournal = new InMemoryJournal
+      val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val sentTime = new AtomicLong()
+      val io = new UndefinedIO with SilentLogging {
+        override def journal: Journal = inMemoryJournal
+
+        override def clock: Long = Long.MaxValue
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          sentTime.set(System.nanoTime())
+          sent += msg
+        }
+      }
+
+      // when a minority prepare response with an ack from node1
+      val ack1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
+
+      // ack
+      val eventAck = new PaxosEvent(io, agent, ack1)
+      val agentAck = paxosAlgorithm(eventAck)
+      // timeout
+      val eventTimeout = new PaxosEvent(io, agentAck, CheckTimeout)
+      paxosAlgorithm(eventTimeout)
+
+      // then it reboardcasts the accept message
+      sent.headOption.value shouldBe recoverHighPrepare
+    }
+    def `requests retransmission if is behind when gets a majority showing others have higher commit watermark` {
+      // given a recoverer with self vote
+      val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
+      val inMemoryJournal = new InMemoryJournal
+      val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val sentTime = new AtomicLong()
+      val io = new UndefinedIO with SilentLogging {
+        override def journal: Journal = inMemoryJournal
+
+        override def clock: Long = Long.MaxValue
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          sentTime.set(System.nanoTime())
+          sent += msg
+        }
+      }
+      // when a majority prepare response with an ack from node1 which shows it is behind
+      val higherProgress = initialData.progress.copy(highestCommitted =
+        initialData.progress.highestCommitted.copy(logIndex = 5L))
+      val ack1 = PrepareAck(prepareId, 1, higherProgress, 0, 0, None)
+      val eventAck = new PaxosEvent(io, agent, ack1)
+      paxosAlgorithm(eventAck)
+      sent.headOption.value match {
+        case RetransmitRequest(0, 1, 0L) => // good
+        case f => fail(f.toString)
+      }
+      sent.lastOption.value match {
+        case Accept(prepareId, NoOperationCommandValue) => // good
+        case f => fail(f.toString)
+      }
+    }
+    def `issue new prepares if it learns from the majority that other nodes have higher accepted values` {
+      // given a recoverer with self vote
+      val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
+      // and verifiable io
+      val inMemoryJournal = new InMemoryJournal
+      val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val sentTime = new AtomicLong()
+      val io = new UndefinedIO with SilentLogging {
+        override def journal: Journal = inMemoryJournal
+
+        override def clock: Long = Long.MaxValue
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          sentTime.set(System.nanoTime())
+          sent += msg
+        }
+      }
+      // when a majority prepare response with an ack from node1 which shows it has missed values
+      val ack1 = PrepareAck(prepareId, 1, initialData.progress, 3, 0, None)
+      val PaxosAgent(_, role, data) = paxosAlgorithm(new PaxosEvent(io, agent, ack1))
+      // then it sends three messages
+      sent.size shouldBe 3
+      // recover prepare for slot 2
+      val identifier2 = prepareId.copy(logIndex = 2L)
+      val prepare2 = Prepare(identifier2)
+      sent(0) shouldBe prepare2
+      // recover prepare for slot 3
+      val identifier3 = prepareId.copy(logIndex = 3L)
+      val prepare3 = Prepare(identifier3)
+      sent(1) shouldBe prepare3
+      // and sends the accept for the majority response
+      sent(2) shouldBe Accept(prepareId, NoOperationCommandValue)
+      // it says as recover
+      role shouldBe Recoverer
+      // and makes self promises to the new prepare
+      data.prepareResponses match {
+        case map if map.isEmpty =>
+          fail("map.isEmpty")
+        case map =>
+          assert(map.size == 2)
+          val keys = map.keys.toSeq
+          assert(keys.contains(identifier2))
+          assert(keys.contains(identifier3))
+      }
+      // and accepts its own values
+      data.acceptResponses match {
+        case accepts if accepts.isEmpty =>
+          fail("accepts.isEmpty")
+        case accepts =>
+          val keys = accepts.keys.toSeq
+          assert(keys.contains(prepareId))
+      }
+      // and send happens after save
+      val saveTime = inMemoryJournal.lastSaveTime.get()
+      assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
+    }
+    def `promote to Leader and ack its own accept if it has not made a higher promise` {
+      // given a recoverer with self vote
+      val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
+      // and verifiable io
+      val inMemoryJournal = new InMemoryJournal
+      val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val sentTime = new AtomicLong()
+      val io = new UndefinedIO with SilentLogging {
+        override def journal: Journal = inMemoryJournal
+
+        override def clock: Long = Long.MaxValue
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          sentTime.set(System.nanoTime())
+          sent += msg
+        }
+      }
+
+      // when a majority prepare response with an ack from node1
+      val ack1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
+      val PaxosAgent(_, role, data) = paxosAlgorithm(new PaxosEvent(io, agent, ack1))
+
+      // then it boardcasts a no-op
+      val accept = Accept(prepareId, NoOperationCommandValue)
+      sent.headOption.value match {
+        case `accept` => // good
+        case f => fail(f.toString)
+      }
+      // and becomes leader
+      role shouldBe Leader
+      // and has acked its own accept
+      data.acceptResponses match {
+        case map if map.isEmpty =>
+          fail("map.isEmpty")
+        case map =>
+          map.get(accept.id) match {
+            case None =>
+              fail("None")
+            case Some(AcceptResponsesAndTimeout(_, _, responses)) =>
+              responses.values.headOption match {
+                case Some(a: AcceptAck) => // good
+                case x =>
+                  fail(x.toString)
+              }
+          }
+      }
+      // and set its epoch
+      data.epoch shouldBe Some(prepareId.number)
+    }
   }
 
+  /**
+   * The following are more like integration tests that pass through recover into leader
+   */
+  object `Full recovery with commit` {
+    def `fix a no-op and promote to Leader then commits if in a three node cluster gets a majority with one ack with no values to fix` {
+      // given a recoverer with self vote
+      val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
+      // and verifiable io
+      val inMemoryJournal = new InMemoryJournal
+      val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val sentTime = new AtomicLong()
+      val io = new UndefinedIO with SilentLogging {
+        override def journal: Journal = inMemoryJournal
+
+        override def clock: Long = Long.MaxValue
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          sentTime.set(System.nanoTime())
+          sent += msg
+        }
+      }
+      // when a majority prepare response with an ack from node1
+      val prepareAck = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
+      val leader@PaxosAgent(_, role, _ )= paxosAlgorithm(new PaxosEvent(io, agent, prepareAck))
+      // then it boardcasts a no-op
+      val accept = Accept(prepareId, NoOperationCommandValue)
+      sent.headOption.value match {
+        case `accept` => // good
+        case f => fail(f.toString)
+      }
+      // and becomes leader
+      role shouldBe Leader
+      // when it gets a majority accept response with an ack from node1
+      sent.clear()
+      val acceptAck = AcceptAck(prepareId, 1, initialData.progress)
+      val PaxosAgent(_, _, data) = paxosAlgorithm(new PaxosEvent(io, leader, acceptAck))
+      // it commits the no-op
+      sent.headOption.value match {
+        case Commit(prepareId, _) => // good
+        case f => fail(f.toString)
+      }
+      // and it has the epoch
+      data.epoch shouldBe Some(prepareId.number)
+      // and it has cleared the recover votes
+      data.prepareResponses.isEmpty shouldBe true
+      // and sets a fresh timeout
+      data.timeout shouldBe 1234L
+      // and send happens after save
+      val saveTime = inMemoryJournal.lastSaveTime.get()
+      assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
+    }
+
+    def `fix a no-op and promote to Leader then commits if in a three node cluster gets a majority with one ack` {
+      // given a recoverer with self vote
+      val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
+      // and verifiable io
+      val lastDelivered = new AtomicReference[CommandValue]()
+      val inMemoryJournal = new InMemoryJournal
+      val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val sentTime = new AtomicLong()
+      val io = new UndefinedIO with SilentLogging {
+        override def journal: Journal = inMemoryJournal
+
+        override def clock: Long = Long.MaxValue
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          sentTime.set(System.nanoTime())
+          sent += msg
+        }
+
+        override def deliver(value: CommandValue): Any = {
+          lastDelivered.set(value)
+          value
+        }
+      }
+      // when a majority prepare response with an ack from node1
+      // and some value returned in the promise from node1 with some lower number
+      val lowerId = prepareId.copy(number = prepareId.number.copy(counter = prepareId.number.counter - 1))
+      val prepareAck = PrepareAck(prepareId, 1, initialData.progress, 0, 0, Some(Accept(lowerId, ClientRequestCommandValue(0, expectedBytes))))
+      val leader@PaxosAgent(_, role, _ )= paxosAlgorithm(new PaxosEvent(io, agent, prepareAck))
+      // then it boardcasts the payload from the promise under its higher epoch number
+      val accept = Accept(prepareId, ClientRequestCommandValue(0, expectedBytes))
+      sent.headOption.value match {
+        case `accept` => // good
+        case f => fail(f.toString)
+      }
+      // and becomes leader
+      role shouldBe Leader
+      // when it gets a majority accept response with an ack from node1
+      sent.clear()
+      val acceptAck = AcceptAck(prepareId, 1, initialData.progress)
+      val PaxosAgent(_, _, data) = paxosAlgorithm(new PaxosEvent(io, leader, acceptAck))
+      // it delivers the value
+      Option(lastDelivered.get()) match {
+        case Some(ClientRequestCommandValue(0, expectedBytes)) => // good
+        case f => fail(f.toString)
+      }
+      // and sends the commit
+      sent.headOption.value match {
+        case Commit(prepareId, _) => // good
+        case f => fail(f.toString)
+      }
+      // and it has the epoch
+      data.epoch shouldBe Some(prepareId.number)
+      // and it has cleared the recover votes
+      data.prepareResponses.isEmpty shouldBe true
+      // and sets a fresh timeout
+      data.timeout shouldBe 1234L
+      // and send happens after save
+      val saveTime = inMemoryJournal.lastSaveTime.get()
+      assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
+    }
+
+    def `fix a no-op promote to Leader and commits if in a five node cluster gets a majority with two acks with no values to fix` {
+      // given a recoverer with self vote
+      val (agent, prepareId) = recovererNoResponsesInClusterOfSize(5)
+      // and verifiable io
+      val inMemoryJournal = new InMemoryJournal
+      val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val sentTime = new AtomicLong()
+      val io = new UndefinedIO with SilentLogging {
+        override def journal: Journal = inMemoryJournal
+
+        override def clock: Long = Long.MaxValue
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          sentTime.set(System.nanoTime())
+          sent += msg
+        }
+      }
+      // when a majority prepare response with an ack from node1 and node2
+      val ack1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
+      val ack1Agent@PaxosAgent(_, roleAck1, _) = paxosAlgorithm(new PaxosEvent(io, agent, ack1))
+      roleAck1 shouldBe Recoverer
+      val ack2 = PrepareAck(prepareId, 2, initialData.progress, 0, 0, None)
+      val leader@PaxosAgent(_, role, _) = paxosAlgorithm(new PaxosEvent(io, ack1Agent, ack2))
+      // then
+      role shouldBe Leader
+      // then it boardcasts a no-op
+      val accept = Accept(prepareId, NoOperationCommandValue)
+      sent.headOption.value match {
+        case `accept` => // good
+        case f => fail(f.toString)
+      }
+      // when it gets a majority accept response with an ack from node1
+      sent.clear()
+      val acceptAck1 = AcceptAck(prepareId, 1, initialData.progress)
+      val leader2@PaxosAgent(_, _, _) = paxosAlgorithm(new PaxosEvent(io, leader, acceptAck1))
+      sent.isEmpty shouldBe true
+      val acceptAck2 = AcceptAck(prepareId, 2, initialData.progress)
+      val PaxosAgent(_, _, data) = paxosAlgorithm(new PaxosEvent(io, leader2, acceptAck2))
+      // it commits the no-op
+      sent.headOption.value match {
+        case Commit(prepareId, _) => // good
+        case f => fail(f.toString)
+      }
+      // and it has the epoch
+      data.epoch shouldBe Some(prepareId.number)
+      // and it has cleared the recover votes
+      data.prepareResponses.isEmpty shouldBe true
+      // and sets a fresh timeout
+      data.timeout shouldBe 1234L
+      // and send happens after save
+      val saveTime = inMemoryJournal.lastSaveTime.get()
+      assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
+    }
+    def `fix a no-op and promote to Leader then commits if in a five node cluster gets a majority with two acks` {
+      // given a recoverer with self vote
+      val (agent, prepareId) = recovererNoResponsesInClusterOfSize(5)
+      // and verifiable io
+      val lastDelivered = new AtomicReference[CommandValue]()
+      val inMemoryJournal = new InMemoryJournal
+      val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val sentTime = new AtomicLong()
+      val io = new UndefinedIO with SilentLogging {
+        override def journal: Journal = inMemoryJournal
+
+        override def clock: Long = Long.MaxValue
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          sentTime.set(System.nanoTime())
+          sent += msg
+        }
+
+        override def deliver(value: CommandValue): Any = {
+          lastDelivered.set(value)
+          value
+        }
+      }
+      // when a majority prepare response with an ack from node1
+      // and some value returned in the promise from node1 with some lower number
+      val lowerId = prepareId.copy(number = prepareId.number.copy(counter = prepareId.number.counter - 1))
+      val prepareAck1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, Some(Accept(lowerId, ClientRequestCommandValue(0, expectedBytes))))
+      val ack1 = paxosAlgorithm(new PaxosEvent(io, agent, prepareAck1))
+      val prepareAck2 = PrepareAck(prepareId, 2, initialData.progress, 0, 0, Some(Accept(lowerId, ClientRequestCommandValue(0, expectedBytes))))
+      val leader@PaxosAgent(_, roleLeader, _) = paxosAlgorithm(new PaxosEvent(io, ack1, prepareAck2))
+
+      // then it boardcasts the payload from the promise under its higher epoch number
+      val accept = Accept(prepareId, ClientRequestCommandValue(0, expectedBytes))
+      sent.headOption.value match {
+        case `accept` => // good
+        case f => fail(f.toString)
+      }
+      // and becomes leader
+      roleLeader shouldBe Leader
+      // when it gets majority accept responses
+      sent.clear()
+      val acceptAck1 = AcceptAck(prepareId, 1, initialData.progress)
+      val acceptAck1agent = paxosAlgorithm(new PaxosEvent(io, leader, acceptAck1))
+      val acceptAck2 = AcceptAck(prepareId, 2, initialData.progress)
+      val PaxosAgent(_, _, data) = paxosAlgorithm(new PaxosEvent(io, acceptAck1agent, acceptAck2))
+      // it delivers the value
+      Option(lastDelivered.get()) match {
+        case Some(ClientRequestCommandValue(0, expectedBytes)) => // good
+        case f => fail(f.toString)
+      }
+      // and sends the commit
+      sent.headOption.value match {
+        case Commit(prepareId, _) => // good
+        case f => fail(f.toString)
+      }
+      // and it has the epoch
+      data.epoch shouldBe Some(prepareId.number)
+      // and it has cleared the recover votes
+      data.prepareResponses.isEmpty shouldBe true
+      // and sets a fresh timeout
+      data.timeout shouldBe 1234L
+      // and send happens after save
+      val saveTime = inMemoryJournal.lastSaveTime.get()
+      assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
+    }
+
+  }
 }

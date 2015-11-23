@@ -234,7 +234,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     // and increments it epoch
     data.epoch shouldBe Some(newEpoch)
     data.timeout shouldBe 12345L
-    val saveTime = tempJournal.p.get()._1
+    val saveTime = tempJournal.lastSaveTime.get()
     assert(saveTime != 0 && sentTime.get() != 0 && saveTime < sentTime.get())
   }
 

@@ -1,6 +1,6 @@
 package com.github.trex_paxos.library
 
-import java.util.concurrent.atomic.{AtomicReference, AtomicBoolean}
+import java.util.concurrent.atomic.{AtomicLong, AtomicReference, AtomicBoolean}
 
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{OptionValues, Matchers, Spec}
@@ -8,9 +8,14 @@ import org.scalatest.{OptionValues, Matchers, Spec}
 import scala.collection.mutable.ArrayBuffer
 
 class InMemoryJournal extends Journal {
+  val lastSaveTime = new AtomicLong()
   val p = new AtomicReference[(Long, Progress)]()
 
-  override def save(progress: Progress): Unit = p.set((System.nanoTime(), progress))
+  override def save(progress: Progress): Unit = {
+    val n = System.nanoTime()
+    lastSaveTime.set(n)
+    p.set((n, progress))
+  }
 
   override def bounds: JournalBounds = JournalBounds(0, 0)
 
@@ -20,11 +25,36 @@ class InMemoryJournal extends Journal {
   val a = collection.mutable.Map.empty[Long, (Long, Accept)]
 
   override def accept(as: Accept*): Unit = as foreach { i =>
-    a.put(i.id.logIndex, (System.nanoTime(), i))
+    val n = System.nanoTime()
+    lastSaveTime.set(n)
+    a.put(i.id.logIndex, (n, i))
   }
 
   override def accepted(logIndex: Long): Option[Accept] = a.get(logIndex).map(_._2)
 
+}
+
+class TestAcceptMapJournal extends Journal {
+  var accept: Map[Long, Accept] = Map.empty
+
+  def accept(accepted: Accept*): Unit = accepted foreach { a =>
+    accept = accept + (a.id.logIndex -> a)
+  }
+
+  def accepted(logIndex: Long): Option[Accept] = {
+    accept.get(logIndex)
+  }
+
+  def bounds: JournalBounds = {
+    val keys = accept.keys
+    if (keys.isEmpty) JournalBounds(0L, 0L) else JournalBounds(keys.head, keys.last)
+  }
+
+  var progress: Progress = null
+
+  def load(): Progress = progress
+
+  def save(p: Progress): Unit = progress = p
 }
 
 class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValues with MockFactory {
