@@ -175,10 +175,6 @@ class FollowerTests extends AllRolesTests {
   }
 
   object `A Follower` {
-
-    def `should use prepare handler` {
-      usesPrepareHandler(Follower)
-    }
     def `responds is not leader` {
       respondsIsNotLeader(Follower)
     }
@@ -225,6 +221,9 @@ class FollowerTests extends AllRolesTests {
       val PaxosAgent(_, role, data) = paxosAlgorithm(event)
       role shouldBe Follower
       data shouldBe agent.data
+    }
+    def `should ignore a late prepare response` {
+      shouldIngoreLatePrepareResponse(Leader)
     }
     def `should ignore an accept response`  {
       // given

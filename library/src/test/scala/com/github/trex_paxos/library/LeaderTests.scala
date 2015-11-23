@@ -1,14 +1,18 @@
 package com.github.trex_paxos.library
 
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong, AtomicReference}
+
 import TestHelpers._
 
-import scala.collection.immutable.TreeMap
+import scala.collection.immutable.{SortedMap, TreeMap}
 import Ordering._
 
+import scala.collection.mutable.ArrayBuffer
+
 class LeaderTests extends AllRolesTests with LeaderLikeTests {
-  val initialDataAgent = PaxosAgent(0, Leader, initialData)
 
   object `The Leader Function` {
+    val initialDataAgent = PaxosAgent(0, Leader, initialData)
     def `should be defined for a leader and RetransmitRequest` {
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, RetransmitRequest(0, 1, 0L))))
     }
@@ -137,11 +141,11 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
   }
 
   object `A Leader` {
-    def `should use prepare handler` {
-      usesPrepareHandler(Leader)
-    }
     def `should ignore a lower commit` {
       shouldIngoreLowerCommit(Leader)
+    }
+    def `should ignore a late prepare response` {
+      shouldIngoreLatePrepareResponse(Leader)
     }
     def `should ingore a commit for same slot from lower numered node` {
       shouldIngoreCommitMessageSameSlotLowerNodeId(Leader)
@@ -164,6 +168,315 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
     def `reissues higher accept message upon having made a higher promise itself by the timeout` {
       sendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(Leader)
     }
-  }
+    val epoch = BallotNumber(1, 1)
+    val dataNewEpoch = epochLens.set(initialData, Some(epoch))
+    val freshAcceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering)
+    val initialLeaderData = leaderLens.set(dataNewEpoch, (SortedMap.empty[Identifier, Map[Int, PrepareResponse]], freshAcceptResponses, Map.empty))
+    val agentInitialLeaderData = new PaxosAgent(0, Leader, initialLeaderData)
+    val expectedString2 = "Paxos"
+    val expectedBytes2 = expectedString2.getBytes
 
+    def `broadcast client values` {
+      // given some client commands
+      val expectedString3 = "Lamport"
+      val expectedBytes3 = expectedString3.getBytes
+      val c1 = ClientRequestCommandValue(0, expectedBytes)
+      val c2 = ClientRequestCommandValue(0, expectedBytes2)
+      val c3 = ClientRequestCommandValue(0, expectedBytes3)
+      // and a verifiable IO
+      val stubJournal: Journal = stub[Journal]
+      val sent = ArrayBuffer[PaxosMessage]()
+      val io = new UndefinedIO with SilentLogging {
+        override def journal: Journal = stubJournal
+
+        override def send(msg: PaxosMessage): Unit = sent += msg
+
+        override def senderId: String = 1.toString
+
+        override def randomTimeout: Long = 12345L
+      }
+      val agent1 = paxosAlgorithm(new PaxosEvent(io, agentInitialLeaderData, c1))
+      val agent2 = paxosAlgorithm(new PaxosEvent(io, agent1, c2))
+      val agent3 = paxosAlgorithm(new PaxosEvent(io, agent2, c3))
+      // then we expect three accepts to be broadcast
+      val accept1 = Accept(Identifier(0, epoch, 1L), c1)
+      val accept2 = Accept(Identifier(0, epoch, 2L), c2)
+      val accept3 = Accept(Identifier(0, epoch, 3L), c3)
+      sent.headOption.value match {
+        case `accept1` => // good
+        case f => fail(f.toString)
+      }
+      sent.takeRight(2).headOption.value match {
+        case `accept2` => // good
+        case f => fail(f.toString)
+      }
+      sent.takeRight(1).headOption.value match {
+        case `accept3` => // good
+        case f => fail(f.toString)
+      }
+      // and it says as leader
+      agent3.role shouldBe Leader
+      // and is read to record responses
+      agent3.data.acceptResponses.size shouldBe 3
+      // and holds slots in order
+      agent3.data.acceptResponses.keys.headOption match {
+        case Some(id) => assert(id.logIndex == 1)
+        case x => fail(x.toString)
+      }
+      agent3.data.acceptResponses.keys.lastOption match {
+        case Some(id) => assert(id.logIndex == 3)
+        case x => fail(x.toString)
+      }
+      // and has journaled the values
+      (stubJournal.accept _).verify(Seq(accept1))
+      (stubJournal.accept _).verify(Seq(accept2))
+      (stubJournal.accept _).verify(Seq(accept3))
+      // and holds the values
+      agent3.data.clientCommands.size shouldBe 3
+      agent3.data.clientCommands(accept1.id) shouldBe (c1 -> "1")
+      agent3.data.clientCommands(accept2.id) shouldBe (c2 -> "1")
+      agent3.data.clientCommands(accept3.id) shouldBe (c3 -> "1")
+    }
+    def `commits when it receives a majority of accept acks` {
+      // given a verifiable io
+      val lastDelivered = new AtomicReference[CommandValue]()
+      val inMemoryJournal = new InMemoryJournal
+      val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val sentTime = new AtomicLong()
+      val io = new UndefinedIO with SilentLogging {
+        override def journal: Journal = inMemoryJournal
+
+        override def clock: Long = Long.MaxValue
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          sentTime.set(System.nanoTime())
+          sent += msg
+        }
+
+        override def deliver(value: CommandValue): Any = {
+          lastDelivered.set(value)
+          value
+        }
+      }
+      // and a leader who has committed slot 98 and broadcast slot 99
+      val lastCommitted = Identifier(0, epoch, 98L)
+      val id99 = Identifier(0, epoch, 99L)
+      val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
+      val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
+      val responses = acceptResponsesLens.set(initialData, votes)
+      val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
+      val data = responses.copy(progress = committed)
+      val agent = PaxosAgent(0, Leader, data)
+      val accept = Accept(id99, ClientRequestCommandValue(0, expectedBytes))
+      inMemoryJournal.a.put(99L, (0L -> accept))
+      // when it gets an ack giving it a majority
+      val ack = AcceptAck(id99, 1, initialData.progress)
+      val leader = paxosAlgorithm(new PaxosEvent(io, agent, ack))
+      // it broadcasts the commit
+      sent.headOption.value match {
+        case Commit(prepareId, _) => // good
+        case f => fail(f.toString)
+      }
+      // it delivers the value
+      Option(lastDelivered.get()) match {
+        case Some(ClientRequestCommandValue(0, expectedBytes)) => // good
+        case f => fail(f.toString)
+      }
+      // and journal bookwork
+      Option(inMemoryJournal.p.get) match {
+        case Some((_, p)) if p == leader.data.progress => // good
+        case x => fail(x.toString)
+      }
+      // and deletes the pending work
+      assert(leader.data.acceptResponses.size == 0)
+      val saveTime = inMemoryJournal.lastSaveTime.get()
+      assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
+    }
+    def `commits in order when it receives responses out of order` {
+      // given a verifiable io
+      val delivered = ArrayBuffer[CommandValue]()
+      val inMemoryJournal = new InMemoryJournal
+      val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val sentTime = new AtomicLong()
+      val io = new UndefinedIO with SilentLogging {
+        override def journal: Journal = inMemoryJournal
+
+        override def clock: Long = Long.MaxValue
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = {
+          sentTime.set(System.nanoTime())
+          sent += msg
+        }
+
+        override def deliver(value: CommandValue): Any = {
+          delivered += value
+          value
+        }
+      }
+      // and a leader who has committed slot 98 and broadcast slot 99 and 100
+      val lastCommitted = Identifier(0, epoch, 98L)
+      val id99 = Identifier(0, epoch, 99L)
+      val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
+      val id100 = Identifier(0, epoch, 100L)
+      val a100 = Accept(id100, ClientRequestCommandValue(0, expectedBytes2))
+
+      val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress)))) +
+        (id100 -> AcceptResponsesAndTimeout(0L, a100, Map(0 -> AcceptAck(id100, 0, initialData.progress))))
+
+      val responses = acceptResponsesLens.set(initialData, votes)
+      val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
+      val data = responses.copy(progress = committed)
+      val agent = PaxosAgent(0, Leader, data)
+      val accept99 = Accept(id99, ClientRequestCommandValue(0, expectedBytes))
+      inMemoryJournal.a.put(99L, (0L -> accept99))
+      val accept100 = Accept(id100, ClientRequestCommandValue(0, expectedBytes2))
+      inMemoryJournal.a.put(100L, (0L -> accept100))
+      // when it gets on accept giving it a majority but on 100 slot
+      val ack1 = AcceptAck(id100, 1, initialData.progress)
+      val leader1 = paxosAlgorithm(new PaxosEvent(io, agent, ack1))
+      // then it does not send a commit
+      sent.isEmpty shouldBe true
+      // then when it gets the majority on the 99 slot
+      val ack2 = AcceptAck(id99, 1, initialData.progress)
+      val leader = paxosAlgorithm(new PaxosEvent(io, leader1, ack2))
+      // it broadcasts the commit
+      sent.headOption.value match {
+        case Commit(id100, _) => // good
+        case f => fail(f.toString)
+      }
+      // it delivers the values in order
+      delivered.headOption.value match {
+        case ClientRequestCommandValue(0, expectedBytes) => // good
+        case f => fail(f.toString)
+      }
+      // it delivers the values in order
+      delivered.tail.headOption.value match {
+        case ClientRequestCommandValue(0, expectedBytes2) => // good
+        case f => fail(f.toString)
+      }
+      // and journal bookwork
+      Option(inMemoryJournal.p.get) match {
+        case Some((_, p)) if p == leader.data.progress => // good
+        case x => fail(x.toString)
+      }
+      // and deletes the pending work
+      assert(leader.data.acceptResponses.size == 0)
+      val saveTime = inMemoryJournal.lastSaveTime.get()
+      assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
+    }
+    def `rebroadcasts its commit with a fresh heartbeat when it gets prompted` {
+      val sent = ArrayBuffer[Commit]()
+      val io = new UndefinedIO with SilentLogging {
+        override def randomTimeout: Long = 0L
+
+        override def clock: Long = 0L
+
+        override def send(msg: PaxosMessage): Unit = {
+          msg match {
+            case c: Commit =>
+              sent += c
+            case _ =>
+          }
+        }
+      }
+      // when it gets a heartbeat
+      val leader = paxosAlgorithm(new PaxosEvent(io, agentInitialLeaderData, HeartBeat))
+      // its sends out a commit
+      val c1 = sent.headOption.value
+      c1 match {
+        case c: Commit if c.identifier == agentInitialLeaderData.data.progress.highestCommitted => // good
+        case f => fail(f.toString)
+      }
+      // and another heartbeat
+      Thread.sleep(2L)
+      sent.clear()
+      paxosAlgorithm(new PaxosEvent(io, leader, HeartBeat))
+      // it sends out another commit
+      val c2 = sent.headOption.value
+      c2 match {
+        case c: Commit if c.identifier == agentInitialLeaderData.data.progress.highestCommitted => // good
+        case f => fail(f.toString)
+      }
+      // and the commits have different heartbeats
+      assert(c2.heartbeat > c1.heartbeat)
+    }
+    def returnsToFollowerTest(messages: ArrayBuffer[PaxosMessage], sent: ArrayBuffer[PaxosMessage]): Unit = {
+      // given a verifiable io
+      val inMemoryJournal = new InMemoryJournal
+      val sentNoLongerLeader = new AtomicBoolean()
+      val io = new UndefinedIO with SilentLogging {
+        override def journal: Journal = inMemoryJournal
+
+        override def clock: Long = Long.MaxValue
+
+        override def randomTimeout: Long = 1234L
+
+        override def send(msg: PaxosMessage): Unit = sent += msg
+
+        override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit =
+          sentNoLongerLeader.set(true)
+      }
+      // and a leader who has committed slot 98 and broadcast slot 99
+      val lastCommitted = Identifier(0, epoch, 98L)
+      val id99 = Identifier(0, epoch, 99L)
+      val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
+      val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
+      val responses = acceptResponsesLens.set(initialData, votes)
+      val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
+      val clientCommands: Map[Identifier, (CommandValue, String)] = Map(id99 -> (ClientRequestCommandValue(0, expectedBytes), "1"))
+      val data = responses.copy(progress = committed, clientCommands = clientCommands)
+      val agent = PaxosAgent(0, Leader, data)
+      val accept = Accept(id99, ClientRequestCommandValue(0, expectedBytes))
+      inMemoryJournal.a.put(99L, (0L -> accept))
+      // when it gets the messages
+      val follower = messages.foldLeft(agent) {
+        (a, m) =>
+          paxosAlgorithm(new PaxosEvent(io, a, m))
+      }
+      // is a follower
+      follower.role shouldBe Follower
+      follower.data.acceptResponses.isEmpty shouldBe true
+      follower.data.epoch shouldBe None
+      follower.data.prepareResponses.isEmpty shouldBe true
+      follower.data.clientCommands.isEmpty shouldBe true
+      sentNoLongerLeader.get() shouldBe true
+    }
+    def `returns to follower when it receives a majority of accept nacks`{
+      val sent = ArrayBuffer[PaxosMessage]()
+      val messages = ArrayBuffer[PaxosMessage]()
+      val id99 = Identifier(0, epoch, 99L)
+      val nack1 = AcceptNack(id99, 1, initialData.progress)
+      val nack2 = AcceptNack(id99, 2, initialData.progress)
+      messages += nack1
+      messages += nack2
+      returnsToFollowerTest(messages, sent)
+      sent shouldBe empty
+    }
+    def `returns to follower when it sees a higher commit watermark in a response` {
+      val sent = ArrayBuffer[PaxosMessage]()
+      val messages = ArrayBuffer[PaxosMessage]()
+      val id99 = Identifier(0, epoch, 99L)
+      val ack = AcceptNack(id99, 1, Progress(epoch, Identifier(0, epoch, 99L)))
+      messages += ack
+      returnsToFollowerTest(messages, sent)
+      // it sends nothing
+      sent.isEmpty shouldBe true
+    }
+    def `returns to follower when it makes a higher promise to another node` {
+      val sent = ArrayBuffer[PaxosMessage]()
+      val messages = ArrayBuffer[PaxosMessage]()
+      val highIdentifier = Identifier(2, BallotNumber(Int.MaxValue, Int.MaxValue), 99L)
+      val highPrepare = Prepare(highIdentifier)
+      messages += highPrepare
+      returnsToFollowerTest(messages, sent)
+      sent.headOption.value match {
+        case pa: PrepareAck => // good
+        case f => fail(f.toString)
+      }
+    }
+  }
 }

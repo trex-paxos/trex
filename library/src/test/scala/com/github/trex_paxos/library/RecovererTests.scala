@@ -181,14 +181,14 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
   }
 
   object `A Recoverer` {
-    def `should use prepare handler` {
-      usesPrepareHandler(Recoverer)
-    }
     def `responds is not leader` {
       respondsIsNotLeader(Recoverer)
     }
     def `should ignore a lower commit` {
       shouldIngoreLowerCommit(Recoverer)
+    }
+    def `should ignore a late prepare response` {
+      shouldIngoreLatePrepareResponse(Leader)
     }
     def `should ingore a commit for same slot from lower numbered node` {
       shouldIngoreCommitMessageSameSlotLowerNodeId(Recoverer)
@@ -495,7 +495,6 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val saveTime = inMemoryJournal.lastSaveTime.get()
       assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
     }
-
     def `fix a no-op and promote to Leader then commits if in a three node cluster gets a majority with one ack` {
       // given a recoverer with self vote
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
@@ -558,7 +557,6 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val saveTime = inMemoryJournal.lastSaveTime.get()
       assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
     }
-
     def `fix a no-op promote to Leader and commits if in a five node cluster gets a majority with two acks with no values to fix` {
       // given a recoverer with self vote
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(5)
@@ -681,6 +679,5 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val saveTime = inMemoryJournal.lastSaveTime.get()
       assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
     }
-
   }
 }

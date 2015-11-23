@@ -2,15 +2,13 @@ package com.github.trex_paxos.library
 
 import java.util.concurrent.atomic.AtomicLong
 
+import com.github.trex_paxos.library.Ordering._
 import com.github.trex_paxos.library.TestHelpers._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{OptionValues, Matchers}
+import org.scalatest.{Matchers, OptionValues}
 
 import scala.collection.immutable.TreeMap
 import scala.collection.mutable.ArrayBuffer
-import Ordering._
-
-import scala.compat.Platform
 
 trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
   def shouldIngoreLowerCommit(role: PaxosRole) {
