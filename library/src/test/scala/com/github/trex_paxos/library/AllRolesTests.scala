@@ -17,7 +17,12 @@ class InMemoryJournal extends Journal {
     p.set((n, progress))
   }
 
-  override def bounds: JournalBounds = JournalBounds(0, 0)
+  override def bounds: JournalBounds = if( a.isEmpty ) {
+    JournalBounds(0, 0)
+  } else {
+    val slots = a.keySet
+    JournalBounds(slots.min, slots.max)
+  }
 
   override def load(): Progress = p.get()._2
 

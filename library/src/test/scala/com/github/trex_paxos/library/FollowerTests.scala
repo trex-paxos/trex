@@ -383,7 +383,170 @@ class FollowerTests extends AllRolesTests {
       newData.timeout shouldBe 987654L
       newData.leaderHeartbeat shouldBe Long.MaxValue
     }
+    def `should bootstrap from a retransmission response` {
+      val paxosAlgorithm = new PaxosAlgorithm
 
+      val tempJournal = new InMemoryJournal()
+
+      // given some retransmitted committed values
+      val v1 = ClientRequestCommandValue(0, Array[Byte] {0})
+      val v2 = ClientRequestCommandValue(1, Array[Byte] {1})
+      val v3 = ClientRequestCommandValue(2, Array[Byte] {2})
+      val a1 =
+        Accept(Identifier(1, BallotNumber(1, 1), 1L), v1)
+      val a2 =
+        Accept(Identifier(2, BallotNumber(2, 2), 2L), v2)
+      val a3 =
+        Accept(Identifier(3, BallotNumber(3, 3), 3L), v3)
+      val retransmission = RetransmitResponse(1, 0, Seq(a1, a2, a3), Seq.empty)
+
+      // and a verifiable io
+      val messages: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val delivered: ArrayBuffer[ClientRequestCommandValue] = ArrayBuffer()
+      val io = new UndefinedIO with SilentLogging{
+        override def send(msg: PaxosMessage): Unit = messages += msg
+
+        override def randomTimeout: Long = 987654L
+
+        override def deliver(value: CommandValue): Any = value match {
+          case c: ClientRequestCommandValue => delivered += c
+          case _ =>
+        }
+
+        override def journal: Journal = tempJournal
+      }
+
+      // and an empty node
+      val agent = PaxosAgent(0, Follower, initialData)
+      // when the retransmission is received
+      val PaxosAgent(_, role, data) = paxosAlgorithm(new PaxosEvent(io, agent, retransmission))
+
+      // then it sends no messages
+      messages.isEmpty shouldBe true
+      // stays in state
+      role shouldBe Follower
+      // updates its commit index
+      data.progress.highestCommitted shouldBe a3.id
+
+      // delivered the committed values
+      delivered.size should be(3)
+      delivered(0) should be(v1)
+      delivered(1) should be(v2)
+      delivered(2) should be(v3)
+
+      // and journalled the values so that it can retransmit itself
+      tempJournal.bounds shouldBe JournalBounds(1, 3)
+
+      tempJournal.accepted(1) match {
+        case Some(a) if a.id == a1.id => // good
+        case x => fail(x.toString)
+      }
+      tempJournal.accepted(2) match {
+        case Some(a) if a.id == a2.id => // good
+        case x => fail(x.toString)
+      }
+      tempJournal.accepted(3) match {
+        case Some(a) if a.id == a3.id => // good
+        case x => fail(x.toString)
+      }
+
+      Option(tempJournal.p.get()) match {
+        case Some((_, Progress(_, a3.id))) => // good
+        case f => fail(f.toString)
+      }
+    }
+    def `should switch to recoverer and issue multiple prepares if there are slots to recover and no leader` {
+      val paxosAlgorithm = new PaxosAlgorithm
+
+      // given three uncommitted values in the journal
+
+      val id1 = Identifier(0, BallotNumber(lowValue + 1, 0), 1)
+      val a1 = Accept(id1, ClientRequestCommandValue(0, expectedBytes))
+
+      val id2 = Identifier(0, BallotNumber(lowValue + 1, 0), 2)
+      val a2 = Accept(id2, ClientRequestCommandValue(0, expectedBytes))
+
+      val id3 = Identifier(0, BallotNumber(lowValue + 1, 0), 3)
+      val a3 = Accept(id3, ClientRequestCommandValue(0, expectedBytes))
+
+      val tempJournal = new InMemoryJournal()
+      tempJournal.a.put(1L , (0L, a1))
+      tempJournal.a.put(2L , (0L, a2))
+      tempJournal.a.put(3L , (0L, a3))
+
+      // and a verifiable io
+      val messages: ArrayBuffer[PaxosMessage] = ArrayBuffer()
+      val delivered: ArrayBuffer[ClientRequestCommandValue] = ArrayBuffer()
+      val io = new UndefinedIO with SilentLogging{
+        override def send(msg: PaxosMessage): Unit = messages += msg
+
+        override def randomTimeout: Long = 987654L
+
+        override def clock: Long = Int.MaxValue
+
+        override def minPrepare: Prepare = Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
+
+        override def deliver(value: CommandValue): Any = value match {
+          case c: ClientRequestCommandValue => delivered += c
+          case _ =>
+        }
+
+        override def journal: Journal = tempJournal
+      }
+
+      // and an empty node
+      val agent = PaxosAgent(0, Follower, initialData)
+      // when at timeout is received
+      val follower = paxosAlgorithm(new PaxosEvent(io, agent, CheckTimeout))
+      // then it sends out a single low prepare
+      messages.headOption.value match {
+        case `minPrepare` => // good
+        case f => fail(f.toString)
+      }
+      messages.clear()
+      // when it hears that the other follower hsa no fresh heartbeat
+      val nack = PrepareNack(minPrepare.id, 2, initialData.progress, initialData.progress.highestCommitted.logIndex, initialData.leaderHeartbeat)
+      val recoverer = paxosAlgorithm(new PaxosEvent(io, follower, nack))
+
+      // it sends out prepares for each uncommitted slot plus an extra slot
+      messages.headOption.value match {
+        case Prepare(id1) => // good
+        case f => fail(f.toString)
+      }
+      messages.drop(1)
+      messages.headOption.value match {
+        case Prepare(id2) => // good
+        case f => fail(f.toString)
+      }
+      messages.drop(1)
+      messages.headOption.value match {
+        case Prepare(id3) => // good
+        case f => fail(f.toString)
+      }
+      val id4 = Identifier(0, BallotNumber(lowValue + 1, 0), 4)
+      messages.drop(1)
+      messages.headOption.value match {
+        case Prepare(id4) => // good
+        case f => fail(f.toString)
+      }
+
+      // and promotes to candidate
+      recoverer.role shouldBe Recoverer
+      // and sets a new timeout
+      recoverer.data.timeout shouldBe 987654L
+      // and make a promise to self
+      recoverer.data.progress.highestPromised shouldBe id1.number
+      // and votes for its own prepares
+      recoverer.data.prepareResponses.isEmpty shouldBe false
+      val prapareIds = recoverer.data.prepareResponses map {
+        case (id, map) if map.keys.headOption == Some(0) && map.values.headOption.getOrElse(fail).requestId == id =>
+          id
+        case x => fail(x.toString)
+      }
+      assert(true == prapareIds.toSet.contains(id1))
+      assert(true == prapareIds.toSet.contains(id2))
+      assert(true == prapareIds.toSet.contains(id3))
+    }
   }
 
 }
