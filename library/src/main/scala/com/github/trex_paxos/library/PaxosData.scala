@@ -19,7 +19,12 @@ case class PaxosData(progress: Progress,
                      leaderHeartbeat: Long,
                      timeout: Long,
                      clusterSize: Int,
-                     prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]] = SortedMap.empty[Identifier, Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering),
+                     prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]] = PaxosData.emptyPrepares,
                      epoch: Option[BallotNumber] = None,
-                     acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering),
+                     acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = PaxosData.emptyAccepts,
                      clientCommands: Map[Identifier, (CommandValue, String)] = Map.empty)
+
+object PaxosData {
+  val emptyPrepares = SortedMap.empty[Identifier, Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering)
+  val emptyAccepts = SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering)
+}

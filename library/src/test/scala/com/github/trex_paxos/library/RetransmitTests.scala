@@ -110,10 +110,10 @@ with OptionValues {
       // then we deliver before we save
       deliveredWithTs.headOption.getOrElse(fail("empty delivered list")) match {
         case (ts, _) =>
-          assert(saveTs != 0 && ts != 0 && ts < saveTs.get)
+          assert(saveTs != 0 && ts != 0 && ts < saveTs.longValue)
       }
       // and we saved before we accepted
-      assert(saveTs != 0 && acceptTs != 0 && saveTs.get < acceptTs.get)
+      assert(saveTs != 0 && acceptTs != 0 && saveTs.longValue < acceptTs.longValue)
       // and we filtered out NoOp values
       assert(deliveredWithTs.size == 1)
     }

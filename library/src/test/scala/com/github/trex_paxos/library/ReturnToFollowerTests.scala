@@ -21,12 +21,12 @@ class ReturnToFollowerTests extends WordSpecLike with Matchers with OptionValues
       // and a commit message id higher than the initial data value of 0L
       val id = initialData.progress.highestCommitted.copy(logIndex = 99L, from = 2)
       // when we handle that message
-      val optMsg = new AtomicReference[PaxosMessage]()
+      val optMsg = new Box[PaxosMessage](None)
       handler.handleReturnToFollowerOnHigherCommit(new TestIO(new UndefinedJournal){
-        override def send(msg: PaxosMessage): Unit = optMsg.set(msg)
+        override def send(msg: PaxosMessage): Unit = optMsg(msg)
       }, PaxosAgent(0, Recoverer, initialData), Commit(id))
       // then
-      optMsg.get shouldBe RetransmitRequest(from = 0, to = 2, initialData.progress.highestCommitted.logIndex)
+      optMsg() shouldBe RetransmitRequest(from = 0, to = 2, initialData.progress.highestCommitted.logIndex)
     }
 
     "send no longer leader to any clients" in {
