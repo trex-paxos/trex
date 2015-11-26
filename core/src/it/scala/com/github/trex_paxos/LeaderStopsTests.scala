@@ -17,51 +17,51 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
     TestKit.shutdownActorSystem(system)
   }
 
-  var clusterHarness: TestActorRef[ClusterHarness] = null
+  var clusterHarness = new Box[TestActorRef[ClusterHarness]](None)
 
   after {
-    clusterHarness ! ClusterHarness.Halt
+    clusterHarness() ! ClusterHarness.Halt
   }
 
   type Delivered = Seq[ArrayBuffer[CommandValue]]
   type Verifier = Delivered => Unit
 
-  var data: Byte = 1
+  var data = new Box[Byte](Option(1.toByte))
 
   def testLeaderDying(clusterSize: Int, verifier: Verifier): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
 
     // given a test cluster harness sized to three nodes
-    clusterHarness = TestActorRef(new ClusterHarness(clusterSize, NoFailureTests.spacedTimeoutConfig), "leaderCrash"+clusterSize)
+    clusterHarness(TestActorRef(new ClusterHarness(clusterSize, NoFailureTests.spacedTimeoutConfig), "leaderCrash"+clusterSize))
 
     def send: Unit = {
       // when we sent it the application value of 1.toByte
-      system.scheduler.scheduleOnce(400 millis, clusterHarness, ClientRequestCommandValue(0, Array[Byte](data)))
+      system.scheduler.scheduleOnce(400 millis, clusterHarness(), ClientRequestCommandValue(0, Array[Byte](data())))
 
       // it commits and sends by the response of -1.toByte
       expectMsgPF(5 second) {
-        case bytes: Array[Byte] if bytes(0) == -1 * data => // okay
+        case bytes: Array[Byte] if bytes(0) == -1 * data() => // okay
         case nlle: NoLongerLeaderException => // okay
         case x => fail(x.toString)
       }
 
-      data = (data + 1).toByte
+      data((1 + data()).toByte)
     }
 
     // reset the client data counter
-    data = 1.toByte
+    data(1.toByte)
 
     // we can commit a message
     send
 
     // then we kill a node
-    clusterHarness ! "KillLeader"
+    clusterHarness() ! "KillLeader"
 
     // we can still commit a message
     send
 
     // dig out the values which were committed
-    val delivered: Seq[ArrayBuffer[CommandValue]] = clusterHarness.underlyingActor.delivered.values.toSeq
+    val delivered: Seq[ArrayBuffer[CommandValue]] = clusterHarness().underlyingActor.delivered.values.toSeq
 
     // verify
     verifier(delivered)
