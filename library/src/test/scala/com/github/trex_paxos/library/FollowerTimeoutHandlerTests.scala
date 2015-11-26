@@ -7,6 +7,8 @@ import TestHelpers._
 
 import Ordering._
 
+import scala.collection.mutable.ArrayBuffer
+
 object TestFollowerHandler extends PaxosLenses {
 
 
@@ -158,7 +160,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
     "computes high prepares for higher slots when should failover" in {
       val vote = PrepareNack(minPrepare.id, 1, initialData.progress, 3, 0)
       val handler = new TestFollowerHandler
-      var highPrepares = Seq.empty[Prepare]
+      val highPrepares = ArrayBuffer[Prepare]()
       val journal = new UndefinedJournal {
         override def save(progress: Progress): Unit = {}
 
@@ -166,7 +168,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       }
       handler.handleLowPrepareResponse(new TestIO(journal){
         override def send(msg: PaxosMessage): Unit = msg match {
-          case p: Prepare => highPrepares = highPrepares :+ p
+          case p: Prepare => highPrepares += p
           case _ =>
         }
         override def randomTimeout: Long = 12345L

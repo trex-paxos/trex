@@ -1,5 +1,7 @@
 package com.github.trex_paxos.library
 
+import java.util.concurrent.atomic.AtomicLong
+
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{OptionValues, Spec, Matchers}
 
@@ -25,15 +27,15 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val id = Identifier(0, TestHelpers.initialData.progress.highestPromised, 0)
       val accept = Accept(id, NoOperationCommandValue)
       val handler = new TestAcceptHandler
-      var saveTs = 0L
+      val saveTs = new AtomicLong
       val journal = new UndefinedJournal {
-        override def accept(a: Accept*): Unit = saveTs = System.nanoTime
+        override def accept(a: Accept*): Unit = saveTs.set(System.nanoTime)
       }
       val agent = PaxosAgent(1, Follower, TestHelpers.initialData)
       val io = new TestIO(journal)
       handler.handleAccept(io, agent, accept)
       io.sent.headOption.value match {
-        case MessageAndTimestamp(ack: AcceptAck, sendTs) if ack.requestId == id && saveTs < sendTs => // good
+        case MessageAndTimestamp(ack: AcceptAck, sendTs) if ack.requestId == id && saveTs.get < sendTs => // good
         case x => fail(x.toString)
       }
     }
@@ -43,11 +45,11 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val highNumber = BallotNumber(Int.MaxValue, Int.MaxValue)
       val id = Identifier(0, highNumber, 1)
       val accept = Accept(id, NoOperationCommandValue)
-      var saveTs = 0L
+      val saveTs = new AtomicLong()
       val journal = new UndefinedJournal {
         override def accept(a: Accept*): Unit = {}
 
-        override def save(progress: Progress): Unit = saveTs = System.nanoTime
+        override def save(progress: Progress): Unit = saveTs.set(System.nanoTime)
       }
       val agent = PaxosAgent(1, Follower, TestHelpers.initialData)
       val io = new TestIO(journal)
@@ -55,7 +57,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val PaxosAgent(_, Follower, newData) = handler.handleAccept(io, agent, accept)
       assert(saveTs != 0L)
       io.sent.headOption.value match {
-        case MessageAndTimestamp(ack: AcceptAck, sendTs) if ack.requestId == id && saveTs < sendTs => // good
+        case MessageAndTimestamp(ack: AcceptAck, sendTs) if ack.requestId == id && saveTs.get < sendTs => // good
         case x => fail(x.toString)
       }
       assert(newData.progress.highestPromised == highNumber)
@@ -115,7 +117,6 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
       val accept = Accept(id, NoOperationCommandValue)
       val handler = new TestAcceptHandler
-      var saveTs = 0L
       val journal = new UndefinedJournal
       val agent = PaxosAgent(1, Follower, TestHelpers.initialData)
       val io = new TestIO(journal)

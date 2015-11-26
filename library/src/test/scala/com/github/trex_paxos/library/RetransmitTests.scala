@@ -1,8 +1,12 @@
 package com.github.trex_paxos.library
 
+import java.util.concurrent.atomic.AtomicLong
+
 import RetransmitHandler.{AcceptState, CommitState, ResponseState}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{OptionValues, Matchers, WordSpecLike}
+
+import scala.collection.mutable.ArrayBuffer
 
 class TestRetransmitHandler extends RetransmitHandler
 
@@ -78,19 +82,19 @@ with OptionValues {
       // given some recognisable processed state
       val progress = Journal.minBookwork
       // and a Journal which records method invocation times
-      var saveTs = 0L
-      var acceptTs = 0L
+      val saveTs = new AtomicLong
+      val acceptTs = new AtomicLong
       val stubJournal: Journal = new UndefinedJournal {
         override def save(progress: Progress): Unit = {
-          saveTs = System.nanoTime()
+          saveTs.set(System.nanoTime())
         }
 
         override def accept(a: Accept*): Unit = {
-          acceptTs = System.nanoTime()
+          acceptTs.set(System.nanoTime())
         }
       }
       // and a retransmit handler which records what was delivered when
-      var deliveredWithTs: Seq[(Long, CommandValue)] = Seq.empty
+      val deliveredWithTs: ArrayBuffer[(Long, CommandValue)] = ArrayBuffer()
       val handler = new TestRetransmitHandler {
         override def processRetransmitResponse(io: PaxosIO, agent: PaxosAgent, response: RetransmitResponse): Retransmission =
           Retransmission(progress, accepts98thru100, accepts98thru100.map(_.value))
@@ -98,7 +102,7 @@ with OptionValues {
       // when it is passed a retransmit response
       handler.handleRetransmitResponse(new TestIO(new UndefinedJournal){
         override def deliver(value: CommandValue): Any = {
-          deliveredWithTs = deliveredWithTs :+(System.nanoTime(), value)
+          deliveredWithTs += (System.nanoTime() -> value)
         }
 
         override def journal: Journal = stubJournal
@@ -106,10 +110,10 @@ with OptionValues {
       // then we deliver before we save
       deliveredWithTs.headOption.getOrElse(fail("empty delivered list")) match {
         case (ts, _) =>
-          assert(saveTs != 0 && ts != 0 && ts < saveTs)
+          assert(saveTs != 0 && ts != 0 && ts < saveTs.get)
       }
       // and we saved before we accepted
-      assert(saveTs != 0 && acceptTs != 0 && saveTs < acceptTs)
+      assert(saveTs != 0 && acceptTs != 0 && saveTs.get < acceptTs.get)
       // and we filtered out NoOp values
       assert(deliveredWithTs.size == 1)
     }

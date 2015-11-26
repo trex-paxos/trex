@@ -1,5 +1,7 @@
 package com.github.trex_paxos.internals
 
+import java.util.concurrent.atomic.AtomicReference
+
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import PaxosActor._
@@ -22,12 +24,12 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
   import Ordering._
 
   class TestJournal extends Journal {
-    var _progress = Journal.minBookwork.copy()
+    val _progress = new AtomicReference[Progress](Journal.minBookwork.copy())
     var _map: SortedMap[Long, Accept] = TreeMap.empty
 
-    def save(progress: Progress): Unit = _progress = progress
+    def save(progress: Progress): Unit = _progress.set(progress)
 
-    def load(): Progress = _progress
+    def load(): Progress = _progress.get
 
     def accept(accepted: Accept*): Unit = accepted foreach { a =>
       _map = _map + (a.id.logIndex -> a)

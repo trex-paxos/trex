@@ -1,5 +1,7 @@
 package com.github.trex_paxos.library
 
+import java.util.concurrent.atomic.AtomicReference
+
 import org.scalatest.WordSpecLike
 
 class UnhandledTests extends WordSpecLike {
@@ -33,10 +35,10 @@ class UnhandledTests extends WordSpecLike {
   "UnhandledHandler" should {
     "trace the event and log an error" in {
       // given
-      var loggedError: String = ""
+      val loggedError = new AtomicReference[String]("")
 
       val handler = new UnhandledHandler {
-        override def stderr(message: String): Unit = loggedError = message
+        override def stderr(message: String): Unit = loggedError.set(loggedError.get +  message)
       }
 
       val unknown = "~unknown message~"
@@ -44,7 +46,7 @@ class UnhandledTests extends WordSpecLike {
       //andler.handleUnhandled(99, Leader, probe.ref, AllStateSpec.initialData, unknown)
       handler.handleUnhandled(new TestIO(new UndefinedJournal), PaxosAgent(99, Leader, initialData), unknown)
 
-      assert(loggedError.contains("99") && loggedError.contains("Leader") && loggedError.contains(unknown))
+      assert(loggedError.get.contains("99") && loggedError.get.contains("Leader") && loggedError.get.contains(unknown))
     }
   }
 }

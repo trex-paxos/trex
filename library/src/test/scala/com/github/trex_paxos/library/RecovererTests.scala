@@ -1,6 +1,6 @@
 package com.github.trex_paxos.library
 
-import java.util.concurrent.atomic.{AtomicReference, AtomicLong}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference, AtomicLong}
 
 import com.github.trex_paxos.library.TestHelpers._
 
@@ -92,21 +92,21 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
     }
 
     def `should deal with timed-out prepares before timed-out accepts` {
-      var handleResendAcceptsInvoked = false
-      var handleResendPreparesInvoked = false
+      val handleResendAcceptsInvoked = new AtomicBoolean(false)
+      val handleResendPreparesInvoked = new AtomicBoolean(false)
       val paxosAlgorithm = new PaxosAlgorithm {
         override def handleResendAccepts(io: PaxosIO, agent: PaxosAgent, time: Long): PaxosAgent = {
-          handleResendAcceptsInvoked = true
+          handleResendAcceptsInvoked.set(true)
           agent
         }
         override def handleResendPrepares(io: PaxosIO, agent: PaxosAgent, time: Long): PaxosAgent = {
-          handleResendPreparesInvoked = true
+          handleResendPreparesInvoked.set(true)
           agent
         }
       }
       val agent = PaxosAgent(0, Recoverer, initialData.copy(prepareResponses = prepareSelfVotes, acceptResponses = emptyAcceptResponses))
       paxosAlgorithm.recovererFunction(PaxosEvent(maxClockIO, agent, CheckTimeout))
-      assert(handleResendPreparesInvoked == true && handleResendAcceptsInvoked == false)
+      assert(handleResendPreparesInvoked.get == true && handleResendAcceptsInvoked.get == false)
     }
 
     def `should be defined for a commit at a higher log index` {

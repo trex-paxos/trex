@@ -1,5 +1,7 @@
 package com.github.trex_paxos.library
 
+import java.util.concurrent.atomic.AtomicLong
+
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, OptionValues, WordSpecLike}
 
@@ -190,8 +192,8 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
         acceptResponses = selfAcceptResponses)
 
       // when we send accept to the handler which records the send time and save time
-      var sendTime = 0L
-      var saveTime = 0L
+      val sendTime = new AtomicLong
+      val saveTime = new AtomicLong
       val vote = AcceptAck(a98.id, 1, progress97)
       val handler = new UndefinedAcceptResponseHandler {
         override def commit(io: PaxosIO, agent: PaxosAgent, identifier: Identifier): (Progress, Seq[(Identifier, Any)]) =
@@ -199,15 +201,15 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       }
 
       val testJournal = new UndefinedJournal {
-        override def save(progress: Progress): Unit = saveTime = System.nanoTime()
+        override def save(progress: Progress): Unit = saveTime.set(System.nanoTime())
       }
       val PaxosAgent(_, _, _) = handler.handleAcceptResponse(new TestIO(testJournal) {
-        override def send(msg: PaxosMessage): Unit = sendTime = System.nanoTime()
+        override def send(msg: PaxosMessage): Unit = sendTime.set(System.nanoTime())
       }, PaxosAgent(0, Recoverer, data), vote)
       // then we saved before we sent
-      assert(saveTime > 0)
-      assert(sendTime > 0)
-      assert(saveTime < sendTime)
+      assert(saveTime.get > 0)
+      assert(sendTime.get > 0)
+      assert(saveTime.get < sendTime.get)
     }
 
     "responds to the clients who's command have been committed" in {
