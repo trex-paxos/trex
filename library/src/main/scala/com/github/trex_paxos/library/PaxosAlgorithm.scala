@@ -7,7 +7,7 @@ case class PaxosEvent(io: PaxosIO, agent: PaxosAgent, message: PaxosMessage)
 trait PaxosIO {
   def journal: Journal
 
-  def plog: PaxosLogging
+  def logger: PaxosLogging
 
   def randomTimeout: Long
 
@@ -15,9 +15,7 @@ trait PaxosIO {
 
   def deliver(value: CommandValue): Any
 
-
   def send(msg: PaxosMessage)
-
 
   def minPrepare: Prepare
 

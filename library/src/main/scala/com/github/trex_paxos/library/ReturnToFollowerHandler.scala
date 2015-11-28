@@ -26,7 +26,7 @@ trait ReturnToFollowerHandler extends PaxosLenses with BackdownAgent {
         agent.data.progress
       }
 
-      io.plog.info("Node {} {} has seen a higher commit {} from node {} so will backdown to be Follower", agent.nodeUniqueId, agent.role, c, c.identifier.from)
+      io.logger.info("Node {} {} has seen a higher commit {} from node {} so will backdown to be Follower", agent.nodeUniqueId, agent.role, c, c.identifier.from)
       backdownAgent(io, agent.copy(data = progressLens.set(agent.data, newProgress).copy(leaderHeartbeat = c.heartbeat)))
     } else {
       agent

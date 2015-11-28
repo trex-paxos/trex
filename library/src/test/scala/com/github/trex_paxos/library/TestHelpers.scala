@@ -11,7 +11,7 @@ object DummyRemoteRef {
 class UndefinedIO extends PaxosIO{
   override def journal: Journal = throw new AssertionError("deliberately not implemented")
 
-  override def plog: PaxosLogging = throw new AssertionError("deliberately not implemented")
+  override def logger: PaxosLogging = throw new AssertionError("deliberately not implemented")
 
   override def minPrepare: Prepare = throw new AssertionError("deliberately not implemented")
 
@@ -32,7 +32,7 @@ class UndefinedIO extends PaxosIO{
 
 trait SilentLogging {
   this: UndefinedIO =>
-  override def plog: PaxosLogging = NoopPaxosLogging
+  override def logger: PaxosLogging = NoopPaxosLogging
 }
 
 class UndefinedPrepareResponse extends PrepareResponse {
@@ -72,7 +72,7 @@ class TestIO(j: Journal) extends UndefinedIO {
 
   override def randomTimeout: Long = 12345L
 
-  override def plog: PaxosLogging = NoopPaxosLogging
+  override def logger: PaxosLogging = NoopPaxosLogging
 }
 
 class UndefinedAcceptResponse extends AcceptResponse {
@@ -94,7 +94,7 @@ object TestHelpers extends PaxosLenses{
   val undefinedSilentIO = new UndefinedIO with SilentLogging
 
   val undefinedIOwithNoopLogging = new UndefinedIO {
-    override def plog: PaxosLogging = NoopPaxosLogging
+    override def logger: PaxosLogging = NoopPaxosLogging
   }
 
   val noopJournal = new Journal {

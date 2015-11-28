@@ -10,7 +10,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
   def highestAcceptedIndex(io: PaxosIO): Long = io.journal.bounds.max
 
   def handleFollowerResendLowPrepares(io: PaxosIO, agent: PaxosAgent): PaxosAgent = {
-    io.plog.debug("Node {} {} timed-out having already issued a low. rebroadcasting", agent.nodeUniqueId, agent.role)
+    io.logger.debug("Node {} {} timed-out having already issued a low. rebroadcasting", agent.nodeUniqueId, agent.role)
     io.send(io.minPrepare)
     agent.copy(data = timeoutLens.set(agent.data, io.randomTimeout))
   }
@@ -25,7 +25,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
   }
   
   def sendLowPrepares(io: PaxosIO, agent: PaxosAgent): PaxosAgent = {
-    io.plog.info("Node {} {} timed-out progress: {}", agent.nodeUniqueId, agent.role, agent.data.progress)
+    io.logger.info("Node {} {} timed-out progress: {}", agent.nodeUniqueId, agent.role, agent.data.progress)
     // nack our own prepare
     val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
       Map(io.minPrepare.id -> Map(agent.nodeUniqueId -> PrepareNack(io.minPrepare.id, agent.nodeUniqueId, agent.data.progress, highestAcceptedIndex(io), agent.data.leaderHeartbeat)))
@@ -49,7 +49,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
     val selfHighestSlot = agent.data.progress.highestCommitted.logIndex
     val otherHighestSlot = vote.progress.highestCommitted.logIndex
     if (otherHighestSlot > selfHighestSlot) {
-      io.plog.debug("Node {} node {} committed slot {} requesting retransmission", agent.nodeUniqueId, vote.from, otherHighestSlot)
+      io.logger.debug("Node {} node {} committed slot {} requesting retransmission", agent.nodeUniqueId, vote.from, otherHighestSlot)
       io.send(RetransmitRequest(agent.nodeUniqueId, vote.from, agent.data.progress.highestCommitted.logIndex))
       backdownAgent(io, agent)
     } else {
@@ -68,14 +68,14 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
             agent.copy(role = Follower, data = agent.data.copy(prepareResponses = TreeMap(Map(io.minPrepare.id -> votes).toArray: _*))) // TODO lens
           }
         case x =>
-          io.plog.debug("Node {} {} is no longer awaiting responses to {} so ignoring {}", agent.nodeUniqueId, agent.role, vote.requestId, x)
+          io.logger.debug("Node {} {} is no longer awaiting responses to {} so ignoring {}", agent.nodeUniqueId, agent.role, vote.requestId, x)
           agent.copy(role = Follower)
       }
     }
   }
 
   def handleMajorityResponse(io: PaxosIO, agent: PaxosAgent, votes: Map[Int, PrepareResponse]): PaxosAgent = {
-    computeFailover(io.plog, agent.nodeUniqueId, agent.data, votes) match {
+    computeFailover(io.logger, agent.nodeUniqueId, agent.data, votes) match {
       case FailoverResult(failover, _) if failover =>
         val highestNumber = Seq(agent.data.progress.highestPromised, agent.data.progress.highestCommitted.number).max
         val maxCommittedSlot = agent.data.progress.highestCommitted.logIndex
@@ -86,7 +86,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
         // make a promise to self not to accept higher numbered messages and journal that
         prepares.headOption match {
           case Some(p) =>
-            io.plog.info(s"Node {} {} is promoting to Recoverer and issuing high prepares. ", agent.nodeUniqueId, agent.role)
+            io.logger.info(s"Node {} {} is promoting to Recoverer and issuing high prepares. ", agent.nodeUniqueId, agent.role)
             val selfPromise = p.id.number
             // accept our own promise and load from the journal any values previous accepted in those slots
             val prepareSelfVotes: SortedMap[Identifier, Map[Int, PrepareResponse]] =
@@ -97,7 +97,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
 
             // the new leader epoch is the promise it made to itself
             val epoch: Option[BallotNumber] = Some(selfPromise)
-            io.plog.info("Node {} Follower broadcast {} prepare messages with {} transitioning Recoverer max slot index {}.", agent.nodeUniqueId, prepares.size, selfPromise, maxAcceptedSlot)
+            io.logger.info("Node {} Follower broadcast {} prepare messages with {} transitioning Recoverer max slot index {}.", agent.nodeUniqueId, prepares.size, selfPromise, maxAcceptedSlot)
             // make a promise to self not to accept higher numbered messages and journal that
             val newData = highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens.set(agent.data, (selfPromise, io.randomTimeout, epoch, prepareSelfVotes, SortedMap.empty))
             io.journal.save(newData.progress)
@@ -105,11 +105,11 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
             agent.copy(role = Recoverer,
               data = newData)
           case None =>
-            io.plog.error("this code should be unreachable")
+            io.logger.error("this code should be unreachable")
             agent.copy(role = Follower, data = agent.data)
         }
       case FailoverResult(_, maxHeartbeat) =>
-        io.plog.debug(s"Node {} {} sees evidence of a leader is not failing over. ", agent.nodeUniqueId, agent.role)
+        io.logger.debug(s"Node {} {} sees evidence of a leader is not failing over. ", agent.nodeUniqueId, agent.role)
         // other nodes are showing a leader behind a partial network partition so we backdown.
         // we update the local known heartbeat in case that leader dies causing a new scenario were only this node can form a majority.
         val a@PaxosAgent(_, _, data) = backdownAgent(io, agent)

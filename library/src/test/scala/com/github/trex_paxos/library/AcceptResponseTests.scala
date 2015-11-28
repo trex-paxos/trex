@@ -273,7 +273,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       val ioRandomTimeout = new UndefinedIO {
         override def randomTimeout: Long = Long.MaxValue
 
-        override def plog: PaxosLogging = new EmptyLogging {
+        override def logger: PaxosLogging = new EmptyLogging {
           override def error(msg: String): Unit = errorLog += msg
         }
       }

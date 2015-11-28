@@ -61,7 +61,7 @@ trait CommitHandler extends PaxosLenses {
       val newHighestCommitted = newProgress.highestCommitted.logIndex
       // if we did not commit up to the value in the commit message request retransmission of missing values
       if (newHighestCommitted < i.logIndex) {
-        io.plog.info("Node {} attempted commit of {} for log index {} found missing accept messages so have only committed up to {} and am requesting retransmission", agent.nodeUniqueId, i, i.logIndex, newHighestCommitted)
+        io.logger.info("Node {} attempted commit of {} for log index {} found missing accept messages so have only committed up to {} and am requesting retransmission", agent.nodeUniqueId, i, i.logIndex, newHighestCommitted)
         io.send(RetransmitRequest(agent.nodeUniqueId, i.from, newHighestCommitted))
       }
       agent.copy(data = progressLens.set(newData, newProgress))

@@ -36,7 +36,7 @@ with CommitHandler {
                 handleFreshResponse(io, agent, latestVotes, accept, vote)
             }
           case None =>
-            io.plog.debug("Node {} {} ignoring response we are not awaiting: {}", agent.nodeUniqueId, agent.role, vote)
+            io.logger.debug("Node {} {} ignoring response we are not awaiting: {}", agent.nodeUniqueId, agent.role, vote)
             agent
         }
     }
@@ -51,7 +51,7 @@ with CommitHandler {
 
     count(agent.data.clusterSize, votes.values, acceptVoteDiscriminator) match {
       case Some(MajorityNack) =>
-        io.plog.info("Node {} {} received a majority accept nack so has lost leadership becoming a follower.", agent.nodeUniqueId, agent.role)
+        io.logger.info("Node {} {} received a majority accept nack so has lost leadership becoming a follower.", agent.nodeUniqueId, agent.role)
         backdownAgent(io, agent)
 
       case Some(MajorityAck) =>
@@ -60,7 +60,7 @@ with CommitHandler {
 
         // grab all the accepted values from the beginning of the tree map
         val (committable, uncommittable) = updated.span { case (_, AcceptResponsesAndTimeout(_, _, rs)) => rs.isEmpty }
-        io.plog.debug("Node " + agent.nodeUniqueId + " {} vote {} committable {} uncommittable {}", agent.role, vote, committable, uncommittable)
+        io.logger.debug("Node " + agent.nodeUniqueId + " {} vote {} committable {} uncommittable {}", agent.role, vote, committable, uncommittable)
 
         // this will have dropped the committable
         val votesData = acceptResponsesLens.set(agent.data, uncommittable)
@@ -70,7 +70,7 @@ with CommitHandler {
           case None =>
             agent.copy(data = votesData) // gap in committable sequence
           case Some((id, _)) if id.logIndex != votesData.progress.highestCommitted.logIndex + 1 =>
-            io.plog.error(s"Node ${agent.nodeUniqueId} ${agent.role} invariant violation: ${agent.role} has committable work which is not contiguous with progress implying we have not issued Prepare/Accept messages for the correct range of slots. Returning to follower.")
+            io.logger.error(s"Node ${agent.nodeUniqueId} ${agent.role} invariant violation: ${agent.role} has committable work which is not contiguous with progress implying we have not issued Prepare/Accept messages for the correct range of slots. Returning to follower.")
             backdownAgent(io, agent)
           case _ =>
             // headOption isn't None so lastOption must be defined
@@ -80,13 +80,13 @@ with CommitHandler {
         }
 
       case Some(SplitVote) =>
-        io.plog.info("Node {} {} got a split accept vote out of total returning to follower: {}", agent.nodeUniqueId, agent.role, votes)
+        io.logger.info("Node {} {} got a split accept vote out of total returning to follower: {}", agent.nodeUniqueId, agent.role, votes)
         backdownAgent(io, agent)
 
       case None =>
         // insufficient votes keep counting
         val updated = agent.data.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(io.randomTimeout, accept, votes))
-        io.plog.debug("Node {} {} insufficient votes for {} have {}", agent.nodeUniqueId, agent.role, vote.requestId, updated)
+        io.logger.debug("Node {} {} insufficient votes for {} have {}", agent.nodeUniqueId, agent.role, vote.requestId, updated)
         agent.copy(data = acceptResponsesLens.set(agent.data, updated))
     }
   }
@@ -107,10 +107,10 @@ with CommitHandler {
           multipleCommittedIds.contains(id)
       }
 
-      io.plog.debug("Node {} {} post commit has responds.size={}, remainders.size={}", agent.nodeUniqueId, agent.role, responds.size, remainders.size)
+      io.logger.debug("Node {} {} post commit has responds.size={}, remainders.size={}", agent.nodeUniqueId, agent.role, responds.size, remainders.size)
       results foreach { case (id, bytes) =>
         responds.get(id) foreach { case (cmd, client) =>
-          io.plog.debug("sending response from accept {} to {}", id, client)
+          io.logger.debug("sending response from accept {} to {}", id, client)
           io.respond(client, bytes)
         }
       }

@@ -13,7 +13,7 @@ trait PrepareResponseHandler extends PaxosLenses with BackdownAgent {
     val highestCommittedIndex = agent.data.progress.highestCommitted.logIndex
     val highestCommittedIndexOther = highestCommitted.logIndex
     if (highestCommittedIndexOther > highestCommittedIndex) {
-      io.plog.info("Node {} Recoverer requesting retransmission to target {} with highestCommittedIndex {}", agent.nodeUniqueId, from, highestCommittedIndex)
+      io.logger.info("Node {} Recoverer requesting retransmission to target {} with highestCommittedIndex {}", agent.nodeUniqueId, from, highestCommittedIndex)
       io.send(RetransmitRequest(agent.nodeUniqueId, from, highestCommittedIndex))
     }
   }
@@ -32,7 +32,7 @@ trait PrepareResponseHandler extends PaxosLenses with BackdownAgent {
     agent.data.prepareResponses.getOrElse(id, Map.empty) match {
       case map if map.isEmpty =>
         // ignore late responses when we already had a majority so no longer waiting
-        io.plog.debug("Node {} Ignored prepare response as not tracking this request: {}", agent.nodeUniqueId, vote)
+        io.logger.debug("Node {} Ignored prepare response as not tracking this request: {}", agent.nodeUniqueId, vote)
         agent
       case map =>
         // register the vote
@@ -47,7 +47,7 @@ trait PrepareResponseHandler extends PaxosLenses with BackdownAgent {
             // only accept your own broadcast if we have not made a higher promise whilst awaiting responses from other nodes
             val selfResponse: AcceptResponse = respondToSelf(io, agent, agent.data, accept)
             // broadcast accept
-            io.plog.debug("Node {} {} sending {}", agent.nodeUniqueId, agent.role, accept)
+            io.logger.debug("Node {} {} sending {}", agent.nodeUniqueId, agent.role, accept)
             io.send(accept)
             // create a fresh vote for your new accept message
             val expandedAccepts = agent.data.acceptResponses + (accept.id -> AcceptResponsesAndTimeout(io.randomTimeout, accept, Map(agent.nodeUniqueId -> selfResponse)))
@@ -56,19 +56,19 @@ trait PrepareResponseHandler extends PaxosLenses with BackdownAgent {
             val newData = leaderLens.set(agent.data, (updatedPrepares, expandedAccepts, Map.empty))
             if (updatedPrepares.isEmpty) {
               // we have completed recovery so we now switch to stable Leader state
-              io.plog.info("Node {} {} has issued accept messages for all prepare messages to promoting to be Leader.", agent.nodeUniqueId, agent.role)
+              io.logger.info("Node {} {} has issued accept messages for all prepare messages to promoting to be Leader.", agent.nodeUniqueId, agent.role)
               agent.copy(role = Leader, data = newData.copy(timeout = io.randomTimeout))
             } else {
-              io.plog.info("Node {} {} is still recovering {} slots", agent.nodeUniqueId, agent.role, updatedPrepares.size)
+              io.logger.info("Node {} {} is still recovering {} slots", agent.nodeUniqueId, agent.role, updatedPrepares.size)
               agent.copy(data = newData)
             }
 
           case Some(MajorityNack) =>
-            io.plog.info("Node {} {} received majority prepare nacks returning to follower", agent.nodeUniqueId, agent.role)
+            io.logger.info("Node {} {} received majority prepare nacks returning to follower", agent.nodeUniqueId, agent.role)
             backdownAgent(io, agent)
 
           case Some(SplitVote) =>
-            io.plog.warning("Node {} {} got a split prepare vote returning to follower", agent.nodeUniqueId, agent.role)
+            io.logger.warning("Node {} {} got a split prepare vote returning to follower", agent.nodeUniqueId, agent.role)
             backdownAgent(io, agent)
 
           case None =>
@@ -92,9 +92,9 @@ object PrepareResponseHandler {
           val prepares = (highestKnownSlotToRecover + 1) to highestSlotToRecoverLatestResponse map { id =>
             Prepare(Identifier(agent.nodeUniqueId, agent.data.epoch.get, id))
           }
-          io.plog.info("Node {} Recoverer broadcasting {} new prepare messages for expanded slots {} to {}", agent.nodeUniqueId, prepares.size, (highestKnownSlotToRecover + 1), highestSlotToRecoverLatestResponse)
+          io.logger.info("Node {} Recoverer broadcasting {} new prepare messages for expanded slots {} to {}", agent.nodeUniqueId, prepares.size, (highestKnownSlotToRecover + 1), highestSlotToRecoverLatestResponse)
           prepares foreach { p =>
-            io.plog.debug("Node {} sending {}", agent.nodeUniqueId, p)
+            io.logger.debug("Node {} sending {}", agent.nodeUniqueId, p)
             io.send(p)
           }
 
@@ -127,23 +127,23 @@ object PrepareResponseHandler {
     }
     if (accepts.isEmpty) {
       val accept = Accept(id, NoOperationCommandValue)
-      io.plog.info("Node {} {} got a majority of positive prepare response with no value sending fresh NO_OPERATION accept message {}", agent.nodeUniqueId, agent.role, accept)
+      io.logger.info("Node {} {} got a majority of positive prepare response with no value sending fresh NO_OPERATION accept message {}", agent.nodeUniqueId, agent.role, accept)
       accept
     } else {
       val max = accepts.maxBy(_.id.number)
       val accept = Accept(id, max.value)
-      io.plog.info("Node {} {} got a majority of positive prepare response with highest accept message {} sending fresh message {}", agent.nodeUniqueId, agent.role, max.id, accept)
+      io.logger.info("Node {} {} got a majority of positive prepare response with highest accept message {} sending fresh message {}", agent.nodeUniqueId, agent.role, max.id, accept)
       accept
     }
   }
 
   def respondToSelf(io: PaxosIO, agent: PaxosAgent, expandedData: PaxosData, accept: Accept) = {
     if (accept.id.number >= expandedData.progress.highestPromised) {
-      io.plog.debug("Node {} {} accepting own message {}", agent.nodeUniqueId, agent.role, accept.id)
+      io.logger.debug("Node {} {} accepting own message {}", agent.nodeUniqueId, agent.role, accept.id)
       io.journal.accept(accept)
       AcceptAck(accept.id, agent.nodeUniqueId, expandedData.progress)
     } else {
-      io.plog.debug("Node {} {} not accepting own message with number {} as have made a higher promise {}", agent.nodeUniqueId, agent.role, accept.id.number, expandedData.progress.highestPromised)
+      io.logger.debug("Node {} {} not accepting own message with number {} as have made a higher promise {}", agent.nodeUniqueId, agent.role, accept.id.number, expandedData.progress.highestPromised)
       AcceptNack(accept.id, agent.nodeUniqueId, expandedData.progress)
     }
   }

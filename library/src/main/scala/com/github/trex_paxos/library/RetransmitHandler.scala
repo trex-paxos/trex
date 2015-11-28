@@ -46,7 +46,7 @@ trait RetransmitHandler extends PaxosLenses {
     // update our progress with new highest commit index and new promise
     val newProgress = Progress.highestPromisedHighestCommitted.set(agent.data.progress, (acceptState.highest, commitState.highestCommitted))
 
-    io.plog.info("Node " + agent.nodeUniqueId + " RetransmitResponse committed {} of {} and accepted {} of {}", committedCount, aboveCommitted.size, acceptState.acceptable.size, response.uncommitted.size)
+    io.logger.info("Node " + agent.nodeUniqueId + " RetransmitResponse committed {} of {} and accepted {} of {}", committedCount, aboveCommitted.size, acceptState.acceptable.size, response.uncommitted.size)
 
     // return new progress, the accepts that we should journal so that we may retransmit on request, and the committed values
     Retransmission(newProgress, (aboveCommitted ++ acceptState.acceptable).distinct, commitState.committed.map(_.value))
@@ -64,7 +64,7 @@ trait RetransmitHandler extends PaxosLenses {
     }
 
     responseData foreach { r =>
-      io.plog.info(s"Node ${agent.nodeUniqueId} retransmission response to node {} for logIndex {} with {} committed and {} proposed entries", r.from, request.logIndex, r.committed.size, r.uncommitted.size)
+      io.logger.info(s"Node ${agent.nodeUniqueId} retransmission response to node {} for logIndex {} with {} committed and {} proposed entries", r.from, request.logIndex, r.committed.size, r.uncommitted.size)
       io.send(r)
     }
 

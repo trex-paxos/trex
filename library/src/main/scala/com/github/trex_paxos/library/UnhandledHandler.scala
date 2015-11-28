@@ -6,7 +6,7 @@ trait UnhandledHandler {
 
    def handleUnhandled(io: PaxosIO, agent: PaxosAgent, msg: Any): Unit = {
      val l = s"Node ${agent.nodeUniqueId} in state ${agent.role} recieved unknown message=${msg}"
-     io.plog.error(l)
+     io.logger.error(l)
      stderr(l)
    }
  }

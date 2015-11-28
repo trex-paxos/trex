@@ -51,7 +51,7 @@ trait ResendHandler extends PaxosLenses {
       // nothing more to do
       AcceptsAndData(Seq.empty, agent.data)
     } else {
-      io.plog.info(s"timed out on ${late.size} accepts")
+      io.logger.info(s"timed out on ${late.size} accepts")
 
       val oldEpoch: BallotNumber = agent.data.epoch.getOrElse(Journal.minBookwork.highestPromised)
 
@@ -70,7 +70,7 @@ trait ResendHandler extends PaxosLenses {
 
       // go one higher if response show higher promises than our epoch
       val (higherNumber, newProgress) = if (highPromise > oldEpoch) {
-        io.plog.info(s"going one higher than highest other promise ${highPromise}")
+        io.logger.info(s"going one higher than highest other promise ${highPromise}")
         // increment
         val higherNumber = highPromise.copy(counter = highPromise.counter + 1, nodeIdentifier = agent.nodeUniqueId)
         // make a self promise

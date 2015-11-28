@@ -8,30 +8,6 @@ class UnhandledTests extends WordSpecLike {
 
   import TestHelpers._
 
-  class VerifiablePaxosLogging extends PaxosLogging {
-    override def info(msg: String): Unit = {}
-
-    override def error(msg: String): Unit = {}
-
-    override def debug(msg: String, one: Any, two: Any): Unit = {}
-
-    override def debug(msg: String, one: Any, two: Any, three: Any): Unit = {}
-
-    override def debug(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = {}
-
-    override def info(msg: String, one: Any): Unit = {}
-
-    override def info(msg: String, one: Any, two: Any): Unit = {}
-
-    override def info(msg: String, one: Any, two: Any, three: Any): Unit = {}
-
-    override def info(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = {}
-
-    override def warning(msg: String): Unit = {}
-
-    override def warning(msg: String, one: Any, two: Any): Unit = {}
-  }
-
   "UnhandledHandler" should {
     "trace the event and log an error" in {
       // given

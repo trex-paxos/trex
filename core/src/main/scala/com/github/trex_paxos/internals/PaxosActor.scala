@@ -33,7 +33,7 @@ with AkkaLoggingAdapter {
 
   var paxosAgent = new PaxosAgent(nodeUniqueId, Follower, PaxosData(journal.load(), 0, 0, config.clusterSize, SortedMap.empty[Identifier, Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering), None, SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering), Map.empty[Identifier, (CommandValue, String)]))
 
-  val plog = this
+  val logger = this
 
   private val paxosAlgorithm = new PaxosAlgorithm
 
@@ -45,7 +45,7 @@ with AkkaLoggingAdapter {
     val ref = sender()
     val pathAsString = ref.path.toString
     actorRefWeakMap.put(pathAsString, ref)
-    plog.debug("weak map key {} value {}", pathAsString, ref)
+    logger.debug("weak map key {} value {}", pathAsString, ref)
     pathAsString
   }
 
@@ -53,7 +53,7 @@ with AkkaLoggingAdapter {
     case Some(ref) =>
       ref ! data
     case _ =>
-      plog.debug("weak map does not hold key {} to reply with {}", pathAsString, data)
+      logger.debug("weak map does not hold key {} to reply with {}", pathAsString, data)
   }
 
   override def receive: Receive = {

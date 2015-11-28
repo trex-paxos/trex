@@ -1,5 +1,9 @@
 package com.github.trex_paxos.library
 
+/**
+ * We would like to log per agent rather than per class/trait so we pass the logger around.
+ * This API happens to follow Akka logging
+ */
 trait PaxosLogging {
   def isErrorEnabled: Boolean = false
 
@@ -19,6 +23,8 @@ trait PaxosLogging {
 
   def info(msg: String, one: Any, two: Any, three: Any, four: Any): Unit
 
+  def debug(msg: String, one: Any): Unit
+
   def debug(msg: String, one: Any, two: Any): Unit
 
   def debug(msg: String, one: Any, two: Any, three: Any): Unit
@@ -27,8 +33,22 @@ trait PaxosLogging {
 
   def error(msg: String): Unit
 
+  def error(msg: String, one: Any): Unit
+
+  def error(msg: String, one: Any, two: Any): Unit
+
+  def error(msg: String, one: Any, two: Any, three: Any): Unit
+
+  def error(msg: String, one: Any, two: Any, three: Any, four: Any): Unit
+
   def warning(msg: String): Unit
 
+  def warning(msg: String, one: Any): Unit
+
   def warning(msg: String, one: Any, two: Any): Unit
+
+  def warning(msg: String, one: Any, two: Any, three: Any): Unit
+
+  def warning(msg: String, one: Any, two: Any, three: Any, four: Any): Unit
 
 }

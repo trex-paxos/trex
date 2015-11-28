@@ -392,7 +392,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
 
     // and a do nothing IO
     val io = new TestIO(noopJournal) {
-      override def plog: PaxosLogging = NoopPaxosLogging
+      override def logger: PaxosLogging = NoopPaxosLogging
     }
 
     // when we get the majority
