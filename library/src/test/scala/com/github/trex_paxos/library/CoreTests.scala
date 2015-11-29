@@ -3,6 +3,7 @@ package com.github.trex_paxos.library
 import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.collection.immutable.{SortedMap, TreeMap}
+import scala.collection.mutable.ArrayBuffer
 
 class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
   "Paxos Numbers" should {
@@ -148,6 +149,135 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
       followerData.acceptResponses.isEmpty shouldBe true
       followerData.clientCommands.isEmpty shouldBe true
       sentNoLongerLeader shouldBe true
+    }
+  }
+
+  "Logging trait" should {
+
+    class TestableLogger extends PaxosLogging {
+
+      override def isErrorEnabled: Boolean = true
+
+      override def isInfoEnabled: Boolean = true
+
+      override def isDebugEnabled: Boolean = true
+
+      override def isWarningEnabled: Boolean = true
+
+      val captured = ArrayBuffer[String]()
+
+      override def warning(msg: String): Unit = captured += "warning:" + msg
+
+      override def warning(msg: String, one: Any): Unit = captured += "warning:" + msg + "," + one
+
+      override def warning(msg: String, one: Any, two: Any): Unit = captured += "warning:" + msg + "," + one + "," + two
+
+      override def warning(msg: String, one: Any, two: Any, three: Any): Unit = captured += "warning:" + msg + "," + one + "," + two + "," + three
+
+      override def warning(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = captured += "warning:" + msg + "," + one + "," + two + "," + three + "," + four
+
+      override def error(msg: String): Unit = captured += "error:" + msg
+
+      override def error(msg: String, one: Any): Unit = captured += "error:" + msg + "," + one
+
+      override def error(msg: String, one: Any, two: Any): Unit = captured += "error:" + msg + "," + one + "," + two
+
+      override def error(msg: String, one: Any, two: Any, three: Any): Unit = captured += "error:" + msg + "," + one + "," + two + "," + three
+
+      override def error(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = captured += "error:" + msg + "," + one + "," + two + "," + three + "," + four
+
+      override def debug(msg: String): Unit = captured += "debug:" + msg
+
+      override def debug(msg: String, one: Any): Unit = captured += "debug:" + msg + "," + one
+
+      override def debug(msg: String, one: Any, two: Any): Unit = captured += "debug:" + msg + "," + one + "," + two
+
+      override def debug(msg: String, one: Any, two: Any, three: Any): Unit = captured += "debug:" + msg + "," + one + "," + two + "," + three
+
+      override def debug(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = captured += "debug:" + msg + "," + one + "," + two + "," + three + "," + four
+
+      override def info(msg: String): Unit = captured += "info:" + msg
+
+      override def info(msg: String, one: Any): Unit = captured += "info:" + msg + "," + one
+
+      override def info(msg: String, one: Any, two: Any): Unit = captured += "info:" + msg + "," + one + "," + two
+
+      override def info(msg: String, one: Any, two: Any, three: Any): Unit = captured += "info:" + msg + "," + one + "," + two + "," + three
+
+      override def info(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = captured += "info:" + msg + "," + one + "," + two + "," + three + "," + four
+    }
+
+    "should log debug" in {
+      val logger = new TestableLogger
+      logger.isDebugEnabled shouldBe true
+      logger.debug("hello")
+      logger.captured(0) shouldBe "debug:hello"
+      logger.captured.clear()
+      logger.debug("hello", "world")
+      logger.captured(0) shouldBe "debug:hello,world"
+      logger.captured.clear()
+      logger.debug("hello", "world", "again")
+      logger.captured(0) shouldBe "debug:hello,world,again"
+      logger.captured.clear()
+      logger.debug("hello", "world", "again", "indeed")
+      logger.captured(0) shouldBe "debug:hello,world,again,indeed"
+      logger.captured.clear()
+      logger.debug("hello", "world", "again", "indeed", "proceed")
+      logger.captured(0) shouldBe "debug:hello,world,again,indeed,proceed"
+    }
+    "should log info" in {
+      val logger = new TestableLogger
+      logger.isInfoEnabled shouldBe true
+      logger.info("hello")
+      logger.captured(0) shouldBe "info:hello"
+      logger.captured.clear()
+      logger.info("hello", "world")
+      logger.captured(0) shouldBe "info:hello,world"
+      logger.captured.clear()
+      logger.info("hello", "world", "again")
+      logger.captured(0) shouldBe "info:hello,world,again"
+      logger.captured.clear()
+      logger.info("hello", "world", "again", "indeed")
+      logger.captured(0) shouldBe "info:hello,world,again,indeed"
+      logger.captured.clear()
+      logger.info("hello", "world", "again", "indeed", "proceed")
+      logger.captured(0) shouldBe "info:hello,world,again,indeed,proceed"
+    }
+    "should log warning" in {
+      val logger = new TestableLogger
+      logger.isWarningEnabled shouldBe true
+      logger.warning("hello")
+      logger.captured(0) shouldBe "warning:hello"
+      logger.captured.clear()
+      logger.warning("hello", "world")
+      logger.captured(0) shouldBe "warning:hello,world"
+      logger.captured.clear()
+      logger.warning("hello", "world", "again")
+      logger.captured(0) shouldBe "warning:hello,world,again"
+      logger.captured.clear()
+      logger.warning("hello", "world", "again", "indeed")
+      logger.captured(0) shouldBe "warning:hello,world,again,indeed"
+      logger.captured.clear()
+      logger.warning("hello", "world", "again", "indeed", "proceed")
+      logger.captured(0) shouldBe "warning:hello,world,again,indeed,proceed"
+    }
+    "should log error" in {
+      val logger = new TestableLogger
+      logger.isErrorEnabled shouldBe true
+      logger.error("hello")
+      logger.captured(0) shouldBe "error:hello"
+      logger.captured.clear()
+      logger.error("hello", "world")
+      logger.captured(0) shouldBe "error:hello,world"
+      logger.captured.clear()
+      logger.error("hello", "world", "again")
+      logger.captured(0) shouldBe "error:hello,world,again"
+      logger.captured.clear()
+      logger.error("hello", "world", "again", "indeed")
+      logger.captured(0) shouldBe "error:hello,world,again,indeed"
+      logger.captured.clear()
+      logger.error("hello", "world", "again", "indeed", "proceed")
+      logger.captured(0) shouldBe "error:hello,world,again,indeed,proceed"
     }
   }
 }

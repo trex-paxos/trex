@@ -23,6 +23,8 @@ trait PaxosLogging {
 
   def info(msg: String, one: Any, two: Any, three: Any, four: Any): Unit
 
+  def debug(msg: String): Unit
+
   def debug(msg: String, one: Any): Unit
 
   def debug(msg: String, one: Any, two: Any): Unit

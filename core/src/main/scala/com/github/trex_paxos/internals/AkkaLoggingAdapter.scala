@@ -8,6 +8,8 @@ trait AkkaLoggingAdapter extends PaxosLogging {
 
   override def info(msg: String): Unit = log.info(msg)
 
+  override def debug(msg: String): Unit = log.debug(msg)
+
   override def info(msg: String, one: Any): Unit = log.info(msg, one)
 
   override def info(msg: String, one: Any, two: Any): Unit = log.info(msg, one, two)
