@@ -59,15 +59,15 @@ with AkkaLoggingAdapter {
   override def receive: Receive = {
     case m: PaxosMessage =>
       val event = new PaxosEvent(this, paxosAgent, m)
-      trace(event, sender().toString())
       val agent = paxosAlgorithm(event)
+      trace(event, sender().toString(), sent)
       transmit(sender())
       paxosAgent = agent
   }
 
   val minPrepare = Prepare(Identifier(nodeUniqueId, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
 
-  var sent: Seq[PaxosMessage] = Seq()
+  var sent: collection.immutable.Seq[PaxosMessage] = collection.immutable.Seq()
 
   def send(msg: PaxosMessage): Unit = {
     sent = sent :+ msg
@@ -78,7 +78,7 @@ with AkkaLoggingAdapter {
       case m@(_: RetransmitRequest | _: RetransmitResponse | _: AcceptResponse | _: PrepareResponse) => send(sender, m)
       case m => broadcast(m)
     }
-    this.sent = Seq()
+    this.sent = collection.immutable.Seq()
   }
 
   def broadcast(msg: PaxosMessage): Unit = broadcastRef ! msg
@@ -109,7 +109,7 @@ with AkkaLoggingAdapter {
   type Epoch = Option[BallotNumber]
   type PrepareSelfVotes = SortedMap[Identifier, Option[Map[Int, PrepareResponse]]]
 
-  def trace(event: PaxosEvent, sender: String): Unit = {}
+  def trace(event: PaxosEvent, sender: String, sent: collection.immutable.Seq[PaxosMessage]): Unit = {}
 
   /**
    * The deliver method is called when the value is committed.
@@ -214,8 +214,7 @@ object PaxosActor {
 
   val random = new SecureRandom
 
-  // Log the nodeUniqueID, stateName,.underlyingActor.data. sender and message for tracing purposes
-  case class TraceData(ts: Long, nodeUniqueId: Int, stateName: PaxosRole, statData: PaxosData, sender: String, message: Any)
+  case class TraceData(ts: Long, nodeUniqueId: Int, stateName: PaxosRole, statData: PaxosData, sender: String, message: Any, sent: Seq[PaxosMessage])
 
   type Tracer = TraceData => Unit
 

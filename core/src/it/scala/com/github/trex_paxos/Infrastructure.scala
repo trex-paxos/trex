@@ -55,7 +55,7 @@ class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, nodeUniqueId: 
   // custom heartbeat interval as things are all in memory
   override def heartbeatInterval = 33
 
-  override def trace(event: PaxosEvent, sender: String): Unit = tracer.foreach(t => t(TraceData(System.nanoTime(), nodeUniqueId, event.agent.role, event.agent.data, sender, event.message)))
+  override def trace(event: PaxosEvent, sender: String, sent: Seq[PaxosMessage]): Unit = tracer.foreach(t => t(TraceData(System.nanoTime(), nodeUniqueId, event.agent.role, event.agent.data, sender, event.message, sent)))
 }
 
 object ClusterHarness {
@@ -209,8 +209,8 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
         tracedData.toSeq foreach {
           case (node, t: Seq[TraceData]) =>
             t foreach { d =>
-              val TraceData(ts, id, state, data, sender, msg) = d
-              fw.write(s"$ts|$id|$state|$msg|$sender|$data\n")
+              val TraceData(ts, id, state, data, sender, msg, sent) = d
+              fw.write(s"$ts|$id|$state|$msg|$sent|$sender|$data\n")
             }
         }
       } match {
