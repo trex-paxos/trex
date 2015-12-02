@@ -55,7 +55,7 @@ class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, nodeUniqueId: 
   // custom heartbeat interval as things are all in memory
   override def heartbeatInterval = 33
 
-  override def trace(state: PaxosRole, data: PaxosData, msg: Any): Unit = tracer.foreach(t => t(TraceData(nodeUniqueId, state, data, None, msg)))
+  override def trace(event: PaxosEvent, sender: String): Unit = tracer.foreach(t => t(TraceData(System.nanoTime(), nodeUniqueId, event.agent.role, event.agent.data, sender, event.message)))
 }
 
 object ClusterHarness {
@@ -210,18 +210,8 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
           case (node, t: Seq[TraceData]) =>
             fw.write(s"#node $node\n\n")
             t foreach { d =>
-              val TraceData(nId, state, data, sender, msg) = d
-              sender match {
-                case Some(actorRef) =>
-                  // if the test fails to commit all values then the leader will have
-                  // a reference to the client who sent the message which does not pickle.
-                  // since the test harness sent the message we simply scrub that field so that
-                  // we can log the state of the leader when the test fails due to a failed commit.
-                  val dataNoActors = data.copy(clientCommands = Map.empty)
-                  fw.write(s"$state|$dataNoActors|${actorRef.toString}|$msg\n\n")
-                case None =>
-                  fw.write(s"delivered: $msg\n\n")
-              }
+              val TraceData(ts, id, state, data, sender, msg) = d
+              fw.write(s"$ts|$id|$state|$msg|$sender|$data\n\n")
             }
         }
       } match {

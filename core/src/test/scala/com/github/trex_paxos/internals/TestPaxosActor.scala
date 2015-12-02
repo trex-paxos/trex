@@ -38,8 +38,6 @@ class TestPaxosActor(config: PaxosActor.Configuration, nodeUniqueId: Int, broadc
     }
   }
 
-  override def trace(state: PaxosRole, data: PaxosData, msg: Any): Unit = tracer.foreach(t => t(TraceData(nodeUniqueId, state, data, None, msg)))
-
   def setAgent(role: PaxosRole, data: PaxosData) = this.paxosAgent = this.paxosAgent.copy(role = role, data = data)
 
   def role = this.paxosAgent.role

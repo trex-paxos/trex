@@ -59,7 +59,7 @@ with AkkaLoggingAdapter {
   override def receive: Receive = {
     case m: PaxosMessage =>
       val event = new PaxosEvent(this, paxosAgent, m)
-      trace(event)
+      trace(event, sender().toString())
       val agent = paxosAlgorithm(event)
       transmit(sender())
       paxosAgent = agent
@@ -109,9 +109,7 @@ with AkkaLoggingAdapter {
   type Epoch = Option[BallotNumber]
   type PrepareSelfVotes = SortedMap[Identifier, Option[Map[Int, PrepareResponse]]]
 
-  def trace(state: PaxosRole, data: PaxosData, msg: Any): Unit = {}
-
-  def trace(event: PaxosEvent): Unit = trace(event.agent.role, event.agent.data, event.message)
+  def trace(event: PaxosEvent, sender: String): Unit = {}
 
   /**
    * The deliver method is called when the value is committed.
@@ -217,7 +215,7 @@ object PaxosActor {
   val random = new SecureRandom
 
   // Log the nodeUniqueID, stateName,.underlyingActor.data. sender and message for tracing purposes
-  case class TraceData(nodeUniqueId: Int, stateName: PaxosRole, statData: PaxosData, sender: Option[String], message: Any)
+  case class TraceData(ts: Long, nodeUniqueId: Int, stateName: PaxosRole, statData: PaxosData, sender: String, message: Any)
 
   type Tracer = TraceData => Unit
 
