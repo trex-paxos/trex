@@ -208,10 +208,9 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       Try {
         tracedData.toSeq foreach {
           case (node, t: Seq[TraceData]) =>
-            fw.write(s"#node $node\n\n")
             t foreach { d =>
               val TraceData(ts, id, state, data, sender, msg) = d
-              fw.write(s"$ts|$id|$state|$msg|$sender|$data\n\n")
+              fw.write(s"$ts|$id|$state|$msg|$sender|$data\n")
             }
         }
       } match {
