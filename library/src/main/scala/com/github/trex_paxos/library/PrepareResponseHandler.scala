@@ -25,6 +25,7 @@ trait PrepareResponseHandler extends PaxosLenses with BackdownAgent {
 
   def handlePrepareResponse(io: PaxosIO, agent: PaxosAgent, vote: PrepareResponse): PaxosAgent = {
     require(agent.role == Recoverer, s"handle prepare response must be called in state Recoverer not ${agent.role}")
+    io.logger.debug("{} sees response {}", agent.nodeUniqueId, vote)
     requestRetransmissionIfBehind(io, agent, vote.from, vote.progress.highestCommitted)
 
     val id = vote.requestId

@@ -96,7 +96,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
 
       override def journal: Journal = stubJournal
 
-      override def deliver(value: CommandValue): Any = delivered += value
+      override def deliver(payload: Payload): Any = delivered += value
     }
     // and commit
     val commit = Commit(identifier)

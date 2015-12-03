@@ -307,10 +307,10 @@ class TypedActorPaxosEndpoint(config: PaxosActor.Configuration, broadcastReferen
     serializer.fromBinary(bytes, manifest = None).asInstanceOf[MethodCall]
   }
 
-  override val deliverClient: PartialFunction[CommandValue, AnyRef] = {
-    case ClientRequestCommandValue(id, bytes) =>
+  override val deliverClient: PartialFunction[Payload, AnyRef] = {
+    case Payload(logIndex, ClientRequestCommandValue(id, bytes)) =>
       val mc@TypedActor.MethodCall(method, parameters) = deserialize(bytes)
-      log.debug("delivering {}", mc)
+      log.debug("delivering slot {} value {}", logIndex, mc)
       val result = Try {
         val response = Option(method.invoke(target, parameters: _*))
         log.debug(s"invoked ${method.getName} returned $response")

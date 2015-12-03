@@ -14,6 +14,13 @@ trait CommandValue extends PaxosMessage {
 }
 
 /**
+ * Once consensus has been reached we deliver CommandValues in consensus order with the possibility of repeats during crash recovery.
+ * @param deduplicationId An id number which can be used to deduplicated repeated deliveries that may happen during crash recovery.
+ * @param command The value which has been chosen by consensus.
+ */
+case class Payload(deduplicationId: Long, command: CommandValue)
+
+/**
  * The logical number used to discriminate messages as either higher or lower. Numbers must be unique to _both_ the node in the cluster *and* paxos prepare.  Physically it is 64bits with high 32bits an epoch number and low 32bits a node unique identifier. The number will be fixed for a stable leader so it also represents a leaders term.
  * @param counter Used by candidate leaders to "go higher" than prior or competing leaders. No guarantees are made as to this number; there may be gaps between values issued by a node and there may be collisions between dueling leaders.
  * @param nodeIdentifier node unique number which must be unique to an agent within the cluster (e.g. set from unique configuration or parsed from DNS name ’node0’, ’node1'). This value is used to tie break between dueling leaders. Safety of the algorithm requires that this value must be unique per cluster.

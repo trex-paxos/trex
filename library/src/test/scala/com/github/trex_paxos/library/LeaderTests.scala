@@ -147,7 +147,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
     def `should ignore a late prepare response` {
       shouldIngoreLatePrepareResponse(Leader)
     }
-    def `should ingore a commit for same slot from lower numered node` {
+    def `should ingore a commit for same slot from lower numbered node` {
       shouldIngoreCommitMessageSameSlotLowerNodeId(Leader)
     }
     def `should backdown on commit same slot higher node number` {
@@ -255,8 +255,8 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
           sent += msg
         }
 
-        override def deliver(value: CommandValue): Any = {
-          lastDelivered.set(value)
+        override def deliver(payload: Payload): Any = {
+          lastDelivered.set(payload.command)
           value
         }
       }
@@ -312,8 +312,8 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
           sent += msg
         }
 
-        override def deliver(value: CommandValue): Any = {
-          delivered += value
+        override def deliver(payload: Payload): Any = {
+          delivered += payload.command
           value
         }
       }

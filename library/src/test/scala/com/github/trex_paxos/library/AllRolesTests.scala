@@ -72,6 +72,8 @@ class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValue
     val sent = ArrayBuffer[PaxosMessage]()
     val io = new UndefinedIO {
       override def send(msg: PaxosMessage): Unit = sent += msg
+
+      override def deliver(payload: Payload): Any = {}
     }
     val event = new PaxosEvent(io, agent, ClientRequestCommandValue(0L, expectedBytes))
     val paxosAlgorithm = new PaxosAlgorithm
@@ -89,7 +91,7 @@ class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValue
   def shouldIngoreLatePrepareResponse(role: PaxosRole) {
     val agent1 = PaxosAgent(0, role, initialDataCommittedSlotOne)
     val event1 = PaxosEvent(undefinedIO, agent1, PrepareNack(minPrepare.id, 2, initialData.progress, initialData.progress.highestCommitted.logIndex, Long.MaxValue))
-    val agent2@PaxosAgent(_, newRole, data) = paxosAlgorithm(event1)
+    val PaxosAgent(_, newRole, data) = paxosAlgorithm(event1)
     newRole shouldBe role
     data shouldBe agent1.data
     val event2 = PaxosEvent(undefinedIO, agent1, PrepareAck(minPrepare.id, 2, initialData.progress, initialData.progress.highestCommitted.logIndex, Long.MaxValue, None))

@@ -26,13 +26,13 @@ class TestPaxosActor(config: PaxosActor.Configuration, nodeUniqueId: Int, broadc
   override def senderId: String = super.senderId
 
   // does nothing but makes this class concrete for testing
-  val deliverClient: PartialFunction[CommandValue, Array[Byte]] = {
-    case m => NoOperationCommandValue.bytes
+  val deliverClient: PartialFunction[Payload, Array[Byte]] = {
+    case x => NoOperationCommandValue.bytes
   }
 
-  override def deliver(value: CommandValue): Array[Byte] = {
-    delivered.append(value)
-    value match {
+  override def deliver(payload: Payload): Array[Byte] = {
+    delivered.append(payload.command)
+    payload.command match {
       case ClientRequestCommandValue(_, bytes) => if (bytes.length > 0) Array[Byte]((-bytes(0)).toByte) else bytes
       case noop@NoOperationCommandValue => noop.bytes
     }

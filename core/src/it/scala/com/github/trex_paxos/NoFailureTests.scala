@@ -2,7 +2,7 @@ package com.github.trex_paxos
 
 import akka.actor._
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
-import com.github.trex_paxos.library.{ClientRequestCommandValue, NoLongerLeaderException, CommandValue}
+import com.github.trex_paxos.library.{Payload, ClientRequestCommandValue, NoLongerLeaderException, CommandValue}
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.{BeforeAndAfterAll, _}
 
@@ -26,19 +26,19 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
   // counts the number of delivered client bytes matches the cluster size
   def check(cluster: ClusterHarness): Boolean = {
 
-    val delivered: Seq[ArrayBuffer[CommandValue]] = cluster.delivered.values.toSeq
+    val delivered: Seq[ArrayBuffer[Payload]] = cluster.delivered.values.toSeq
 
     val count = (0 until cluster.size).foldLeft(0){ (count, i) =>
-      delivered(i).headOption match {
-        case Some(c: ClientRequestCommandValue) =>
+      val found = delivered(i) map {
+        case Payload(_, c: ClientRequestCommandValue) =>
           c.bytes(0) match {
-            case 1 => i + 1
-            case _ => i
+            case 1 => 1
+            case _ => 0
           }
-        case _ => i
+        case _ => 0
       }
+      count + found.sum
     }
-
     count == cluster.size
   }
 
@@ -59,11 +59,15 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
       case x => fail(x.toString)
     }
 
-    // await all the nodes having something deliver the one byte sent by the client
-    awaitCond(check(ref.underlyingActor), 6 seconds, 100 millis)
+    // await all the nodes having delivered the one byte sent by the client
+    awaitCond(check(ref.underlyingActor), 6 seconds, 1 second)
 
     // kill off that cluster
     ref ! ClusterHarness.Halt
+
+    expectMsgPF(12 second) {
+      case m: Map[_,_] => // results we are ignoring as we verified during awaitCond
+    }
   }
 
   object `A three node cluster` {

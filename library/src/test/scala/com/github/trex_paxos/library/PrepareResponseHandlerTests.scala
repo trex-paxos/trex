@@ -430,7 +430,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
     val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = 5, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress))
 
     // when we get the majority
-    val PaxosAgent(_, role, data) = handler.handlePrepareResponse(undefinedIO, agent, vote)
+    val PaxosAgent(_, role, data) = handler.handlePrepareResponse(undefinedSilentIO, agent, vote)
 
     // then we have simply recorded the vote
     role shouldBe Recoverer

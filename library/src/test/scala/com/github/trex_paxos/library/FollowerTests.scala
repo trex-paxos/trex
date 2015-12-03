@@ -206,7 +206,7 @@ class FollowerTests extends AllRolesTests {
       val timeout = 123L
       val heartbeat = 9999L
 
-      val timeoutIO = new UndefinedIO {
+      val timeoutIO = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = timeout
       }
 
@@ -217,7 +217,7 @@ class FollowerTests extends AllRolesTests {
     }
     def `should ignore a lower commit` {
       val agent = PaxosAgent(0, Follower, initialDataCommittedSlotOne)
-      val event = PaxosEvent(undefinedIO, agent, Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0L), Long.MinValue))
+      val event = PaxosEvent(undefinedSilentIO, agent, Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0L), Long.MinValue))
       val PaxosAgent(_, role, data) = paxosAlgorithm(event)
       role shouldBe Follower
       data shouldBe agent.data
@@ -241,7 +241,7 @@ class FollowerTests extends AllRolesTests {
       // given
       val agent = PaxosAgent(0, Follower, initialData)
       val message = Commit(initialData.progress.highestCommitted, Long.MaxValue)
-      val io = new UndefinedIO{
+      val io = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = 12345L
       }
       val event = new PaxosEvent(io, agent, message)
@@ -408,8 +408,8 @@ class FollowerTests extends AllRolesTests {
 
         override def randomTimeout: Long = 987654L
 
-        override def deliver(value: CommandValue): Any = value match {
-          case c: ClientRequestCommandValue => delivered += c
+        override def deliver(payload: Payload): Any = payload match {
+          case Payload(_, c: ClientRequestCommandValue) => delivered += c
           case _ =>
         }
 
@@ -486,8 +486,8 @@ class FollowerTests extends AllRolesTests {
 
         override def minPrepare: Prepare = Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
 
-        override def deliver(value: CommandValue): Any = value match {
-          case c: ClientRequestCommandValue => delivered += c
+        override def deliver(payload: Payload): Any = payload match {
+          case Payload(_, c: ClientRequestCommandValue) => delivered += c
           case _ =>
         }
 

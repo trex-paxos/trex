@@ -97,12 +97,12 @@ with OptionValues {
       val deliveredWithTs: ArrayBuffer[(Long, CommandValue)] = ArrayBuffer()
       val handler = new TestRetransmitHandler {
         override def processRetransmitResponse(io: PaxosIO, agent: PaxosAgent, response: RetransmitResponse): Retransmission =
-          Retransmission(progress, accepts98thru100, accepts98thru100.map(_.value))
+          Retransmission(progress, accepts98thru100, accepts98thru100.map(a => a.id.logIndex -> a.value))
       }
       // when it is passed a retransmit response
       handler.handleRetransmitResponse(new TestIO(new UndefinedJournal){
-        override def deliver(value: CommandValue): Any = {
-          deliveredWithTs += (System.nanoTime() -> value)
+        override def deliver(payload: Payload): Any = {
+          deliveredWithTs += (System.nanoTime() -> payload.command)
         }
 
         override def journal: Journal = stubJournal
@@ -114,8 +114,6 @@ with OptionValues {
       }
       // and we saved before we accepted
       assert(saveTs != 0 && acceptTs != 0 && saveTs.longValue < acceptTs.longValue)
-      // and we filtered out NoOp values
-      assert(deliveredWithTs.size == 1)
     }
 
     "commit contiguous values" in {
@@ -167,7 +165,7 @@ with OptionValues {
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
-      assert(retransmission.committed.headOption.value eq a99.value)
+      assert(retransmission.committed.headOption.value._2 eq a99.value)
     }
 
     "only select commands contiguous with its last commit" in {
@@ -192,7 +190,7 @@ with OptionValues {
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
-      retransmission.committed.headOption.value shouldBe a98.value
+      retransmission.committed.headOption.value shouldBe (98L, a98.value)
       retransmission.newProgress.highestCommitted shouldBe a98.id
     }
 

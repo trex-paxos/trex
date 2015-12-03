@@ -33,19 +33,19 @@ class TestJournal extends Journal {
   }
 }
 
-class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: ArrayBuffer[CommandValue], tracer: Option[PaxosActor.Tracer])
+class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: ArrayBuffer[Payload], tracer: Option[PaxosActor.Tracer])
   extends PaxosActorWithTimeout(config, nodeUniqueId, broadcastRef, journal) {
 
   def broadcast(msg: Any): Unit = send(broadcastRef, msg)
 
   // does nothing but makes this class concrete for testing
-  val deliverClient: PartialFunction[CommandValue, AnyRef] = {
-    case ClientRequestCommandValue(_, bytes) => bytes
+  val deliverClient: PartialFunction[Payload, AnyRef] = {
+    case Payload(_, ClientRequestCommandValue(_, bytes)) => bytes
   }
 
-  override def deliver(value: CommandValue): Array[Byte] = {
-    delivered.append(value)
-    value match {
+  override def deliver(payload: Payload): Array[Byte] = {
+    delivered.append(payload)
+    payload.command match {
       case ClientRequestCommandValue(_, bytes) =>
         if (bytes.length > 0) Array[Byte]((-bytes(0)).toByte) else bytes
       case noop@NoOperationCommandValue => noop.bytes
@@ -81,7 +81,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
   // the journals
   var journal = Map.empty[Int, TestJournal]
   // the values delivered to the application
-  var delivered = Map.empty[Int, ArrayBuffer[CommandValue]]
+  var delivered = Map.empty[Int, ArrayBuffer[Payload]]
   // lookup of which client sent which data so we can route it back correctly
   var valuesToClients = Map.empty[Byte, ActorRef]
   // last leader so we can kill it
@@ -98,7 +98,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
   (0 until size) foreach { i =>
     val node = new TestJournal
     journal = journal + (i -> node)
-    val deliver: ArrayBuffer[CommandValue] = ArrayBuffer.empty
+    val deliver: ArrayBuffer[Payload] = ArrayBuffer.empty
     delivered = delivered + (i -> deliver)
     val actor: ActorRef = context.actorOf(Props(classOf[TestPaxosActorWithTimeout], PaxosActor.Configuration(config, size), i, self, node, deliver, Some(recordTraceData _)))
     children = children + (i -> actor)
@@ -148,33 +148,34 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
     case NotLeader(from, msgId) =>
       val child = nextRoundRobinNode(sender)
       val v@ClientRequestCommandValue(_, bytes) = valueByMsgId(msgId)
-      log.info("Test cluster resending {} to node {}", bytes(0), invertedChildren(child))
+      log.info("NotLeader {} trying {} to {}", from, bytes(0), invertedChildren(child))
       context.system.scheduler.scheduleOnce(10 millis, child, v)
     case p: Prepare =>
       log.info(s"$sender sent $p broadcasting")
       children foreach {
         case (id, actor) if id != p.id.from =>
+          log.info(s"$id <- $p : $actor <- $sender")
           actor ! p
         case _ =>
       }
     case p: PrepareResponse =>
       children foreach {
         case (id, actor) if id == p.requestId.from =>
-          log.info(s"$sender sent $p to $actor")
+          log.info(s"$id <- $p : $actor <- $sender")
           actor ! p
         case _ =>
       }
     case a: Accept =>
       children foreach {
         case (id, actor) if id != a.id.from =>
-          log.info(s"$sender sent $a to $actor")
+          log.info(s"$id <- $a : $actor <- $sender")
           actor ! a
         case _ =>
       }
     case a: AcceptResponse =>
       children foreach {
         case (id, actor) if id == a.requestId.from =>
-          log.info(s"$sender sent $a to $actor")
+          log.info(s"$id <- $a : $actor <- $sender")
           actor ! a
         case _ =>
       }
@@ -182,20 +183,21 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       log.info(s"$sender sent $c broadcasting")
       children foreach {
         case (id, actor) if id != c.identifier.from =>
+          log.info(s"$id <- $c : $actor <- $sender")
           actor ! c
         case _ =>
       }
     case r@RetransmitRequest(_, to, _) =>
       children foreach {
         case (id, actor) if to == id =>
-          log.info(s"$sender sent $r to $actor")
+          log.info(s"$id <- $r : $actor <- $sender")
           actor ! r
         case _ =>
       }
     case r: RetransmitResponse =>
-      log.info(s"$sender sent $r to ${r.to}")
       children foreach {
         case (id, actor) if r.to == id =>
+          log.info(s"$id <- $r : $actor <- $sender")
           actor ! r
         case _ =>
       }
@@ -222,6 +224,9 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
         c => c ! PoisonPill.getInstance
       }
       self ! PoisonPill.getInstance
+
+      // output what was committed
+      sender ! delivered
     case "KillLeader" =>
       log.info(s"killing leader {}", invertedChildren(lastLeader))
       lastLeader ! PoisonPill.getInstance

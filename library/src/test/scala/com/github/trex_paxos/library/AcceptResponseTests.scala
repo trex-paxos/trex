@@ -165,6 +165,8 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
         override def journal: Journal = mockJournal
 
         override def send(msg: PaxosMessage): Unit = sent += msg
+
+        override def deliver(payload: Payload): Any = {}
       }
 
       // when
@@ -232,6 +234,8 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
         override def send(msg: PaxosMessage): Unit = {}
 
         override def respond(client: String, data: Any): Unit = responds += client
+
+        override def deliver(payload: Payload): Any = {}
       }
 
       // when

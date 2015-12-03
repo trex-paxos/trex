@@ -464,6 +464,8 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
           sentTime.set(System.nanoTime())
           sent += msg
         }
+
+        override def deliver(payload: Payload): Any = {}
       }
       // when a majority prepare response with an ack from node1
       val prepareAck = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
@@ -515,8 +517,8 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
           sent += msg
         }
 
-        override def deliver(value: CommandValue): Any = {
-          lastDelivered.set(value)
+        override def deliver(payload: Payload): Any = {
+          lastDelivered.set(payload.command)
           value
         }
       }
@@ -575,6 +577,8 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
           sentTime.set(System.nanoTime())
           sent += msg
         }
+
+        override def deliver(payload: Payload): Any = {}
       }
       // when a majority prepare response with an ack from node1 and node2
       val ack1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
@@ -632,8 +636,8 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
           sent += msg
         }
 
-        override def deliver(value: CommandValue): Any = {
-          lastDelivered.set(value)
+        override def deliver(payload: Payload): Any = {
+          lastDelivered.set(payload.command)
           value
         }
       }

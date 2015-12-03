@@ -16,7 +16,7 @@ with CommitHandler {
   import Vote._
 
   def handleAcceptResponse(io: PaxosIO, agent: PaxosAgent, vote: AcceptResponse): PaxosAgent = {
-
+    io.logger.debug("{} sees response {}", agent.nodeUniqueId, vote)
     val highestCommitted = agent.data.progress.highestCommitted.logIndex
     val highestCommittedOther = vote.progress.highestCommitted.logIndex
     highestCommitted < highestCommittedOther match {
@@ -76,7 +76,6 @@ with CommitHandler {
             // headOption isn't None so lastOption must be defined
             val (lastId, _) = committable.lastOption.getOrElse(unreachable)
             processCommit(io, agent.copy(data = votesData), lastId)
-
         }
 
       case Some(SplitVote) =>
@@ -94,6 +93,8 @@ with CommitHandler {
   def processCommit(io: PaxosIO, agent: PaxosAgent, lastId: Identifier) = {
     val (newProgress, results) = commit(io, agent, lastId)
 
+    io.logger.debug("Node {} committed {} with new progress {} and results {}", agent.nodeUniqueId, lastId, newProgress, results)
+
     io.journal.save(newProgress)
 
     io.send(Commit(newProgress.highestCommitted))
@@ -110,7 +111,7 @@ with CommitHandler {
       io.logger.debug("Node {} {} post commit has responds.size={}, remainders.size={}", agent.nodeUniqueId, agent.role, responds.size, remainders.size)
       results foreach { case (id, bytes) =>
         responds.get(id) foreach { case (cmd, client) =>
-          io.logger.debug("sending response from accept {} to {}", id, client)
+          io.logger.debug("sending client response {} to client {}", id, client)
           io.respond(client, bytes)
         }
       }

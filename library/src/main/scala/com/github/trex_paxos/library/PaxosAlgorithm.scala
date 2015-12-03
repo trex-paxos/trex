@@ -13,7 +13,7 @@ trait PaxosIO {
 
   def clock: Long
 
-  def deliver(value: CommandValue): Any
+  def deliver(payload: Payload): Any
 
   def send(msg: PaxosMessage)
 

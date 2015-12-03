@@ -21,7 +21,7 @@ class UndefinedIO extends PaxosIO{
 
   override def send(msg: PaxosMessage): Unit = throw new AssertionError("deliberately not implemented")
 
-  override def deliver(value: CommandValue): Any = throw new AssertionError("deliberately not implemented")
+  override def deliver(payload: Payload): Any = throw new AssertionError("deliberately not implemented")
 
   override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = throw new AssertionError("deliberately not implemented")
 

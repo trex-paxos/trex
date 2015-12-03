@@ -112,18 +112,26 @@ with AkkaLoggingAdapter {
   def trace(event: PaxosEvent, sender: String, sent: collection.immutable.Seq[PaxosMessage]): Unit = {}
 
   /**
-   * The deliver method is called when the value is committed.
-   * @param value The committed value command to deliver.
+   * The deliver method is called when a command is committed after having been selected by consensus.
+   * @param payload The selected value and a delivery id that can be used to deduplicate deliveries during crash recovery.
    * @return The response to the value command that has been delivered. May be an empty array.
    */
-  def deliver(value: CommandValue): Any = (deliverClient orElse deliverMembership)(value)
+  def deliver(payload: Payload): Any = (filteredDeliverClient orElse deliverMembership)(payload)
+
+  /**
+   * The consensus algorithm my commit noop values which are filtered out rather than being passed to the client code.
+   */
+  val filteredDeliverClient: PartialFunction[Payload, Any] = {
+    case Payload(_, NoOperationCommandValue) => NoOperationCommandValue.bytes
+    case p => deliverClient(p)
+  }
 
   /**
    * The cluster membership finite state machine. The new membership has been chosen but will come into effect
    * only for the next message for which we generate an accept message.
    */
-  val deliverMembership: PartialFunction[CommandValue, Array[Byte]] = {
-    case m@MembershipCommandValue(_, members) =>
+  val deliverMembership: PartialFunction[Payload, Array[Byte]] = {
+    case Payload(_, m@MembershipCommandValue(_, members)) =>
       throw new AssertionError("not yet implemented")
   }
 
@@ -151,7 +159,7 @@ with AkkaLoggingAdapter {
    * The host application finite state machine invocation.
    * This method is abstract as the implementation is specific to the host application.
    */
-  val deliverClient: PartialFunction[CommandValue, AnyRef]
+  val deliverClient: PartialFunction[Payload, AnyRef]
 
 }
 

@@ -24,10 +24,9 @@ trait CommitHandler extends PaxosLenses {
     committable.lastOption match {
       case Some(newHighestCommitted) =>
         val results = committable map { a =>
-          val bytes = a.value match {
-            case noop@NoOperationCommandValue => noop.bytes
-            case _ => io.deliver(a.value)
-          }
+          val p = Payload(a.id.logIndex, a.value)
+          io.logger.debug("Node {} delivering {}", agent.nodeUniqueId, p)
+          val bytes = io.deliver(p)
           (a.id, bytes)
         }
         val newProgress = Progress.highestCommittedLens.set(agent.data.progress, newHighestCommitted.id)
@@ -40,6 +39,7 @@ trait CommitHandler extends PaxosLenses {
   }
 
   def handleFollowerCommit(io: PaxosIO, agent: PaxosAgent, c: Commit): PaxosAgent = {
+    io.logger.debug("Node {} sees {}", agent.nodeUniqueId, c)
     val heartbeat = c.heartbeat
     val oldData = agent.data
     val i = c.identifier
@@ -63,6 +63,8 @@ trait CommitHandler extends PaxosLenses {
       if (newHighestCommitted < i.logIndex) {
         io.logger.info("Node {} attempted commit of {} for log index {} found missing accept messages so have only committed up to {} and am requesting retransmission", agent.nodeUniqueId, i, i.logIndex, newHighestCommitted)
         io.send(RetransmitRequest(agent.nodeUniqueId, i.from, newHighestCommitted))
+      } else {
+        io.logger.debug("Node {} committed up to {}", agent.nodeUniqueId, newHighestCommitted)
       }
       agent.copy(data = progressLens.set(newData, newProgress))
     }
