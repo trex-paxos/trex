@@ -1,6 +1,9 @@
 package com.github.trex_paxos
 
 import java.io.FileWriter
+import java.util
+import java.util.Collections
+import java.util.concurrent.CopyOnWriteArrayList
 
 import akka.actor._
 import com.github.trex_paxos.internals.PaxosActor.TraceData
@@ -9,9 +12,11 @@ import com.github.trex_paxos.library._
 import com.typesafe.config.Config
 
 import scala.collection.immutable.{Seq, SortedMap}
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable
+import scala.concurrent.JavaConversions
 import scala.language.postfixOps
 import scala.util.Try
+
 
 class TestJournal extends Journal {
   private var _progress = Journal.minBookwork.copy()
@@ -33,7 +38,7 @@ class TestJournal extends Journal {
   }
 }
 
-class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: ArrayBuffer[Payload], tracer: Option[PaxosActor.Tracer])
+class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: mutable.Buffer[Payload], tracer: Option[PaxosActor.Tracer])
   extends PaxosActorWithTimeout(config, nodeUniqueId, broadcastRef, journal) {
 
   def broadcast(msg: Any): Unit = send(broadcastRef, msg)
@@ -66,11 +71,11 @@ object ClusterHarness {
 }
 
 /**
- * Synthetically simulates the network between actors and allows us to interfere with nodes (e.g. crash, suspend, ...)
- *
- * @param size The cluster size
- * @param config The cluster config
- */
+  * Synthetically simulates the network between actors and allows us to interfere with nodes (e.g. crash, suspend, ...)
+  *
+  * @param size The cluster size
+  * @param config The cluster config
+  */
 class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogging {
 
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -81,7 +86,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
   // the journals
   var journal = Map.empty[Int, TestJournal]
   // the values delivered to the application
-  var delivered = Map.empty[Int, ArrayBuffer[Payload]]
+  var delivered = Map.empty[Int, mutable.Buffer[Payload]]
   // lookup of which client sent which data so we can route it back correctly
   var valuesToClients = Map.empty[Byte, ActorRef]
   // last leader so we can kill it
@@ -91,14 +96,14 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
   // record what each node saw in which state for debugging a full trace
   var tracedData = SortedMap.empty[Int, Seq[TraceData]]
 
-  def recordTraceData(data:TraceData): Unit = {
+  def recordTraceData(data: TraceData): Unit = {
     tracedData = tracedData + (data.nodeUniqueId -> (tracedData(data.nodeUniqueId) :+ data))
   }
 
   (0 until size) foreach { i =>
     val node = new TestJournal
     journal = journal + (i -> node)
-    val deliver: ArrayBuffer[Payload] = ArrayBuffer.empty
+    val deliver: mutable.Buffer[Payload] = collection.JavaConversions.asScalaBuffer(new CopyOnWriteArrayList[Payload])
     delivered = delivered + (i -> deliver)
     val actor: ActorRef = context.actorOf(Props(classOf[TestPaxosActorWithTimeout], PaxosActor.Configuration(config, size), i, self, node, deliver, Some(recordTraceData _)))
     children = children + (i -> actor)

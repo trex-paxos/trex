@@ -6,6 +6,7 @@ import com.github.trex_paxos.library.{Payload, ClientRequestCommandValue, NoLong
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.{BeforeAndAfterAll, _}
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 
@@ -26,7 +27,7 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
   // counts the number of delivered client bytes matches the cluster size
   def check(cluster: ClusterHarness): Boolean = {
 
-    val delivered: Seq[ArrayBuffer[Payload]] = cluster.delivered.values.toSeq
+    val delivered: Seq[mutable.Buffer[Payload]] = cluster.delivered.values.toSeq
 
     val count = (0 until cluster.size).foldLeft(0){ (count, i) =>
       val found = delivered(i) map {
@@ -60,7 +61,7 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
     }
 
     // await all the nodes having delivered the one byte sent by the client
-    awaitCond(check(ref.underlyingActor), 6 seconds, 1 second)
+    awaitCond(check(ref.underlyingActor), 6 seconds, 200 millisecond)
 
     // kill off that cluster
     ref ! ClusterHarness.Halt

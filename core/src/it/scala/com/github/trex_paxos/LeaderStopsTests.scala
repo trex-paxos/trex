@@ -7,9 +7,11 @@ import com.github.trex_paxos.library._
 import org.scalatest._
 
 import scala.collection.immutable.Iterable
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Await
 import scala.language.postfixOps
+import scala.collection.mutable.Buffer
 
 class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
   NoFailureTests.spacedTimeoutConfig)) with SpecLike with ImplicitSender with BeforeAndAfterAll with BeforeAndAfter with Matchers {
@@ -38,7 +40,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
 
     def send: Unit = {
       // when we sent it the application value of 1.toByte
-      system.scheduler.scheduleOnce(400 millis, clusterHarness(), ClientRequestCommandValue(0, Array[Byte](data())))
+      system.scheduler.scheduleOnce(50 millis, clusterHarness(), ClientRequestCommandValue(0, Array[Byte](data())))
 
       // it commits and sends by the response of -1.toByte
       expectMsgPF(2 second) {
@@ -65,15 +67,32 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
     import akka.pattern.ask
     implicit val timeout = Timeout(2 seconds)
 
+    awaitCond(check(clusterHarness().underlyingActor), 12 seconds, 200 millisecond)
+
     // shutdown the actor and have it tell us what was committed
     val future = clusterHarness().ask(ClusterHarness.Halt)
 
-    val delivered = Await.result(future, 2 seconds).asInstanceOf[Map[Int, ArrayBuffer[Payload]]]
+    val delivered = Await.result(future, 2 seconds).asInstanceOf[Map[Int, Buffer[Payload]]]
 
     consistentDeliveries(delivered)
   }
 
-  def consistentDeliveries(delivered: Map[Int, ArrayBuffer[Payload]]): Unit = {
+  // counts the number of delivered client bytes matches 2x cluster size - 1
+  def check(cluster: ClusterHarness): Boolean = {
+
+    val delivered: Seq[mutable.Buffer[Payload]] = cluster.delivered.values.toSeq
+
+    val count = (0 until cluster.size).foldLeft(0){ (count, i) =>
+      val found = delivered(i) map {
+        case Payload(_, c: ClientRequestCommandValue) => 1
+        case _ => 0
+      }
+      count + found.sum
+    }
+    count == 2 * cluster.size - 1
+  }
+
+  def consistentDeliveries(delivered: Map[Int, Buffer[Payload]]): Unit = {
 
     // slots are committed in ascending order with possible repeats and no gaps
     delivered.values foreach { values =>
