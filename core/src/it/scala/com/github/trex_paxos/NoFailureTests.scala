@@ -51,7 +51,7 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
 
     // when we sent it the application value of 1.toByte after 0.4s for the cluster to stabilize
     val expectedMsgId = 123456789L
-    system.scheduler.scheduleOnce(400 millis, ref, ClientRequestCommandValue(expectedMsgId, Array[Byte](1)))
+    system.scheduler.scheduleOnce(200 millis, ref, ClientRequestCommandValue(expectedMsgId, Array[Byte](1)))
 
     // it commits and sends by the response of -1.toByte else replies that it has lost the leadership
     expectMsgPF(12 second) {
@@ -61,7 +61,7 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
     }
 
     // await all the nodes having delivered the one byte sent by the client
-    awaitCond(check(ref.underlyingActor), 6 seconds, 200 millisecond)
+    awaitCond(check(ref.underlyingActor), 20 seconds, 200 millisecond)
 
     // kill off that cluster
     ref ! ClusterHarness.Halt

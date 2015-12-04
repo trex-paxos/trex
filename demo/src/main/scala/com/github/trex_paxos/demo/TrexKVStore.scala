@@ -1,15 +1,14 @@
 package com.github.trex_paxos.demo
 
-import java.net.InetSocketAddress
-
 import akka.actor._
-import com.github.trex_paxos.{TrexServer, Cluster, StaticClusterDriver}
-import com.github.trex_paxos.internals.{FileJournal, PaxosActor}
-import scala.language.postfixOps
-import scala.concurrent.duration._
 import akka.util.Timeout
+import com.github.trex_paxos.internals.{FileJournal, PaxosActor}
+import com.github.trex_paxos.{Cluster, StaticClusterDriver, TrexServer}
 import com.typesafe.config._
 import org.mapdb.{DB, DBMaker}
+
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 object TrexKVClient {
   def usage(): Unit = {

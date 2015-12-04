@@ -40,7 +40,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
 
     def send: Unit = {
       // when we sent it the application value of 1.toByte
-      system.scheduler.scheduleOnce(50 millis, clusterHarness(), ClientRequestCommandValue(0, Array[Byte](data())))
+      system.scheduler.scheduleOnce(200 millis, clusterHarness(), ClientRequestCommandValue(0, Array[Byte](data())))
 
       // it commits and sends by the response of -1.toByte
       expectMsgPF(2 second) {
@@ -67,7 +67,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
     import akka.pattern.ask
     implicit val timeout = Timeout(2 seconds)
 
-    awaitCond(check(clusterHarness().underlyingActor), 12 seconds, 200 millisecond)
+    awaitCond(check(clusterHarness().underlyingActor), 20 seconds, 200 millisecond)
 
     // shutdown the actor and have it tell us what was committed
     val future = clusterHarness().ask(ClusterHarness.Halt)
