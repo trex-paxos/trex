@@ -22,7 +22,6 @@ lazy val library = project.settings(commonSettings: _*).
     )
   )
 
-
 lazy val core = project.dependsOn(library).
   configs(IntegrationTest).
   settings(commonSettings: _*).
