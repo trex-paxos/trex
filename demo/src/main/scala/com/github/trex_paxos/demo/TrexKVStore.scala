@@ -26,7 +26,7 @@ object TrexKVClient {
     val cluster = Cluster.parseConfig(config)
 
     val system =
-      ActorSystem(cluster.name, ConfigFactory.load("client.conf"))
+      ActorSystem(cluster.name, ConfigFactory.load("client2.conf"))
 
     val timeout = Timeout(100 millisecond)
 
@@ -116,7 +116,7 @@ object TrexKVStore {
         val journal = new FileJournal(logFile, cluster.retained)
         // actor system with the node config
         val system =
-          ActorSystem(cluster.name, ConfigFactory.load("server.conf").withValue("akka.remote.netty.tcp.port", ConfigValueFactory.fromAnyRef(node.clientPort)))
+          ActorSystem(cluster.name, ConfigFactory.load("server3.conf").withValue("akka.remote.netty.tcp.port", ConfigValueFactory.fromAnyRef(node.clientPort)))
         // generic entry point accepts TypedActor MethodCall messages and reflectively invokes them on our client app
         system.actorOf(Props(classOf[TrexServer], cluster, PaxosActor.Configuration(config, cluster.nodes.size), node.id, journal, target))
 
