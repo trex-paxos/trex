@@ -75,7 +75,7 @@ with AkkaLoggingAdapter {
 
   def transmit(sender: ActorRef): Unit = {
     this.sent foreach {
-      case m@(_: RetransmitRequest | _: RetransmitResponse | _: AcceptResponse | _: PrepareResponse) => send(sender, m)
+      case m@(_: RetransmitRequest | _: RetransmitResponse | _: AcceptResponse | _: PrepareResponse | _: NotLeader ) => send(sender, m)
       case m => broadcast(m)
     }
     this.sent = collection.immutable.Seq()
