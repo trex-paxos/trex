@@ -22,11 +22,12 @@ object TrexKVClient {
       System.exit(1)
     }
     args.foreach(println(_))
-    val config = ConfigFactory.load(args(0))
+    val configName = args(0)
+    val config = ConfigFactory.load(configName)
     val cluster = Cluster.parseConfig(config)
 
     val system =
-      ActorSystem(cluster.name, ConfigFactory.load("client2.conf"))
+      ActorSystem(cluster.name, ConfigFactory.load(configName))
 
     val timeout = Timeout(100 millisecond)
 
@@ -92,9 +93,11 @@ object TrexKVStore {
       System.exit(1)
     }
     args.foreach(println(_))
-    val config = ConfigFactory.load(args(0))
-    val cluster = Cluster.parseConfig(config)
+    val configName = args(0)
     val nodeId = args(1).toInt
+    val config = ConfigFactory.load(configName)
+    val cluster = Cluster.parseConfig(config)
+    val node = cluster.nodeMap.getOrElse(nodeId, throw new IllegalArgumentException(s"No node $nodeId in $cluster"))
 
     println(cluster)
     val nodeMap = cluster.nodes.map(node => (node.id, node)).toMap
@@ -114,9 +117,12 @@ object TrexKVStore {
         val logFile = new java.io.File(folder.getCanonicalPath + "/paxos")
         println(s"paxos data log is ${logFile.getCanonicalPath}")
         val journal = new FileJournal(logFile, cluster.retained)
+        val systemConfig = ConfigFactory.load(configName)
+          .withValue("akka.remote.netty.tcp.port", ConfigValueFactory.fromAnyRef(node.clientPort))
+          .withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(node.host))
+        println(systemConfig.toString)
         // actor system with the node config
-        val system =
-          ActorSystem(cluster.name, ConfigFactory.load("server3.conf").withValue("akka.remote.netty.tcp.port", ConfigValueFactory.fromAnyRef(node.clientPort)))
+        val system = ActorSystem(cluster.name, systemConfig)
         // generic entry point accepts TypedActor MethodCall messages and reflectively invokes them on our client app
         system.actorOf(Props(classOf[TrexServer], cluster, PaxosActor.Configuration(config, cluster.nodes.size), node.id, journal, target))
 
