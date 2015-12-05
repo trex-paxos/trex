@@ -12,22 +12,32 @@ import scala.language.postfixOps
 
 object TrexKVClient {
   def usage(): Unit = {
-    println("Args: conf")
+    println("Args: conf [hostname]")
     println("Where:\tconf is the config file defining the cluster")
+    println("Where:\thostname is the optional address of inbound response defaults to 127.0.0.1")
   }
 
   def main(args: Array[String]): Unit = {
-    if (args.length != 1) {
+    val argMap: Map[Int, String] = (args zipWithIndex).toMap.map(_.swap)
+
+    if (args.length != 1 && args.length != 2) {
       usage()
       System.exit(1)
     }
+
     args.foreach(println(_))
+
     val configName = args(0)
     val config = ConfigFactory.load(configName)
     val cluster = Cluster.parseConfig(config)
+    val hostname = argMap.getOrElse(1, "127.0.0.1")
+
+    val systemConfig = ConfigFactory.load(configName).withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(hostname))
+
+    println(systemConfig)
 
     val system =
-      ActorSystem(cluster.name, ConfigFactory.load(configName))
+      ActorSystem(cluster.name, systemConfig)
 
     val timeout = Timeout(100 millisecond)
 
