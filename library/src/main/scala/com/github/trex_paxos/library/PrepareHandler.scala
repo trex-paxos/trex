@@ -14,6 +14,7 @@ trait PrepareHandler extends PaxosLenses with BackdownAgent {
       case Prepare(id) if id.number == agent.data.progress.highestPromised =>
         io.send(PrepareAck(id, agent.nodeUniqueId, agent.data.progress, io.journal.bounds.max, agent.data.leaderHeartbeat, io.journal.accepted(id.logIndex)))
         agent
+      case f => throw new IllegalArgumentException(s"${f.getClass.getCanonicalName}:${f.toString}")
     }
   }
 
