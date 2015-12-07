@@ -11,17 +11,17 @@ class UnhandledTests extends WordSpecLike {
   "UnhandledHandler" should {
     "trace the event and log an error" in {
       // given
-      val loggedError = new AtomicReference[String]("")
+      val loggedError = Box("")
 
       val handler = new UnhandledHandler {
-        override def stderr(message: String): Unit = loggedError.set(loggedError.get +  message)
+        override def stderr(message: String): Unit = loggedError(loggedError() +  message)
       }
 
       val unknown = "~unknown message~"
 
       handler.handleUnhandled(new TestIO(new UndefinedJournal), PaxosAgent(99, Leader, initialData), unknown)
 
-      assert(loggedError.get.contains("99") && loggedError.get.contains("Leader") && loggedError.get.contains(unknown))
+      assert(loggedError().contains("99") && loggedError().contains("Leader") && loggedError().contains(unknown))
     }
   }
 }

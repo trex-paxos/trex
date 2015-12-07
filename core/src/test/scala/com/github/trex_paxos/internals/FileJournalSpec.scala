@@ -101,12 +101,12 @@ class FileJournalSpec extends WordSpecLike with Matchers with BeforeAndAfter wit
       assert(java.util.Arrays.equals(Pickle.pickle(accept).toArray, Pickle.pickle(readBackAccept).toArray))
     }
     "overwrite old values" in {
-      var n = 0
+      val n = Box(0)
       def next = {
-        val high = BallotNumber(n, n)
-        val logIndex = n.toLong
+        val high = BallotNumber(n(), n())
+        val logIndex = n().toLong
         val identifier = Identifier(1, high, logIndex)
-        n = n + 1
+        n(n() + 1)
         Accept(identifier, ClientRequestCommandValue(0, expectedBytes))
       }
 
@@ -114,7 +114,7 @@ class FileJournalSpec extends WordSpecLike with Matchers with BeforeAndAfter wit
 
       for (a <- 0 to 9) j.accept(next)
 
-      j.save(Progress(BallotNumber(n, n), Identifier(1, BallotNumber(n, n), 5)))
+      j.save(Progress(BallotNumber(n(), n()), Identifier(1, BallotNumber(n(), n()), 5)))
 
       val found = 1 to 10 flatMap {
         j.accepted(_)
@@ -137,12 +137,12 @@ class FileJournalSpec extends WordSpecLike with Matchers with BeforeAndAfter wit
       }
     }
     "return the bounds of the keys" in {
-      var n = 100
+      val n = Box(100)
       def next = {
-        val high = BallotNumber(n, n)
-        val logIndex = n.toLong
+        val high = BallotNumber(n(), n())
+        val logIndex = n().toLong
         val identifier = Identifier(1, high, logIndex)
-        n = n + 1
+        n(n() + 1)
         Accept(identifier, ClientRequestCommandValue(0, expectedBytes))
       }
 
