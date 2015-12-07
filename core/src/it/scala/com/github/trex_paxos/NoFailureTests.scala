@@ -67,7 +67,7 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
     ref ! ClusterHarness.Halt
 
     expectMsgPF(12 second) {
-      case m: Map[_,_] => // results we are ignoring as we verified during awaitCond
+      case _ => // results we are ignoring as we verified during awaitCond
     }
   }
 

@@ -22,7 +22,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
     TestKit.shutdownActorSystem(system)
   }
 
-  var clusterHarness = new Box[TestActorRef[ClusterHarness]](None)
+  val clusterHarness = new Box[TestActorRef[ClusterHarness]](None)
 
   after {
     clusterHarness() ! ClusterHarness.Halt
@@ -30,7 +30,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
 
   type Delivered = Map[Int, ArrayBuffer[Payload]]
 
-  var data = new Box[Byte](Option(1.toByte))
+  val data = new Box[Byte](Option(1.toByte))
 
   def testLeaderDying(clusterSize: Int): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global

@@ -63,6 +63,7 @@ with AkkaLoggingAdapter {
       trace(event, sender().toString(), sent)
       transmit(sender())
       paxosAgent = agent
+    case f => logger.error("Recieved unknown messages type so ignoring {}", f)
   }
 
   val minPrepare = Prepare(Identifier(nodeUniqueId, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
