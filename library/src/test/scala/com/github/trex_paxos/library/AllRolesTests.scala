@@ -9,12 +9,12 @@ import scala.collection.mutable.ArrayBuffer
 
 class InMemoryJournal extends Journal {
   val lastSaveTime = new AtomicLong()
-  val p = new AtomicReference[(Long, Progress)]()
+  val p: Box[(Long, Progress)] = new Box(None)
 
   override def save(progress: Progress): Unit = {
     val n = System.nanoTime()
     lastSaveTime.set(n)
-    p.set((n, progress))
+    p((n, progress))
   }
 
   override def bounds: JournalBounds = if( a.isEmpty ) {
@@ -24,7 +24,10 @@ class InMemoryJournal extends Journal {
     JournalBounds(slots.min, slots.max)
   }
 
-  override def load(): Progress = p.get()._2
+  override def load(): Progress = p() match {
+    case (_, p) => p
+    case f => throw new IllegalArgumentException(f.toString)
+  }
 
   // Map[logIndex,(nanoTs,accept)]
   val a = collection.mutable.Map.empty[Long, (Long, Accept)]
@@ -35,31 +38,34 @@ class InMemoryJournal extends Journal {
     a.put(i.id.logIndex, (n, i))
   }
 
-  override def accepted(logIndex: Long): Option[Accept] = a.get(logIndex).map(_._2)
+  override def accepted(logIndex: Long): Option[Accept] = a.get(logIndex).map {
+    case (_, a) => a
+    case f => throw new AssertionError(f.toString())
+  }
 
 }
 
 class TestAcceptMapJournal extends Journal {
-  var accept: Map[Long, Accept] = Map.empty
+  val accept = Box(Map[Long, Accept]())
 
   def accept(accepted: Accept*): Unit = accepted foreach { a =>
-    accept = accept + (a.id.logIndex -> a)
+    accept(accept() + (a.id.logIndex -> a))
   }
 
   def accepted(logIndex: Long): Option[Accept] = {
-    accept.get(logIndex)
+    accept().get(logIndex)
   }
 
   def bounds: JournalBounds = {
-    val keys = accept.keys
+    val keys = accept().keys
     if (keys.isEmpty) JournalBounds(0L, 0L) else JournalBounds(keys.head, keys.last)
   }
 
-  var progress: Progress = null
+  val progress: Box[Progress] = new Box(None)
 
-  def load(): Progress = progress
+  def load(): Progress = progress()
 
-  def save(p: Progress): Unit = progress = p
+  def save(p: Progress): Unit = progress(p)
 }
 
 class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValues with MockFactory {

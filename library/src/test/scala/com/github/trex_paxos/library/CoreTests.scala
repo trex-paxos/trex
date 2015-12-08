@@ -132,11 +132,11 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
         clientCommands = Map(id ->(NoOperationCommandValue, DummyRemoteRef()))
       )
       val handler = new PaxosLenses with BackdownAgent
-      var sentNoLongerLeader = false
+      val sentNoLongerLeader = Box(false)
       val io = new TestIO(new UndefinedJournal) {
         override def randomTimeout: Long = 99L
 
-        override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = sentNoLongerLeader = true
+        override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = sentNoLongerLeader(true)
       }
       // when we backdown
       val PaxosAgent(nuid, role, followerData) = handler.backdownAgent(io, PaxosAgent(0, Leader, leaderData))
@@ -148,7 +148,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
       followerData.epoch shouldBe None
       followerData.acceptResponses.isEmpty shouldBe true
       followerData.clientCommands.isEmpty shouldBe true
-      sentNoLongerLeader shouldBe true
+      sentNoLongerLeader() shouldBe true
     }
   }
 

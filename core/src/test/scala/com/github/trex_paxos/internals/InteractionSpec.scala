@@ -65,7 +65,10 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       expectMsg(50 millisecond, minPrepare)
       // and node one will nack the load prepare
       actor1 ! minPrepare
-      val nack: PrepareNack = expectMsgPF(50 millisecond) { case p: PrepareNack => p }
+      val nack: PrepareNack = expectMsgPF(50 millisecond) {
+        case p: PrepareNack => p
+        case f => fail(f.toString)
+      }
       // which will cause node zero to issue a higher prepare
       nack.requestId.from should be(0)
       // when we send it back to node zero
@@ -89,7 +92,10 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       actor0 ! pack
 
       // it will issue a noop accept
-      val accept: Accept = expectMsgPF(50 millisecond) { case a: Accept => a }
+      val accept: Accept = expectMsgPF(50 millisecond) {
+        case a: Accept => a
+        case f => fail(f.toString)
+      }
 
       accept.id.logIndex should be(1)
       accept.value shouldBe NoOperationCommandValue
@@ -111,7 +117,10 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       actor1 ! accept
 
       // it will ack
-      val aack: AcceptAck = expectMsgPF(50 millisecond) { case a: AcceptAck => a }
+      val aack: AcceptAck = expectMsgPF(50 millisecond) {
+        case a: AcceptAck => a
+        case f => fail(f.toString)
+      }
       aack.requestId should be(accept.id)
       // when we send that to node zero
       actor0 ! aack
@@ -195,6 +204,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         client.expectMsgPF(50 millis) {
           case bytes: Array[Byte] =>
             bytes(0) should be(-1 * msg)
+          case f => fail(f.toString)
         }
       }
     }
@@ -429,6 +439,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       // it commits
       expectMsgPF(50 millisecond) {
         case c: Commit => // good
+        case f => fail(f.toString)
       }
 
       // when we send accept1 to node1 it will ack and node0 will commit
@@ -443,6 +454,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       // it commits
       expectMsgPF(50 millisecond) {
         case c: Commit => // good
+        case f => fail(f.toString)
       }
       // when we send accept1 to node1 it will ack and node0 will commit
       actor1 ! accept3

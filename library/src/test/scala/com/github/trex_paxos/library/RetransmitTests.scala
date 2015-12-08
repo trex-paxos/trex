@@ -62,7 +62,7 @@ with OptionValues {
       // when we send it a request and we have only uncommitted values
       val testIO = new TestIO(new UndefinedJournal){
         override def send(msg: PaxosMessage): Unit = {
-          sent = sent :+ MessageAndTimestamp(msg, 0L)
+          sent(sent() :+ MessageAndTimestamp(msg, 0L))
         }
 
         override def journal: Journal = stubJournal
@@ -70,7 +70,7 @@ with OptionValues {
       handler.handleRetransmitRequest(testIO, PaxosAgent(99, Leader, initialDataCommittedSlotOne), RetransmitRequest(2, 0, 0L))
       // then
       val expected = RetransmitResponse(99, 2, Seq(a98), Seq(a99))
-      testIO.sent.headOption.value match {
+      testIO.sent().headOption.value match {
         case MessageAndTimestamp(msg, 0L) if msg == expected => // good
         case x => fail(s"$x != $expected")
       }
@@ -165,7 +165,10 @@ with OptionValues {
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
-      assert(retransmission.committed.headOption.value._2 eq a99.value)
+      retransmission.committed.headOption.value match {
+        case (_, value) if value eq a99.value => // good
+        case f => fail(f.toString)
+      }
     }
 
     "only select commands contiguous with its last commit" in {

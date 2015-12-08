@@ -184,7 +184,10 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     }
     data.epoch shouldBe Some(newEpoch)
     data.timeout shouldBe 12345L
-    val saveTime = tempJournal.p.get()._1
+    val saveTime = tempJournal.p() match {
+      case (t, _) => t
+      case f => throw new IllegalArgumentException(f.toString)
+    }
     assert(saveTime != 0 && sentTime.get() != 0 && saveTime < sentTime.get())
   }
   def sendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(role: PaxosRole) {

@@ -128,6 +128,7 @@ class PickleTests extends WordSpecLike with Matchers {
                 assert(bequals(Array[Byte](5, 6), bout))
               case f => fail(f.toString)
             }
+          case f => fail(f.toString)
         }
       }
     }
@@ -163,6 +164,7 @@ class PickleTests extends WordSpecLike with Matchers {
             case f => fail(f.toString)
           }
         }
+        case f => fail(f.toString)
       }
     }
 
@@ -177,6 +179,7 @@ class PickleTests extends WordSpecLike with Matchers {
                   bequals(b1, b2)
                 case f => fail(f.toString)
               }
+            case f => fail(f.toString)
           }
         } else false
       } else false

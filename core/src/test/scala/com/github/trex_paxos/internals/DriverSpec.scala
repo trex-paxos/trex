@@ -211,7 +211,10 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
         case f => fail(f.toString)
       }
 
-      Seq(testProbe1, testProbe2, testProbe3).foreach(_.receiveN(2).map({ case ClientRequestCommandValue(_, bytes) => fromBinary(bytes) }) should be(Seq("hello world", "hello world")))
+      Seq(testProbe1, testProbe2, testProbe3).foreach(_.receiveN(2).map({
+        case ClientRequestCommandValue(_, bytes) => fromBinary(bytes)
+        case f => fail(f.toString)
+      }) should be(Seq("hello world", "hello world")))
     }
 
   }

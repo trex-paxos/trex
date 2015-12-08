@@ -34,7 +34,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val agent = PaxosAgent(1, Follower, TestHelpers.initialData)
       val io = new TestIO(journal)
       handler.handleAccept(io, agent, accept)
-      io.sent.headOption.value match {
+      io.sent().headOption.value match {
         case MessageAndTimestamp(ack: AcceptAck, sendTs) if ack.requestId == id && saveTs.longValue() < sendTs => // good
         case x => fail(x.toString)
       }
@@ -56,7 +56,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val handler = new TestAcceptHandler
       val PaxosAgent(_, Follower, newData) = handler.handleAccept(io, agent, accept)
       assert(saveTs != 0L)
-      io.sent.headOption.value match {
+      io.sent().headOption.value match {
         case MessageAndTimestamp(ack: AcceptAck, sendTs) if ack.requestId == id && saveTs.longValue() < sendTs => // good
         case x => fail(x.toString)
       }
@@ -82,7 +82,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val io = new TestIO(stubJournal)
       val PaxosAgent(_, Follower, newData) = handler.handleAccept(io, agent, accepted)
       // it acks
-      io.sent.headOption.value match {
+      io.sent().headOption.value match {
         case MessageAndTimestamp(ack: AcceptAck, _) => // good
         case x => fail(x.toString)
       }
@@ -105,7 +105,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val io = new TestIO(stubJournal)
       val PaxosAgent(_, Follower, newData) = handler.handleAccept(io, agent, acceptedAccept)
       // it nacks
-      io.sent.headOption.value match {
+      io.sent().headOption.value match {
         case MessageAndTimestamp(ack: AcceptNack, _) => // good
         case x => fail(x.toString)
       }
@@ -121,7 +121,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val agent = PaxosAgent(1, Follower, TestHelpers.initialData)
       val io = new TestIO(journal)
       handler.handleAccept(io, agent, accept)
-      io.sent.headOption.value match {
+      io.sent().headOption.value match {
         case MessageAndTimestamp(ack: AcceptNack, _) => // good
         case x => fail(x.toString)
       }

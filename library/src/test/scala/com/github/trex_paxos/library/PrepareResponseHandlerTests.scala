@@ -155,9 +155,9 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       // and an ack vote showing no higher accepted log index
       val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), recoverHighPrepare.id.logIndex, 13, None)
       // and a journal which records save and send time
-      var saved: Option[TimeAndParameter] = None
+      val saved: Box[TimeAndParameter] = new Box(None)
       val journal = new UndefinedJournal {
-        override def accept(a: Accept*): Unit = saved = Some(TimeAndParameter(System.nanoTime(), a))
+        override def accept(a: Accept*): Unit = saved(TimeAndParameter(System.nanoTime(), a))
       }
       // and an IO that records send time
       val io = new TestIO(journal) {
@@ -198,8 +198,8 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
         case TimeAndMessage(a: Accept, ts: Long) => ts
         case f => fail(f.toString)
       }
-      assert(saved.value.time < sendTime)
-      saved.value.parameter match {
+      assert(saved().time < sendTime)
+      saved().parameter match {
         case Seq(a: Accept) if a.id.logIndex == 1 => // good
         case f => fail(f.toString)
       }

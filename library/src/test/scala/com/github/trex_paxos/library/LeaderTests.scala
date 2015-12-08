@@ -75,21 +75,21 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
     }
 
     def `should deal with timed-out prepares before timed-out accepts` {
-      var handleResendAcceptsInvoked = false
-      var handleResendPreparesInvoked = false
+      val handleResendAcceptsInvoked = Box(false)
+      val handleResendPreparesInvoked = Box(false)
       val paxosAlgorithm = new PaxosAlgorithm {
         override def handleResendAccepts(io: PaxosIO, agent: PaxosAgent, time: Long): PaxosAgent = {
-          handleResendAcceptsInvoked = true
+          handleResendAcceptsInvoked(true)
           agent
         }
         override def handleResendPrepares(io: PaxosIO, agent: PaxosAgent, time: Long): PaxosAgent = {
-          handleResendPreparesInvoked = true
+          handleResendPreparesInvoked(true)
           agent
         }
       }
       val agent = PaxosAgent(0, Leader, initialData.copy(prepareResponses = prepareSelfVotes, acceptResponses = emptyAcceptResponses))
       paxosAlgorithm.leaderFunction(PaxosEvent(maxClockIO, agent, CheckTimeout))
-      assert(handleResendPreparesInvoked == true && handleResendAcceptsInvoked == false)
+      assert(handleResendPreparesInvoked() == true && handleResendAcceptsInvoked() == false)
     }
 
     def `should be defined for a commit at a higher log index` {
@@ -285,8 +285,8 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
         case f => fail(f.toString)
       }
       // and journal bookwork
-      Option(inMemoryJournal.p.get) match {
-        case Some((_, p)) if p == leader.data.progress => // good
+     inMemoryJournal.p() match {
+        case (_, p) if p == leader.data.progress => // good
         case x => fail(x.toString)
       }
       // and deletes the pending work
@@ -359,8 +359,8 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
         case f => fail(f.toString)
       }
       // and journal bookwork
-      Option(inMemoryJournal.p.get) match {
-        case Some((_, p)) if p == leader.data.progress => // good
+      inMemoryJournal.p() match {
+        case (_, p) if p == leader.data.progress => // good
         case x => fail(x.toString)
       }
       // and deletes the pending work

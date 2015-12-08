@@ -130,6 +130,7 @@ class FileJournalSpec extends WordSpecLike with Matchers with BeforeAndAfter wit
           assert(a == b)
           assert(index == a)
           index
+        case f => fail(f.toString)
       }).toSet
 
       3 to 9 foreach { index =>

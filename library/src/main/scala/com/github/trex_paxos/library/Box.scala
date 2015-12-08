@@ -20,6 +20,6 @@ class Box[T](value: Option[T]) {
 
 object Box {
   def apply[T](value: T): Box[T] = {
-    return new Box[T](Option(value))
+    new Box[T](Option(value))
   }
 }

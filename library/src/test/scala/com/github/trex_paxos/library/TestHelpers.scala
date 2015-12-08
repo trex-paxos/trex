@@ -62,10 +62,10 @@ class UndefinedJournal extends Journal {
 case class MessageAndTimestamp(msg: PaxosMessage, ts: Long)
 
 class TestIO(j: Journal) extends UndefinedIO {
-  var sent: Seq[MessageAndTimestamp] = Seq()
+  var sent = Box(Seq[MessageAndTimestamp]())
 
   override def send(msg: PaxosMessage): Unit = {
-    sent = sent :+ MessageAndTimestamp(msg, System.nanoTime)
+    sent(sent() :+ MessageAndTimestamp(msg, System.nanoTime))
   }
 
   override def journal: Journal = j
