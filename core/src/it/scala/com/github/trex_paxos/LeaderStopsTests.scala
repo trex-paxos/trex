@@ -6,12 +6,10 @@ import akka.util.Timeout
 import com.github.trex_paxos.library._
 import org.scalatest._
 
-import scala.collection.immutable.Iterable
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{ArrayBuffer, Buffer}
 import scala.concurrent.Await
 import scala.language.postfixOps
-import scala.collection.mutable.Buffer
 
 class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
   NoFailureTests.spacedTimeoutConfig)) with SpecLike with ImplicitSender with BeforeAndAfterAll with BeforeAndAfter with Matchers {

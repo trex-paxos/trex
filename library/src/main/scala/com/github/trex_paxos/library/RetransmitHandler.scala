@@ -66,6 +66,7 @@ trait RetransmitHandler extends PaxosLenses {
     val responseData: Option[RetransmitResponse] = processRetransmitRequest(io.journal.bounds, committedLogIndex, io.journal.accepted _, requestedLogIndex) map {
       case ResponseState(committed, uncommitted) =>
         RetransmitResponse(agent.nodeUniqueId, to, committed, uncommitted)
+      case f => throw new AssertionError("unreachable code")
     }
 
     responseData foreach { r =>

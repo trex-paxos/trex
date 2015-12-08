@@ -181,7 +181,10 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       def performConsensus(leader: ActorRef, follower: ActorRef, client: TestProbe, msg: Byte): Unit = {
         client.send(leader, ClientRequestCommandValue(0, Array[Byte](msg)))
         // it will send out an accept
-        val accept: Accept = expectMsgPF(50 millisecond) { case a: Accept => a }
+        val accept: Accept = expectMsgPF(50 millisecond) {
+          case a: Accept => a
+          case f => fail(f.toString)
+        }
         accept.value.asInstanceOf[ClientRequestCommandValue].bytes.length should be(1)
         // when we send that to node one
         follower ! accept

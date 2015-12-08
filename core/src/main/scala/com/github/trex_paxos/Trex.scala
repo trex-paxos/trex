@@ -208,6 +208,8 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
           val target = resolve(counter)
           target ! in.command
           log.debug("resent request from {} to {} is {}", sender(), target, in.command)
+        case _ =>
+          log.error("unreachable code")
       }
 
     case nlle: NoLongerLeaderException =>
@@ -251,7 +253,7 @@ class StaticClusterDriver(timeout: Timeout, cluster: Cluster, maxAttempts: Int) 
   // TODO inject these timings from config
   context.system.scheduler.schedule(Duration(5, MILLISECONDS), Duration(1000, MILLISECONDS), self, CheckTimeout)
 
-  val selectionUrls: Map[Int, String] = (cluster.nodes.indices zip Cluster.selectionUrls(cluster).map(_._2)).toMap
+  val selectionUrls: Map[Int, String] = (cluster.nodes.indices zip Cluster.selectionUrls(cluster).map( {case (_, s) => s} )).toMap
 
   log.info("selections are: {}", selectionUrls)
 
@@ -321,6 +323,7 @@ class TypedActorPaxosEndpoint(config: PaxosActor.Configuration, broadcastReferen
           ServerResponse(id, Option(ex))
       }
       result.get
+    case f => throw new AssertionError("unreachable code")
   }
 }
 
