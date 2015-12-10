@@ -97,38 +97,38 @@ object so that it is replicated across a cluster of nodes. You can fork the code
 <p>Now that we understand the object we wish to replicate we can go step-by-step through [the demo code]. It starts with a static TRex cluster configuration:</p>
 
 <pre><code># trex simple cluster configuration
-trex {
-  # folder to use to persist data at each node
-  data-folder="/tmp"
-  # number of slots entries to retain in the log to support retransmission
-  data-retained=1048576
-  # static cluster definintion
-  cluster {
-    name = "PaxosKVStore"
-    nodes = "2552,2562,2572"
-    node-2552 {
-      host = "127.0.0.1"
-      client-port = 2552
-      node-port = 2553
+    trex {
+    # folder to use to persist data at each node
+    data-folder="/tmp"
+    # number of slots entries to retain in the log to support retransmission
+    data-retained=1048576
+    # static cluster definintion
+    cluster {
+        name = "PaxosKVStore"
+        nodes = "101,102,103"
+        node-101 {
+            host = "192.168.122.11"
+            client-port = 43124
+            node-port = 43125
+        }
+        node-102 {
+            host = "192.168.122.12"
+            client-port = 43124
+            node-port = 43125
+        }
+        node-103 {
+            host = "192.168.122.13"
+            client-port = 43124
+            node-port = 43125
+        }
     }
-    node-2562 {
-      host = "127.0.0.1"
-      client-port = 2562
-      node-port = 2563
+    # timeouts
+    leader-timeout-max=4000
+    leader-timeout-min=2000
     }
-    node-2572 {
-      host = "127.0.0.1"
-      client-port = 2572
-      node-port = 2573
-    }
-  }
-  # timeouts
-  leader-timeout-max=4000
-  leader-timeout-min=2000
-}
 </code></pre>
 
-<p>That defines a TRex cluster with three server nodes on localhost exposing a TCP port to clients and a UDP port to the other cluster nodes. A more typical deployment would use three separate hosts and the same ports on each. The client application loads the configuration then creates a dynamic proxy backed by the Paxos cluster:</p>
+<p>That defines a TRex cluster with three server nodes on localhost exposing a TCP port to clients and a UDP port to the other cluster nodes. The client application loads the configuration then creates a dynamic proxy backed by the Paxos cluster:</p>
 
 <div class="highlight highlight-Scala"><pre>    <span class="pl-k">val</span> <span class="pl-en">cluster</span> <span class="pl-k">=</span> <span class="pl-en">Cluster</span>.parseConfig(config)
 
