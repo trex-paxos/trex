@@ -23,7 +23,7 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 - [x] overrideable send methods
 - [x] fix the fixmes
 - [x] extract a core functional library with no dependencies
-- [x] retire monolithic tests and increase unit test coverage
+- [x] breakup monolithic actor and increase unit test coverage
 - [ ] jepsen style destruction tests
 
 0.6 - practical
