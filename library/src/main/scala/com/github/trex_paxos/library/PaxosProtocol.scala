@@ -14,10 +14,10 @@ trait CommandValue extends PaxosMessage {
 }
 
 /**
- * Once consensus has been reached we deliver CommandValues in consensus order with the possibility of repeats during crash recovery.
- * @param deduplicationId An id number which can be used to deduplicated repeated deliveries that may happen during crash recovery.
- * @param command The value which has been chosen by consensus.
- */
+  * Once consensus has been reached we deliver CommandValues in consensus order with the possibility of repeats during crash recovery.
+  * @param deduplicationId An id number which can be use dto deduplicate repeated deliveries that may happen during crash recovery.
+  * @param command The value which has been chosen by the consensus protocol.
+  */
 case class Payload(deduplicationId: Long, command: CommandValue)
 
 /**

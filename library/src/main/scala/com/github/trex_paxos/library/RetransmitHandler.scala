@@ -63,9 +63,10 @@ trait RetransmitHandler extends PaxosLenses {
     val HighestCommittedIndex(committedLogIndex) = agent.data
 
     // send the response based on what we have in our journal, access to the journal, and where they have committed
-    val responseData = processRetransmitRequest(io.journal.bounds, committedLogIndex, io.journal.accepted _, requestedLogIndex) map {
+    val responseData: Option[RetransmitResponse] = processRetransmitRequest(io.journal.bounds, committedLogIndex, io.journal.accepted _, requestedLogIndex) map {
       case ResponseState(committed, uncommitted) =>
         RetransmitResponse(agent.nodeUniqueId, to, committed, uncommitted)
+      case f => throw new AssertionError("unreachable code")
     }
 
     responseData foreach { r =>

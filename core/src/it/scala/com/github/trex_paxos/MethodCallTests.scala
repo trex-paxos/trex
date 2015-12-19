@@ -48,7 +48,9 @@ class MethodCallInvokingActor(target: Any) extends Actor with ActorLogging {
         case Failure(ex) =>
           log.error(ex, s"call to $method with ${parameters} got exception $ex")
           sender ! ex
+        case f => throw new IllegalArgumentException(f.toString)
       }
+    case f => throw new IllegalArgumentException(f.toString)
   }
 }
 

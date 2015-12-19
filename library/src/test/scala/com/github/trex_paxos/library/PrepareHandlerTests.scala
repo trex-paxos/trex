@@ -29,9 +29,9 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
       val journal = new InMemoryJournal
       val io = new TestIO(journal)
       testPromiseHandler.handlePrepare(io, agentPromise10, prepare)
-      io.sent.headOption.value match {
+      io.sent().headOption.value match {
         case MessageAndTimestamp(ack: PrepareAck, sendTs) =>
-          journal.p.get() match {
+          journal.p() match {
             case (saveTs, _ ) if saveTs < sendTs => // good
             case f => fail(f.toString)
           }
@@ -77,10 +77,10 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
       val mockJournal = stub[Journal]
       (mockJournal.save _ ).when(*)
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
-      var sentNoLongerLeader = false
+      val sentNoLongerLeader = Box(false)
       val io = new TestIO(mockJournal) {
         override def sendNoLongerLeader(cmds: Map[Identifier, (CommandValue, String)]): Unit = {
-          sentNoLongerLeader = true
+          sentNoLongerLeader(true)
           cmds match {
             case `clientCommands` => // good
             case x => fail(x.toString())
@@ -88,7 +88,7 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
         }
       }
       testPromiseHandler.handlePrepare(io, agentPromise10.copy(data = clientCommandsData, role = Leader), Prepare(Identifier(0, BallotNumber(11, 11), 10)))
-      assert(sentNoLongerLeader)
+      assert(sentNoLongerLeader())
     }
 
     def `should nack lower number` {
@@ -97,7 +97,7 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
       (mockJournal.accepted _).when(*).returns(None)
       val io = new TestIO(mockJournal)
       testPromiseHandler.handlePrepare(io, agentPromise10, Prepare(Identifier(0, BallotNumber(9, 9), 10)))
-      io.sent.headOption.value match {
+      io.sent().headOption.value match {
         case MessageAndTimestamp(ack: PrepareNack, _) => // good
         case x => fail(x.toString)
       }
@@ -109,7 +109,7 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
       (mockJournal.accepted _).when(*).returns(None)
       val io = new TestIO(mockJournal)
       testPromiseHandler.handlePrepare(io, agentPromise10, Prepare(Identifier(0, BallotNumber(10, 10), 10)))
-      io.sent.headOption.value match {
+      io.sent().headOption.value match {
         case MessageAndTimestamp(ack: PrepareAck, _) => // good
         case x => fail(x.toString)
       }

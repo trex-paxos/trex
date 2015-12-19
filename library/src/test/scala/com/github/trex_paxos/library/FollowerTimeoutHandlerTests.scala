@@ -31,12 +31,12 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
   "FollowerTimeoutHandler" should {
     "broadcast a minPrepare and set a new timeout" in {
       // given a handler which records what it broadcasts
-      var sentMsg: Option[Any] = None
+      val sentMsg: Box[Any] = new Box(None)
       val handler = new TestFollowerHandler
       val agent: PaxosAgent = PaxosAgent(99, Follower, initialData)
       // when timeout on minPrepare logic is invoked
       handler.sendLowPrepares(new TestIO(new UndefinedJournal){
-        override def send(msg: PaxosMessage): Unit = sentMsg = Option(msg)
+        override def send(msg: PaxosMessage): Unit = sentMsg(msg)
         override def randomTimeout: Long = 12345L
         override def minPrepare: Prepare = TestFollowerHandler.minPrepare
       }, agent) match {
@@ -50,31 +50,32 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
           }
         case x => fail(x.toString)
       }
-      sentMsg.value shouldBe minPrepare
+      sentMsg() shouldBe minPrepare
     }
     "rebroadcast minPrepare and set a new timeout" in {
       // given a handler which records what it broadcasts
-      var sentMsg: Option[Any] = None
+      val sentMsg: Box[Any] = new Box(None)
       val handler = new TestFollowerHandler
       // when timeout on minPrepare logic is invoked
       handler.handleFollowerResendLowPrepares(new TestIO(new UndefinedJournal){
-        override def send(msg: PaxosMessage): Unit = sentMsg = Option(msg)
+        override def send(msg: PaxosMessage): Unit = sentMsg(msg)
         override def randomTimeout: Long = 12345L
         override def minPrepare: Prepare = TestFollowerHandler.minPrepare
       }, PaxosAgent(99, Follower, initialData)) match {
         case PaxosAgent(_, _, data) =>
           // it should set a fresh timeout
           data.timeout shouldBe 12345L
+        case f => fail(f.toString)
       }
       // and have broadcast the minPrepare
-      sentMsg match {
-        case Some(`minPrepare`) => // good
+      sentMsg() match {
+        case `minPrepare` => // good
         case x => fail(x.toString)
       }
     }
     "backdown and send retransmit request if sees evidence of higher committed slot in response" in {
       // given a handler which records what it sends and that it has backed down
-      var sentMsg: Option[Any] = None
+      val sentMsg: Box[Any] = new Box(None)
       val handler = new TestFollowerHandler
       // and a vote showing a higher committed slot
       val ballotNumber = BallotNumber(5, 2)
@@ -83,7 +84,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       val vote = PrepareNack(higherCommittedSlot, 3, higherCommittedProgress, 0, initialDataWithTimeoutAndPrepareResponses.leaderHeartbeat)
       // when it sees a higher committed slot index in a response
       handler.handleLowPrepareResponse(new TestIO(new UndefinedJournal){
-        override def send(msg: PaxosMessage): Unit = sentMsg = Option(msg)
+        override def send(msg: PaxosMessage): Unit = sentMsg(msg)
         override def randomTimeout: Long = 999L
       }, PaxosAgent(0, Follower, initialDataWithTimeoutAndPrepareResponses), vote) match {
         case PaxosAgent(0, Follower, data) =>
@@ -92,11 +93,8 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
           data.timeout shouldBe 999L
         case x => fail(x.toString)
       }
-      sentMsg match {
-        case Some(m: RetransmitRequest) => m match {
-          case RetransmitRequest(0, 3, logIndex) if logIndex == 0 => // good
-          case x => fail(x.toString)
-        }
+      sentMsg() match {
+        case RetransmitRequest(0, 3, logIndex) if logIndex == 0 => // good
         case x => fail(x.toString)
       }
     }

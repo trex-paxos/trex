@@ -27,7 +27,7 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
   // counts the number of delivered client bytes matches the cluster size
   def check(cluster: ClusterHarness): Boolean = {
 
-    val delivered: Seq[mutable.Buffer[Payload]] = cluster.delivered.values.toSeq
+    val delivered: Seq[mutable.Buffer[Payload]] = cluster.delivered().values.toSeq
 
     val count = (0 until cluster.size).foldLeft(0){ (count, i) =>
       val found = delivered(i) map {
@@ -67,7 +67,7 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
     ref ! ClusterHarness.Halt
 
     expectMsgPF(12 second) {
-      case m: Map[_,_] => // results we are ignoring as we verified during awaitCond
+      case _ => // results we are ignoring as we verified during awaitCond
     }
   }
 

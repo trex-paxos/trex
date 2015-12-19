@@ -15,6 +15,8 @@ trait AcceptHandler extends PaxosLenses {
         agent
       case id if agent.data.progress.highestPromised <= id.number =>
         handleHighAccept(io, agent, accept)
+      case f =>
+        throw new IllegalArgumentException(s"${f.getClass.getCanonicalName}:${f.toString}")
     }
 
   }

@@ -6,12 +6,10 @@ import akka.util.Timeout
 import com.github.trex_paxos.library._
 import org.scalatest._
 
-import scala.collection.immutable.Iterable
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{ArrayBuffer, Buffer}
 import scala.concurrent.Await
 import scala.language.postfixOps
-import scala.collection.mutable.Buffer
 
 class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
   NoFailureTests.spacedTimeoutConfig)) with SpecLike with ImplicitSender with BeforeAndAfterAll with BeforeAndAfter with Matchers {
@@ -22,7 +20,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
     TestKit.shutdownActorSystem(system)
   }
 
-  var clusterHarness = new Box[TestActorRef[ClusterHarness]](None)
+  val clusterHarness = new Box[TestActorRef[ClusterHarness]](None)
 
   after {
     clusterHarness() ! ClusterHarness.Halt
@@ -30,7 +28,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
 
   type Delivered = Map[Int, ArrayBuffer[Payload]]
 
-  var data = new Box[Byte](Option(1.toByte))
+  val data = new Box[Byte](Option(1.toByte))
 
   def testLeaderDying(clusterSize: Int): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
@@ -80,7 +78,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
   // counts the number of delivered client bytes matches 2x cluster size - 1
   def check(cluster: ClusterHarness): Boolean = {
 
-    val delivered: Seq[mutable.Buffer[Payload]] = cluster.delivered.values.toSeq
+    val delivered: Seq[mutable.Buffer[Payload]] = cluster.delivered().values.toSeq
 
     val count = (0 until cluster.size).foldLeft(0){ (count, i) =>
       val found = delivered(i) map {

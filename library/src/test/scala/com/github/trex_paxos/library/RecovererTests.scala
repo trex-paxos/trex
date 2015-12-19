@@ -1,7 +1,5 @@
 package com.github.trex_paxos.library
 
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference, AtomicLong}
-
 import com.github.trex_paxos.library.TestHelpers._
 
 import scala.collection.immutable.{SortedMap}
@@ -92,21 +90,22 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
     }
 
     def `should deal with timed-out prepares before timed-out accepts` {
-      val handleResendAcceptsInvoked = new AtomicBoolean(false)
-      val handleResendPreparesInvoked = new AtomicBoolean(false)
+      val handleResendAcceptsInvoked =Box(false)
+      val handleResendPreparesInvoked = Box(false)
       val paxosAlgorithm = new PaxosAlgorithm {
         override def handleResendAccepts(io: PaxosIO, agent: PaxosAgent, time: Long): PaxosAgent = {
-          handleResendAcceptsInvoked.set(true)
+          handleResendAcceptsInvoked(true)
           agent
         }
         override def handleResendPrepares(io: PaxosIO, agent: PaxosAgent, time: Long): PaxosAgent = {
-          handleResendPreparesInvoked.set(true)
+          handleResendPreparesInvoked(true)
           agent
         }
       }
       val agent = PaxosAgent(0, Recoverer, initialData.copy(prepareResponses = prepareSelfVotes, acceptResponses = emptyAcceptResponses))
       paxosAlgorithm.recovererFunction(PaxosEvent(maxClockIO, agent, CheckTimeout))
-      assert(handleResendPreparesInvoked.get == true && handleResendAcceptsInvoked.get == false)
+
+      assert(handleResendPreparesInvoked() == true && handleResendAcceptsInvoked() == false)
     }
 
     def `should be defined for a commit at a higher log index` {
@@ -215,7 +214,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val (agent, _) = recovererNoResponsesInClusterOfSize(3)
       val inMemoryJournal = new InMemoryJournal
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val sentTime = new AtomicLong()
+      val sentTime = Box(0L)
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
@@ -224,7 +223,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
-          sentTime.set(System.nanoTime())
+          sentTime(System.nanoTime())
           sent += msg
         }
       }
@@ -246,7 +245,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
       val inMemoryJournal = new InMemoryJournal
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val sentTime = new AtomicLong()
+      val sentTime = Box(0L)
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
@@ -255,7 +254,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
-          sentTime.set(System.nanoTime())
+          sentTime(System.nanoTime())
           sent += msg
         }
       }
@@ -271,7 +270,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(5)
       val inMemoryJournal = new InMemoryJournal
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val sentTime = new AtomicLong()
+      val sentTime = Box(0L)
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
@@ -280,7 +279,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
-          sentTime.set(System.nanoTime())
+          sentTime(System.nanoTime())
           sent += msg
         }
       }
@@ -303,7 +302,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
       val inMemoryJournal = new InMemoryJournal
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val sentTime = new AtomicLong()
+      val sentTime = Box(0L)
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
@@ -312,7 +311,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
-          sentTime.set(System.nanoTime())
+          sentTime(System.nanoTime())
           sent += msg
         }
       }
@@ -337,7 +336,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       // and verifiable io
       val inMemoryJournal = new InMemoryJournal
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val sentTime = new AtomicLong()
+      val sentTime = Box(0L)
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
@@ -346,7 +345,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
-          sentTime.set(System.nanoTime())
+          sentTime(System.nanoTime())
           sent += msg
         }
       }
@@ -387,7 +386,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       }
       // and send happens after save
       val saveTime = inMemoryJournal.lastSaveTime.get()
-      assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
+      assert(saveTime > 0L && sentTime() > 0L && saveTime < sentTime())
     }
     def `promote to Leader and ack its own accept if it has not made a higher promise` {
       // given a recoverer with self vote
@@ -395,7 +394,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       // and verifiable io
       val inMemoryJournal = new InMemoryJournal
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val sentTime = new AtomicLong()
+      val sentTime = Box(0L)
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
@@ -404,7 +403,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
-          sentTime.set(System.nanoTime())
+          sentTime(System.nanoTime())
           sent += msg
         }
       }
@@ -452,7 +451,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       // and verifiable io
       val inMemoryJournal = new InMemoryJournal
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val sentTime = new AtomicLong()
+      val sentTime = Box(0L)
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
@@ -461,7 +460,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
-          sentTime.set(System.nanoTime())
+          sentTime(System.nanoTime())
           sent += msg
         }
 
@@ -495,16 +494,16 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       data.timeout shouldBe 1234L
       // and send happens after save
       val saveTime = inMemoryJournal.lastSaveTime.get()
-      assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
+      assert(saveTime > 0L && sentTime() > 0L && saveTime < sentTime())
     }
     def `fix a no-op and promote to Leader then commits if in a three node cluster gets a majority with one ack` {
       // given a recoverer with self vote
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
       // and verifiable io
-      val lastDelivered = new AtomicReference[CommandValue]()
+      val lastDelivered: Box[CommandValue] = new Box(None)
       val inMemoryJournal = new InMemoryJournal
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val sentTime = new AtomicLong()
+      val sentTime = Box(0L)
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
@@ -513,12 +512,12 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
-          sentTime.set(System.nanoTime())
+          sentTime(System.nanoTime())
           sent += msg
         }
 
         override def deliver(payload: Payload): Any = {
-          lastDelivered.set(payload.command)
+          lastDelivered(payload.command)
           value
         }
       }
@@ -540,7 +539,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val acceptAck = AcceptAck(prepareId, 1, initialData.progress)
       val PaxosAgent(_, _, data) = paxosAlgorithm(new PaxosEvent(io, leader, acceptAck))
       // it delivers the value
-      Option(lastDelivered.get()) match {
+      Option(lastDelivered()) match {
         case Some(ClientRequestCommandValue(0, expectedBytes)) => // good
         case f => fail(f.toString)
       }
@@ -557,7 +556,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       data.timeout shouldBe 1234L
       // and send happens after save
       val saveTime = inMemoryJournal.lastSaveTime.get()
-      assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
+      assert(saveTime > 0L && sentTime() > 0L && saveTime < sentTime())
     }
     def `fix a no-op promote to Leader and commits if in a five node cluster gets a majority with two acks with no values to fix` {
       // given a recoverer with self vote
@@ -565,7 +564,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       // and verifiable io
       val inMemoryJournal = new InMemoryJournal
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val sentTime = new AtomicLong()
+      val sentTime = Box(0L)
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
@@ -574,7 +573,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
-          sentTime.set(System.nanoTime())
+          sentTime(System.nanoTime())
           sent += msg
         }
 
@@ -614,16 +613,16 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       data.timeout shouldBe 1234L
       // and send happens after save
       val saveTime = inMemoryJournal.lastSaveTime.get()
-      assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
+      assert(saveTime > 0L && sentTime() > 0L && saveTime < sentTime())
     }
     def `fix a no-op and promote to Leader then commits if in a five node cluster gets a majority with two acks` {
       // given a recoverer with self vote
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(5)
       // and verifiable io
-      val lastDelivered = new AtomicReference[CommandValue]()
+      val lastDelivered: Box[CommandValue] = new Box(None)
       val inMemoryJournal = new InMemoryJournal
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val sentTime = new AtomicLong()
+      val sentTime = Box(0L)
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
@@ -632,12 +631,12 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
-          sentTime.set(System.nanoTime())
+          sentTime(System.nanoTime())
           sent += msg
         }
 
         override def deliver(payload: Payload): Any = {
-          lastDelivered.set(payload.command)
+          lastDelivered(payload.command)
           value
         }
       }
@@ -664,7 +663,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val acceptAck2 = AcceptAck(prepareId, 2, initialData.progress)
       val PaxosAgent(_, _, data) = paxosAlgorithm(new PaxosEvent(io, acceptAck1agent, acceptAck2))
       // it delivers the value
-      Option(lastDelivered.get()) match {
+      Option(lastDelivered()) match {
         case Some(ClientRequestCommandValue(0, expectedBytes)) => // good
         case f => fail(f.toString)
       }
@@ -681,7 +680,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       data.timeout shouldBe 1234L
       // and send happens after save
       val saveTime = inMemoryJournal.lastSaveTime.get()
-      assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
+      assert(saveTime > 0L && sentTime() > 0L && saveTime < sentTime())
     }
   }
 }

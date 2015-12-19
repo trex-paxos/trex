@@ -11,15 +11,6 @@ import scala.compat.Platform
 import scala.concurrent.duration._
 import akka.util.Timeout
 
-class CollectingActor extends Actor {
-  var messages: Seq[Any] = Seq.empty
-
-  override def receive: Receive = {
-    case x =>
-      messages = messages :+ x
-  }
-}
-
 object DriverSpec {
   val conf = ConfigFactory.parseString("akka.loglevel = \"DEBUG\"\nakka.log-dead-letters-during-shutdown=false")
 }
@@ -213,14 +204,17 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
       ref ! CheckTimeout
       clientProbe.expectNoMsg(25 millisecond)
       ref ! CheckTimeout
+
       clientProbe.expectMsgPF(1 seconds) {
         case ex: TimeoutException =>
           ex.getMessage.indexOf(s"Exceeded maxAttempts 6") should be(0)
+        case f => fail(f.toString)
       }
 
-      Seq(testProbe1, testProbe2, testProbe3) foreach {
-        _.receiveN(2).map({ case ClientRequestCommandValue(_, bytes) => fromBinary(bytes) }) should be(Seq("hello world", "hello world"))
-      }
+      Seq(testProbe1, testProbe2, testProbe3).foreach(_.receiveN(2).map({
+        case ClientRequestCommandValue(_, bytes) => fromBinary(bytes)
+        case f => fail(f.toString)
+      }) should be(Seq("hello world", "hello world")))
     }
 
   }

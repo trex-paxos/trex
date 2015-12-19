@@ -58,6 +58,7 @@ class PickleTests extends WordSpecLike with Matchers {
       val c = Commit(Identifier(1, BallotNumber(2, 3), 4L))
       Pickle.unpack(Pickle.pack(c)) match {
         case `c` =>
+        case f => fail(f.toString)
       }
     }
     val bytes1 = Array[Byte](5, 6)
@@ -72,6 +73,7 @@ class PickleTests extends WordSpecLike with Matchers {
       val p = Prepare(Identifier(1, BallotNumber(2, 3), 4L))
       Pickle.unpack(Pickle.pack(p)) match {
         case `p` =>
+        case f => fail(f.toString)
       }
     }
 
@@ -82,18 +84,21 @@ class PickleTests extends WordSpecLike with Matchers {
         Pickle.unpack(b) match {
           case Accept(Identifier(1, BallotNumber(2, 3), 4L), ClientRequestCommandValue(0, bout)) =>
             assert(bequals(Array[Byte](5, 6), bout))
+          case f => fail(f.toString)
         }
       }
       {
         val a = Accept(Identifier(1, BallotNumber(2, 3), 4L), NoOperationCommandValue)
         Pickle.unpack(Pickle.pack(a)) match {
           case `a` =>
+          case f => fail(f.toString)
         }
       }
       {
         val a = Accept(Identifier(1, BallotNumber(2, 3), 4L), MembershipCommandValue(99L, Seq(ClusterMember(1, "x", true), ClusterMember(2, "y", false))))
         Pickle.unpack(Pickle.pack(a)) match {
           case `a` =>
+          case f => fail(f.toString)
         }
       }
     }
@@ -101,12 +106,14 @@ class PickleTests extends WordSpecLike with Matchers {
       val r = AcceptAck(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)))
       Pickle.unpack(Pickle.pack(r)) match {
         case `r` =>
+        case f => fail(f.toString)
       }
     }
     "roundtrip AcceptNack" in {
       val r = AcceptNack(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)))
       Pickle.unpack(Pickle.pack(r)) match {
         case `r` =>
+        case f => fail(f.toString)
       }
     }
 
@@ -115,6 +122,7 @@ class PickleTests extends WordSpecLike with Matchers {
         val p = PrepareAck(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), 12, 13, None)
         Pickle.unpack(Pickle.pack(p)) match {
           case `p` =>
+          case f => fail(f.toString)
         }
       }
       {
@@ -125,7 +133,9 @@ class PickleTests extends WordSpecLike with Matchers {
             a match {
               case Accept(Identifier(1, BallotNumber(2, 3), 4L), ClientRequestCommandValue(0, bout)) =>
                 assert(bequals(Array[Byte](5, 6), bout))
+              case f => fail(f.toString)
             }
+          case f => fail(f.toString)
         }
       }
     }
@@ -133,12 +143,14 @@ class PickleTests extends WordSpecLike with Matchers {
       val p = PrepareNack(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), 12, 13)
       Pickle.unpack(Pickle.pack(p)) match {
         case `p` =>
+        case f => fail(f.toString)
       }
     }
     "roundtrip RetransmitRequest" in {
       val r = RetransmitRequest(1, 2, 3L)
       Pickle.unpack(Pickle.pack(r)) match {
         case `r` =>
+        case f => fail(f.toString)
       }
     }
     "roundtrip simple RetransmitResponse" in {
@@ -151,12 +163,15 @@ class PickleTests extends WordSpecLike with Matchers {
           a1 match {
             case Accept(Identifier(1, BallotNumber(2, 3), 4L), ClientRequestCommandValue(0, bout)) =>
               assert(bequals(Array[Byte](5, 6), bout))
+            case f => fail(f.toString)
           }
           a2 match {
             case Accept(Identifier(5, BallotNumber(6, 7), 8L), ClientRequestCommandValue(0, bout)) =>
               assert(bequals(Array[Byte](7, 8), bout))
+            case f => fail(f.toString)
           }
         }
+        case f => fail(f.toString)
       }
     }
 
@@ -169,7 +184,9 @@ class PickleTests extends WordSpecLike with Matchers {
                 case ClientRequestCommandValue(a2i, b2) =>
                   a1i should be(a2i)
                   bequals(b1, b2)
+                case f => fail(f.toString)
               }
+            case f => fail(f.toString)
           }
         } else false
       } else false

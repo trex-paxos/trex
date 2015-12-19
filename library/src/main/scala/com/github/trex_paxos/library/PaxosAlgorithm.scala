@@ -82,6 +82,12 @@ with ClientCommandHandler {
       agent
   }
 
+  val unknown: PaxosFunction = {
+    case PaxosEvent(io, agent, x) =>
+      io.logger.warning("unknown message {}", x)
+      agent
+  }
+
   /**
    * If no other logic has caught a timeout then do nothing.
    */
@@ -95,7 +101,8 @@ with ClientCommandHandler {
       prepareStateFunction orElse
       acceptStateFunction orElse
       ignoreHeartbeatStateFunction orElse
-      ignoreNotTimedOutCheck
+      ignoreNotTimedOutCheck orElse
+      unknown
 
   val notLeaderFunction: PaxosFunction = {
     case PaxosEvent(io, agent, v: CommandValue) =>

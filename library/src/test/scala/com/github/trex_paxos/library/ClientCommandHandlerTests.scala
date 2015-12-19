@@ -25,6 +25,7 @@ with PaxosLenses {
           id shouldBe Identifier(agent.nodeUniqueId,
             agent.data.epoch.value,
             agent.data.progress.highestCommitted.logIndex + 1)
+        case f => fail(f.toString)
       }
     }
     "ack if has not made a higher promise" in {

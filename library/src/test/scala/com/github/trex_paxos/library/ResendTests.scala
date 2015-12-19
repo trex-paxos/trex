@@ -103,27 +103,27 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
     }
     "journalling and sending happens in the correct order" in {
       // given a journal which records saving and accepting
-      var saveJournalTime = 0L
-      var acceptJournalTime = 0L
+      val saveJournalTime = Box(0L)
+      val acceptJournalTime = Box(0L)
       val tempJournal = new UndefinedJournal {
-        override def save(progress: Progress): Unit = saveJournalTime = System.nanoTime()
+        override def save(progress: Progress): Unit = saveJournalTime(System.nanoTime())
 
-        override def accept(a: Accept*): Unit = acceptJournalTime = System.nanoTime()
+        override def accept(a: Accept*): Unit = acceptJournalTime(System.nanoTime())
       }
       // and a handler that records broadcase time
-      var sendTime = 0L
+      val sendTime = Box(0L)
       val handler = new TestResendHandler
       // when we get it to do work
 
       handler.handleResendAccepts(new TestIO(tempJournal) {
         override def randomTimeout: Long = 121L
 
-        override def send(msg: PaxosMessage): Unit = sendTime = System.nanoTime()
+        override def send(msg: PaxosMessage): Unit = sendTime(System.nanoTime())
       }, PaxosAgent(99, Leader, initialData.copy(acceptResponses = emptyAcceptResponses)), 100L)
       // then we saved, accepted and sent
-      assert(saveJournalTime > 0 && acceptJournalTime > 0 && sendTime > 0)
+      assert(saveJournalTime() > 0 && acceptJournalTime() > 0 && sendTime() > 0)
       // in the correct order had we done a full round of paxos which is promise, accept then send last
-      assert(sendTime > acceptJournalTime && acceptJournalTime > saveJournalTime)
+      assert(sendTime() > acceptJournalTime() && acceptJournalTime() > saveJournalTime())
     }
     "resend prepares and refresh its timeout" in {
       // given

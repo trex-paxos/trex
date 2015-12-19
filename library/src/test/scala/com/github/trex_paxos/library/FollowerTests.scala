@@ -450,8 +450,8 @@ class FollowerTests extends AllRolesTests {
         case x => fail(x.toString)
       }
 
-      Option(tempJournal.p.get()) match {
-        case Some((_, Progress(_, a3.id))) => // good
+      tempJournal.p() match {
+        case (_, Progress(_, a3.id)) => // good
         case f => fail(f.toString)
       }
     }

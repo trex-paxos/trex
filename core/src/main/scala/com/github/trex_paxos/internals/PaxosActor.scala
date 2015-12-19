@@ -63,6 +63,7 @@ with AkkaLoggingAdapter {
       trace(event, sender().toString(), sent)
       transmit(sender())
       paxosAgent = agent
+    case f => logger.error("Recieved unknown messages type ", f)
   }
 
   val minPrepare = Prepare(Identifier(nodeUniqueId, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
@@ -75,8 +76,12 @@ with AkkaLoggingAdapter {
 
   def transmit(sender: ActorRef): Unit = {
     this.sent foreach {
-      case m@(_: RetransmitRequest | _: RetransmitResponse | _: AcceptResponse | _: PrepareResponse | _: NotLeader ) => send(sender, m)
-      case m => broadcast(m)
+      case m@(_: RetransmitRequest | _: RetransmitResponse | _: AcceptResponse | _: PrepareResponse | _: NotLeader ) =>
+        logger.debug("sending {} msg {}", sender, m)
+        send(sender, m)
+      case m =>
+        logger.debug("broadcasting {}", m)
+        broadcast(m)
     }
     this.sent = collection.immutable.Seq()
   }
