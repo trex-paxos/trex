@@ -24,7 +24,7 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 - [x] fix the fixmes
 - [x] extract a core functional library with no dependencies
 - [x] breakup monolithic actor and increase unit test coverage
-- [ ] jepsen style destruction tests
+- [ ] jepsen destruction tests
 
 0.6 - practical
 
@@ -36,6 +36,7 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 - [ ] binary tracing 
 - [ ] jumbo UDP packets
 - [ ] learners
+- [ ] leases
 
 0.7 - performance
 
