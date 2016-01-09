@@ -36,14 +36,14 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 - [ ] binary tracing 
 - [ ] jumbo UDP packets
 - [ ] learners
-- [ ] leases
+- [ ] weak reads
 
 0.7 - performance
 
 - [ ] batching 
 - [ ] remove remote actor use akka tcp
 - [ ] multicast 
-- [ ] strong read optimisation
+- [ ] leases
 - [ ] noop heartbeats to suppress duels
 - [ ] compression 
 - [ ] journal truncation by size 
