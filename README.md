@@ -47,6 +47,7 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 - [ ] noop heartbeats to suppress duels
 - [ ] compression 
 - [ ] journal truncation by size 
+- [ ] periodically leader number boosting
 
 0.8 
 
