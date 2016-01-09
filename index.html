@@ -4,7 +4,7 @@
   <head>
     <meta charset='utf-8'>
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <meta name="description" content="Trex : A Paxos transaction log replication engine">
+    <meta name="description" content="Trex : A Paxos state replication engine">
 
     <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
 
@@ -12,14 +12,14 @@
   </head>
 
   <body>
-
+<a href="https://github.com/trex-paxos/trex"><img style="position: absolute; top: -50px; left: 0; border: 0;" src="https://camo.githubusercontent.com/82b228a3648bf44fc1163ef44c62fcc60081495e/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f6c6566745f7265645f6161303030302e706e67" alt="Fork me on GitHub" /></a>
     <!-- HEADER -->
     <div id="header_wrap" class="outer">
         <header class="inner">
           <a id="forkme_banner" href="https://github.com/simbo1905/trex">View on GitHub</a>
 
           <h1 id="project_title">TRex</h1>
-          <h2 id="project_tagline">An embeddable Paxos transaction log replication engine for the JVM</h2>
+          <h2 id="project_tagline">An embeddable Paxos state replication engine for the JVM</h2>
 
             <section id="downloads">
               <a class="zip_download_link" href="https://github.com/simbo1905/trex/zipball/master">
@@ -39,13 +39,12 @@
 <p>Below is a rough sketch of an article to introduce the demo app. WARNING: 
 This page is a work in progress and may be significantly out-of-date compared to the current sourcecode.</p>
 
-
 <h3>
 <a id="trex-the-paxos-engine" class="anchor" href="#trex-the-paxos-engine" aria-hidden="true">
   <span class="octicon octicon-link"></span></a>TRex The Paxos Engine</h3>
 
 <p>Previous <a href="https://simbo1905.wordpress.com/2014/10/28/transaction-log-replication-with-paxos/">posts</a> 
-described how the Paxos algorithm can be applied to binary log replication. This post introduces an embeddable Paxos state 
+described how the Paxos algorithm can be applied to state replication. This post introduces an embeddable Paxos state 
 machine replication engine called TRex. At the heart of TRex is a 
 library that has no 3rd party dependencies, other than Scala, which implements the Paxos algorithm as defined by 
 the paper <a href="http://research.microsoft.com/en-us/um/people/lamport/pubs/paxos-simple.pdf">Paxos Made Simple</a>. 
@@ -53,11 +52,16 @@ The library is used by an embeddable consensus server which provides UDP messagi
 The embeddable server comes with a client driver which is cluster aware. The combined solution can be used to build a 
 strongly consistent and fault tolerate service by reliably replicate messages, commands or method invocations 
 across a cluster of nodes with automatic failover. The demo code for TRex shows how to wrap a simple application 
-object so that it is replicated across a cluster of nodes. You can fork the code over at <a href="https://github.com/simbo1905/trex">GitHub</a>.</p>
+object so that it is replicated across a cluster of nodes. You can fork the code over at 
+<a href="https://github.com/simbo1905/trex">GitHub</a>.</p>
 
-<p>This post will provide a walk-through of the demo application. A detailed description of how multi-Paxos is implemented in TRex is given in a previous post. TRex also comes with extensive unit tests that are an executable specification of its implementation of the multi-Paxos consensus algorithm. </p>
+<p>This post will provide a walk-through of the demo application. A detailed description of how multi-Paxos is implemented in 
+TRex is given in a previous post. TRex also comes with extensive unit tests that are an executable specification of its 
+implementation of the multi-Paxos consensus algorithm. </p>
 
-<p>Before we begin I should make a statement about the status of the codebase. Currently this post describes version x.y.z of the code. Some features that a production replication service would need to provide (e.g. metrics, dynamic cluster membership) are not yet implemented. This blog post will be updated as new features are added to TRex. </p>
+<p>Before we begin I should make a statement about the status of the codebase. Currently this post describes version 
+x.y.z of the code. Some features that a production replication service would need to provide (e.g. metrics, dynamic 
+cluster membership) are not yet implemented. This blog post will be updated as new features are added to TRex. </p>
 
 <p>The demo application implements a key-value store that has the following interface:</p>
 
