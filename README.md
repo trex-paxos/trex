@@ -24,25 +24,25 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 - [x] fix the fixmes
 - [x] extract a core functional library with no dependencies
 - [x] breakup monolithic actor and increase unit test coverage
+- [ ] weak reads
+- [ ] java demo
 - [ ] jepsen destruction tests
 
 0.6 - practical
 
-- [ ] java demo
-- [ ] complete the TODOs
 - [ ] dynamic cluster membership  
 - [ ] snapshots and out of band retransmission
 - [ ] metrics/akka-tracing
 - [ ] binary tracing 
 - [ ] jumbo UDP packets
-- [ ] learners
-- [ ] weak reads
+- [ ] learners / scale-out multicast
+- [ ] complete the TODOs
 
 0.7 - performance
 
+- [ ] optimised journal 
 - [ ] batching 
 - [ ] remove remote actor use akka tcp
-- [ ] multicast 
 - [ ] leases
 - [ ] noop heartbeats to suppress duels
 - [ ] compression 
