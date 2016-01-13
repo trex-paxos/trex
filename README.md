@@ -31,7 +31,7 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 0.6 - practical
 
 - [ ] dynamic cluster membership
-- [ ] leases
+- [ ] noop heartbeats (less duels and partitioned leader detection)
 - [ ] snapshots and out of band retransmission
 - [ ] metrics/akka-tracing
 - [ ] binary tracing 
@@ -45,7 +45,6 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 - [ ] batching 
 - [ ] remove remote actor from client driver
 - [ ] replica strong reads
-- [ ] noop heartbeats to suppress duels
 - [ ] compression 
 - [ ] journal truncation by size 
 - [ ] periodically leader number boosting
