@@ -51,9 +51,8 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 
 0.8 
 
-- [ ] final API 
-- [ ] mapdb compression
-- [ ] weak reads demo
+- [ ] final API
+- [ ] forwarded reads
 
 M1
 
