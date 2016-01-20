@@ -1,8 +1,15 @@
-package com.github.trex_paxos.internals // TODO location does not match package
+package com.github.trex_paxos.internals
 
-import com.github.trex_paxos.library.{PaxosMessage, CommandValue}
+import com.github.trex_paxos.library.CommandValue
 
 /**
+  * Client request command has an id to correlate to the server response.
+  */
+private[trex_paxos] case class ClientRequestCommandValue(msgId: Long, val bytes: Array[Byte]) extends CommandValue
+
+/**
+  * Placeholder currently not implemented.
+  *
   * There are a number of optimisations that are possible with read-only work. These trade consistency for speed and
   * scalability; possibly even offloading the read to a follower. These case classes let you wrap your work in case
   * classes that tag the work as optimisable. Whether the work is optimised, and how, will depend on the current feature
@@ -13,6 +20,8 @@ sealed trait OptimizableReadOnlyWork {
 }
 
 /**
+  * Placeholder currently not implemented.
+  *
   * A `Strong` read is a read of committed work which is always strongly ordered with respect to writes. This requires
   * the leader to assign an order to reads and writes upon arrive, then only run the reads when it learns that all
   * preceeding writes have been chosen. It then must return the results in the same order.
@@ -22,6 +31,8 @@ sealed trait OptimizableReadOnlyWork {
 case class StrongReadWork(val raw: AnyRef) extends OptimizableReadOnlyWork
 
 /**
+  * Placeholder currently not implemented.
+  *
   * A `Timeline` read is a read of committed work where a single thread (a single timeline) will see it's own writes but
   * its reads may see stale (cached) reads with respect to write made on separate timelines (other client processes or
   * other threads in the same process).
@@ -34,6 +45,8 @@ case class StrongReadWork(val raw: AnyRef) extends OptimizableReadOnlyWork
 case class TimelineReadWork(val raw: AnyRef) extends OptimizableReadOnlyWork
 
 /**
+  * Placeholder currently not implemented.
+  *
   * An `Outdated` read is read work which is safe to read directly from a replica. No special effort is made to order
   * the read with respect to pending writes going via the leader. Depending on the replication lag of the follower and
   * possible network partitions the value read may be very stale. Semantically such reads are equivalent to reading from
@@ -45,11 +58,6 @@ case class TimelineReadWork(val raw: AnyRef) extends OptimizableReadOnlyWork
   * @param raw The actual raw client command which is opaque to Trex.
   */
 case class OutdatableReadWork(val raw: AnyRef) extends OptimizableReadOnlyWork
-
-/**
-  * Client request command has an id to correlate to the server response.
-  */
-private[trex_paxos] case class ClientRequestCommandValue(msgId: Long, val bytes: Array[Byte]) extends CommandValue
 
 /**
   * Placeholder currently not implemented.
@@ -69,11 +77,15 @@ private[trex_paxos] case class ClusterMember(nodeUniqueId: Int, location: String
 private[trex_paxos] case class Membership(members: Seq[ClusterMember])
 
 /**
+  * Placeholder currently not implemented.
+  *
   * Marking traffic as read-only allows for optimisation such as not forcing disk flushes and reading from replicas.
   */
 sealed trait ReadOnlyCommand extends CommandValue
 
 /**
+  * Placeholder currently not implemented.
+  *
   * An outdated read is a weak read of committed data directly from a replica. This can very likely be a stale read so
   * your application semantics must be safe to stale cached reads (e.g. any write based on the stale read are protected
   * by optimistic locking or compare-and-swap). This is the most scalable read type which may be suitable for high read
@@ -82,6 +94,8 @@ sealed trait ReadOnlyCommand extends CommandValue
 private[trex_paxos] case class OutdatedRead(msgId: Long, val bytes: Array[Byte]) extends ReadOnlyCommand
 
 /**
+  * Placeholder currently not implemented.
+  *
   * A single read is a weak read of committed data ordered via the leader but possibly handed off to a follower. If
   * their is a leader failover (perhaps due to a partition) the read may be stale. As this can be stale read during such
   * failure scenarios your application semantics must be safe to stale cached reads (e.g. any write based on the stale
@@ -92,6 +106,8 @@ private[trex_paxos] case class OutdatedRead(msgId: Long, val bytes: Array[Byte])
 private[trex_paxos] case class SingleRead(msgId: Long, val bytes: Array[Byte]) extends ReadOnlyCommand
 
 /**
+  * Placeholder currently not implemented.
+  *
   * A strong read is strictly ordered with respect to writes under all failure scenarios. Depending on cluster
   * configurations this may be by either arranged by either the use of a leader lease else by using a majority read.
   */

@@ -240,18 +240,6 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
           remove(request)
       }
 
-    case outdateableWork: OutdatableReadWork =>
-      // we round robin outdatable reads to followers.
-      followerCounter = followerCounter + 1
-      if( followerCounter == leaderCounter ) followerCounter = followerCounter + 1
-      outboundClientWork(followerCounter, outdateableWork)
-
-    case leaderRead@( _: StrongReadWork | _: TimelineReadWork) =>
-      // single or strong reads must be ordered with respect to writes so have to go via the leader
-      outboundClientWork(leaderCounter, leaderRead.asInstanceOf[AnyRef])
-
-
-
     case msg: Any =>
       outboundClientWork(leaderCounter, msg.asInstanceOf[AnyRef])
   }

@@ -24,13 +24,12 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 - [x] fix the fixmes
 - [x] extract a core functional library with no dependencies
 - [x] breakup monolithic actor and increase unit test coverage
-- [ ] weak reads
-- [ ] java demo
 - [ ] jepsen destruction tests
 
 0.6 - practical
 
 - [ ] dynamic cluster membership
+- [ ] timeline reads
 - [ ] noop heartbeats (less duels and partitioned leader detection)
 - [ ] snapshots and out of band retransmission
 - [ ] metrics/akka-tracing
@@ -41,6 +40,8 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 
 0.7 - performance
 
+- [ ] strong reads
+- [ ] outdated reads
 - [ ] optimised journal 
 - [ ] batching 
 - [ ] remove remote actor from client driver
@@ -52,7 +53,7 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 0.8 
 
 - [ ] final API
-- [ ] forwarded reads
+- [ ] hand-off reads? 
 
 M1
 
