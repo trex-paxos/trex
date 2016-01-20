@@ -81,7 +81,7 @@ class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValue
 
       override def deliver(payload: Payload): Any = {}
     }
-    val event = new PaxosEvent(io, agent, ClientRequestCommandValue(0L, expectedBytes))
+    val event = new PaxosEvent(io, agent, DummyCommandValue(1))
     val paxosAlgorithm = new PaxosAlgorithm
     // when
     val PaxosAgent(_,newRole, newData) = paxosAlgorithm(event)

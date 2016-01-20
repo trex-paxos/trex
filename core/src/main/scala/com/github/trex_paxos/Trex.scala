@@ -10,7 +10,7 @@ import akka.io.Udp.CommandFailed
 import akka.io.{IO, Udp}
 import akka.serialization._
 import akka.util.Timeout
-import com.github.trex_paxos.internals.{PaxosActor, PaxosActorWithTimeout, Pickle}
+import com.github.trex_paxos.internals._
 import com.github.trex_paxos.library._
 import com.typesafe.config.Config
 
@@ -103,19 +103,28 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
   val timeoutMillis = requestTimeout.duration.toMillis
 
   /**
-   * Returns an ActorSelection mapped to the passed counter.
+   * Returns an ActorSelection mapped to the passed cluster membership index.
    * This is abstract so that there can be a subclass which knows about cluster membership changes.
    * Counter can be incremented to round-robin to find the new stable leader.
+    * @param memberIndex The index of the node in the cluster to resolve.
    */
-  protected def resolve(member: Int): ActorSelection
+  protected def resolveActorSelectorForIndex(memberIndex: Int): ActorSelection
 
   /**
-   * Incremented to try the next node in the cluster.
-   */
-  protected var counter = 0
+    * Returns the current cluster size.
+    */
+  protected def clusterSize: Int
 
   /**
-   * Incremented for each request sent. 
+   * This counter modulo the cluster size is used to pick a member of the cluster to send leader messages.
+   * If we get back a response that the node isn't the leader the driver will increment the counter to try the next node.
+   */
+  protected var leaderCounter: Long = 0
+
+  protected var followerCounter: Long = (100 * Math.random()).toLong
+
+  /**
+   * Incremented for each request sent.
    */
   private[this] var requestId: Long = 0
 
@@ -124,7 +133,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
     requestId
   }
 
-  case class Request(timeoutTime: Long, client: ActorRef, command: ClientRequestCommandValue, attempt: Int)
+  case class Request(timeoutTime: Long, client: ActorRef, command: CommandValue, attempt: Int)
 
   private[this] var requestById: SortedMap[Long, Request] = SortedMap.empty
   private[this] var requestByTimeoutById: SortedMap[Long, Map[Long, Request]] = SortedMap.empty
@@ -168,12 +177,23 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
   def now() = Platform.currentTime // override for tests
 
   override def receive: Receive = {
+    case ServerResponse(id, responseOption) =>
+      if (log.isDebugEnabled) log.debug("{} found is {} is in map {}", id, requestById.contains(id), requestById)
+      requestById.get(id) foreach {
+        case request@Request(_, client, _, _) =>
+          responseOption foreach { response =>
+            client ! response
+            log.debug("response {} for {} is {}", id, client, response)
+          }
+          remove(request)
+      }
+
     case CheckTimeout =>
       val ts = now()
       val overdue = requestByTimeoutById.takeWhile { case (timeout, _) => ts > timeout }
       if (overdue.nonEmpty) {
-        counter = counter + 1
-        log.debug("incremented counter to {}", counter)
+        leaderCounter = leaderCounter + 1
+        log.debug("incremented counter to {}", leaderCounter)
       }
       val requests: Iterable[Request] = overdue flatMap {
         case (_, r) =>
@@ -192,7 +212,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
       underAttempts foreach { out =>
         val in = out.copy(attempt = out.attempt + 1, timeoutTime = now + timeoutMillis)
         replace(out, in)
-        val target = resolve(counter)
+        val target = resolveActorSelectorForIndex((leaderCounter % clusterSize).toInt)
         target ! in.command
         log.debug("resent request from {} to {} is {}", sender(), target, in.command)
       }
@@ -202,10 +222,10 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
       requestById.get(msgId) foreach {
         case out: Request =>
           // TODO do we want to validate that we were waiting for a message from that node?
-          counter = counter + 1
+          leaderCounter = leaderCounter + 1
           val in = out.copy(attempt = out.attempt + 1, timeoutTime = now + timeoutMillis)
           replace(out, in)
-          val target = resolve(counter)
+          val target = resolveActorSelectorForIndex((leaderCounter % clusterSize).toInt)
           target ! in.command
           log.debug("resent request from {} to {} is {}", sender(), target, in.command)
         case _ =>
@@ -213,31 +233,37 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
       }
 
     case nlle: NoLongerLeaderException =>
-      log.error("node {} responded to message {} with an exception: {}", nlle.nodeId, nlle.msgId, nlle.getMessage)
+      log.error("node {} responded to message {} with an NoLongerLeaderException so we don't know whether the command succeeded or failed: {}", nlle.nodeId, nlle.msgId, nlle.getMessage)
       requestById.get(nlle.msgId) foreach {
         case request@Request(_, client, _, _) =>
           client ! nlle
           remove(request)
       }
 
-    case ServerResponse(id, responseOption) =>
-      if (log.isDebugEnabled) log.debug("{} found is {} is in map {}", id, requestById.contains(id), requestById)
-      requestById.get(id) foreach {
-        case request@Request(_, client, _, _) =>
-          responseOption foreach { response =>
-            client ! response
-            log.debug("response {} for {} is {}", id, client, response)
-          }
-          remove(request)
-      }
+    case outdateableWork: OutdatableReadWork =>
+      // we round robin outdatable reads to followers.
+      followerCounter = followerCounter + 1
+      if( followerCounter == leaderCounter ) followerCounter = followerCounter + 1
+      outboundClientWork(followerCounter, outdateableWork)
+
+    case leaderRead@( _: StrongReadWork | _: TimelineReadWork) =>
+      // single or strong reads must be ordered with respect to writes so have to go via the leader
+      outboundClientWork(leaderCounter, leaderRead.asInstanceOf[AnyRef])
+
+
+
     case msg: Any =>
-      val bytes = getSerializer(msg.getClass).toBinary(msg.asInstanceOf[AnyRef])
+      outboundClientWork(leaderCounter, msg.asInstanceOf[AnyRef])
+  }
+
+  def outboundClientWork(counter: Long, work: AnyRef): Unit = {
+      val bytes = getSerializer(work.getClass).toBinary(work)
       val commandValue = ClientRequestCommandValue(incrementAndGetRequestId(), bytes)
       val request = Request(Platform.currentTime + timeoutMillis, sender(), commandValue, 1)
-      val target = resolve(counter)
+      val target = resolveActorSelectorForIndex((counter % clusterSize).toInt)
       target ! commandValue
       add(request)
-      log.debug("sent request from {} to {} is {} containing {}", sender(), target, commandValue, msg)
+      log.debug("sent normal request from {} to {} is {} containing {}", sender(), target, commandValue, work)
   }
 }
 
@@ -258,7 +284,12 @@ class StaticClusterDriver(timeout: Timeout, cluster: Cluster, maxAttempts: Int) 
   log.info("selections are: {}", selectionUrls)
 
   // cluster membership is static
-  def resolve(node: Int): ActorSelection = context.actorSelection(selectionUrls(node % cluster.nodes.size))
+  def resolveActorSelectorForIndex(node: Int): ActorSelection = context.actorSelection(selectionUrls(node))
+
+  /**
+    * Returns the current cluster size.
+    */
+  override protected def clusterSize: Int = cluster.nodes.size
 }
 
 case class Node(id: Int, host: String, clientPort: Int, nodePort: Int)
@@ -310,17 +341,17 @@ class TypedActorPaxosEndpoint(config: PaxosActor.Configuration, broadcastReferen
   }
 
   override val deliverClient: PartialFunction[Payload, AnyRef] = {
-    case Payload(logIndex, ClientRequestCommandValue(id, bytes)) =>
-      val mc@TypedActor.MethodCall(method, parameters) = deserialize(bytes)
+    case Payload(logIndex, c: CommandValue) =>
+      val mc@TypedActor.MethodCall(method, parameters) = deserialize(c.bytes)
       log.debug("delivering slot {} value {}", logIndex, mc)
       val result = Try {
         val response = Option(method.invoke(target, parameters: _*))
         log.debug(s"invoked ${method.getName} returned $response")
-        ServerResponse(id, response)
+        ServerResponse(c.msgId, response)
       } recover {
         case ex =>
           log.error(ex, s"call to $method with $parameters got exception $ex")
-          ServerResponse(id, Option(ex))
+          ServerResponse(c.msgId, Option(ex))
       }
       result.get
     case f => throw new AssertionError("unreachable code")

@@ -15,7 +15,7 @@ with PaxosLenses {
     "assign a command to the next slot" in {
       // given
       val agent = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)))
-      val value = ClientRequestCommandValue(9L, Array[Byte]())
+      val value = DummyCommandValue(1)
       // when
       val acceptOpt = ClientCommandHandler.acceptFor(agent, value)
       // then
@@ -156,7 +156,7 @@ with PaxosLenses {
       // and a client
       val client = DummyRemoteRef()
       // and a dummy value
-      val value = ClientRequestCommandValue(99L, Array[Byte]())
+      val value = DummyCommandValue(1)
       // when
       val PaxosAgent(_, _, data) = handler.handleClientCommand(ioWithTimeout, agent, value, client)
       // then

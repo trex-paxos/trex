@@ -58,7 +58,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
         assert(newData == nodeData)
       }
       {
-        val a1 = Accept(Identifier(1, BallotNumber(1, 1), 1L), ClientRequestCommandValue(0, Array[Byte](1, 1)))
+        val a1 = Accept(Identifier(1, BallotNumber(1, 1), 1L), DummyCommandValue(1))
         val acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(id -> AcceptResponsesAndTimeout(0L, a1, Map.empty))
         val newData = acceptResponsesLens.set(nodeData, acceptResponses)
         assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, a1, Map.empty))
@@ -94,7 +94,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
       }
       {
         val prepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]] = TreeMap(id -> Map.empty)
-        val a1 = Accept(Identifier(1, BallotNumber(1, 1), 1L), ClientRequestCommandValue(0, Array[Byte](1, 1)))
+        val a1 = Accept(Identifier(1, BallotNumber(1, 1), 1L), DummyCommandValue(1))
         val acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(id -> AcceptResponsesAndTimeout(0L, a1, Map.empty))
         val commandValue = new CommandValue {
           override def msgId: Long = 0L

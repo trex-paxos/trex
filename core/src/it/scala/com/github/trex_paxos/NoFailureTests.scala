@@ -2,7 +2,8 @@ package com.github.trex_paxos
 
 import akka.actor._
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
-import com.github.trex_paxos.library.{Payload, ClientRequestCommandValue, NoLongerLeaderException, CommandValue}
+import com.github.trex_paxos.internals.ClientRequestCommandValue
+import com.github.trex_paxos.library.{Payload, NoLongerLeaderException, CommandValue}
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.{BeforeAndAfterAll, _}
 

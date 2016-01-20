@@ -3,6 +3,7 @@ package com.github.trex_paxos
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import akka.util.Timeout
+import com.github.trex_paxos.internals.ClientRequestCommandValue
 import com.github.trex_paxos.library._
 import org.scalatest._
 

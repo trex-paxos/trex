@@ -83,7 +83,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     require(role == Leader || role == Recoverer)
     // given slot 1 has been accepted under the same number as previously committed slot 0 shown in initialData
     val identifier = Identifier(1, BallotNumber(lowValue, lowValue), 1L)
-    val value = ClientRequestCommandValue(0, expectedBytes)
+    val value = DummyCommandValue(0)
     val accepted = Accept(identifier, value)
     val stubJournal: Journal = stub[Journal]
     (stubJournal.accepted _) when(*) returns (Some(accepted))
@@ -115,7 +115,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     // self voted on accept id99
     val lastCommitted = Identifier(0, BallotNumber(1, 0), 98L)
     val id99 = Identifier(0, BallotNumber(1, 0), 99L)
-    val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
+    val a99 = Accept(id99,  DummyCommandValue(99))
     val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
     val responses = acceptResponsesLens.set(initialData, votes)
     val oldProgress = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
@@ -145,7 +145,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     val tempJournal = new InMemoryJournal()
     val lastCommitted = Identifier(0, BallotNumber(1, 0), 98L)
     val id99 = Identifier(0, BallotNumber(1, 0), 99L)
-    val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
+    val a99 = Accept(id99, DummyCommandValue(99))
     val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(
       0 -> AcceptAck(id99, 0, initialData.progress),
       1 -> AcceptNack(id99, 1, initialData.progress.copy(highestPromised = BallotNumber(22, 2)))
@@ -196,7 +196,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     val tempJournal = new InMemoryJournal()
     val lastCommitted = Identifier(0, BallotNumber(1, 0), 98L)
     val id99 = Identifier(0, BallotNumber(1, 0), 99L)
-    val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
+    val a99 = Accept(id99, DummyCommandValue(99))
     val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(
       0 -> AcceptAck(id99, 0, initialData.progress)
     )))

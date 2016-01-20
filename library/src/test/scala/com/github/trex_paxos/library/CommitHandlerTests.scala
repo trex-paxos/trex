@@ -8,8 +8,8 @@ import scala.collection.mutable.ArrayBuffer
 class TestableCommitHandler extends CommitHandler with OptionValues
 
 object CommitHandlerTests {
-  val v1 = ClientRequestCommandValue(0, Array[Byte](0))
-  val v3 = ClientRequestCommandValue(2, Array[Byte](2))
+  val v1 = DummyCommandValue(1)
+  val v3 = DummyCommandValue(3)
 
   val identifier11: Identifier = Identifier(1, BallotNumber(1, 1), 11L)
   val identifier12: Identifier = Identifier(2, BallotNumber(2, 2), 12L)
@@ -140,7 +140,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val handler = new Object with CommitHandler
       // and wrong values in journal
       val identifierMin = Identifier(0, BallotNumber(lowValue, lowValue), 1L)
-      val accepted = Accept(identifierMin, ClientRequestCommandValue(0,  expectedBytes))
+      val accepted = Accept(identifierMin, DummyCommandValue(0))
       val stubJournal = stub[Journal]
       (stubJournal.accepted _) when (*) returns Some(accepted)
       // and an agent
@@ -169,13 +169,13 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val otherNodeId = 1
 
       val id1 = Identifier(otherNodeId, BallotNumber(lowValue, 99), 1L)
-      (stubJournal.accepted _) when (1L) returns Some(Accept(id1, ClientRequestCommandValue(0, expectedBytes)))
+      (stubJournal.accepted _) when (1L) returns Some(Accept(id1, DummyCommandValue(1)))
 
       val id2 = Identifier(otherNodeId, BallotNumber(lowValue, 99), 2L)
       (stubJournal.accepted _) when (2L) returns None // gap
 
       val id3 = Identifier(otherNodeId, BallotNumber(lowValue, 99), 3L)
-      (stubJournal.accepted _) when (3L) returns Some(Accept(id3, ClientRequestCommandValue(0, expectedBytes)))
+      (stubJournal.accepted _) when (3L) returns Some(Accept(id3, DummyCommandValue(3)))
       // and an agent
       val agent = PaxosAgent(0, Follower, initialData)
       // and an io
@@ -207,13 +207,13 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       // given slots 1 and 3 match the promise but slot 2 has old value from failed leader.
 
       val id1 = Identifier(node1, BallotNumber(99, node1), 1L)
-      (stubJournal.accepted _) when (1L) returns Some(Accept(id1, ClientRequestCommandValue(0, expectedBytes)))
+      (stubJournal.accepted _) when (1L) returns Some(Accept(id1, DummyCommandValue(1)))
 
       val id2other = Identifier(node2, BallotNumber(98, node2), 2L)
-      (stubJournal.accepted _) when (2L) returns Some(Accept(id2other, ClientRequestCommandValue(0, expectedBytes)))
+      (stubJournal.accepted _) when (2L) returns Some(Accept(id2other, DummyCommandValue(2)))
 
       val id3 = Identifier(node1, BallotNumber(99, node1), 3L)
-      (stubJournal.accepted _) when (3L) returns Some(Accept(id3, ClientRequestCommandValue(0, expectedBytes)))
+      (stubJournal.accepted _) when (3L) returns Some(Accept(id3, DummyCommandValue(3)))
 
       // and an agent
       val agent = PaxosAgent(0, Follower, initialData)

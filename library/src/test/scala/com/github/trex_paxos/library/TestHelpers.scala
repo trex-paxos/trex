@@ -4,6 +4,12 @@ import Ordering._
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 
+case class DummyCommandValue(id: Long) extends CommandValue {
+  override def bytes: Array[Byte] = Array()
+
+  override def msgId: Long = id
+}
+
 object DummyRemoteRef {
   def apply(number: Int = 0) = s"DummyRemoteRef$number"
 }
@@ -147,12 +153,11 @@ object TestHelpers extends PaxosLenses{
   val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
     Seq((prepare.id -> Map(0 -> PrepareAck(prepare.id, 0, initialData.progress, 0, 0, None))))
 
-  val v3 = ClientRequestCommandValue(2, Array[Byte](2))
   val identifier99: Identifier = Identifier(2, BallotNumber(2, 2), 99L)
   val identifier100: Identifier = Identifier(3, BallotNumber(3, 3), 100L)
   val a99 = Accept(identifier99, NoOperationCommandValue)
 
-  val a100 = Accept(identifier100, v3)
+  val a100 = Accept(identifier100, DummyCommandValue(100))
 
   val emptyAcceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(
     a98.id -> AcceptResponsesAndTimeout(100L, a98, Map.empty),
@@ -190,7 +195,7 @@ object TestHelpers extends PaxosLenses{
       BallotNumber(lowValue, lowValue), Identifier(0, BallotNumber(lowValue, lowValue), 1)
     ), 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, String)])
 
-  val a101 = Accept(identifier101, v3)
+  val a101 = Accept(identifier101, DummyCommandValue(101))
 
   val misorderedAccepts = Seq(a98, a99, a101, a100)
 

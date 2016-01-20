@@ -114,7 +114,7 @@ class FollowerTests extends AllRolesTests {
 
   object `The Follower Function` {
     def `should be defined for a client command message` {
-      assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, ClientRequestCommandValue(0L, Array.empty[Byte]))))
+      assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue(0))))
     }
 
     def `should be defined for RetransmitRequest` {
@@ -389,9 +389,9 @@ class FollowerTests extends AllRolesTests {
       val tempJournal = new InMemoryJournal()
 
       // given some retransmitted committed values
-      val v1 = ClientRequestCommandValue(0, Array[Byte] {0})
-      val v2 = ClientRequestCommandValue(1, Array[Byte] {1})
-      val v3 = ClientRequestCommandValue(2, Array[Byte] {2})
+      val v1 = DummyCommandValue(1)
+      val v2 = DummyCommandValue(2)
+      val v3 = DummyCommandValue(3)
       val a1 =
         Accept(Identifier(1, BallotNumber(1, 1), 1L), v1)
       val a2 =
@@ -402,14 +402,14 @@ class FollowerTests extends AllRolesTests {
 
       // and a verifiable io
       val messages: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val delivered: ArrayBuffer[ClientRequestCommandValue] = ArrayBuffer()
+      val delivered: ArrayBuffer[DummyCommandValue] = ArrayBuffer()
       val io = new UndefinedIO with SilentLogging{
         override def send(msg: PaxosMessage): Unit = messages += msg
 
         override def randomTimeout: Long = 987654L
 
         override def deliver(payload: Payload): Any = payload match {
-          case Payload(_, c: ClientRequestCommandValue) => delivered += c
+          case Payload(_, c: DummyCommandValue) => delivered += c
           case _ =>
         }
 
@@ -461,13 +461,13 @@ class FollowerTests extends AllRolesTests {
       // given three uncommitted values in the journal
 
       val id1 = Identifier(0, BallotNumber(lowValue + 1, 0), 1)
-      val a1 = Accept(id1, ClientRequestCommandValue(0, expectedBytes))
+      val a1 = Accept(id1, DummyCommandValue(1))
 
       val id2 = Identifier(0, BallotNumber(lowValue + 1, 0), 2)
-      val a2 = Accept(id2, ClientRequestCommandValue(0, expectedBytes))
+      val a2 = Accept(id2, DummyCommandValue(2))
 
       val id3 = Identifier(0, BallotNumber(lowValue + 1, 0), 3)
-      val a3 = Accept(id3, ClientRequestCommandValue(0, expectedBytes))
+      val a3 = Accept(id3, DummyCommandValue(3))
 
       val tempJournal = new InMemoryJournal()
       tempJournal.a.put(1L , (0L, a1))
@@ -476,7 +476,7 @@ class FollowerTests extends AllRolesTests {
 
       // and a verifiable io
       val messages: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val delivered: ArrayBuffer[ClientRequestCommandValue] = ArrayBuffer()
+      val delivered: ArrayBuffer[DummyCommandValue] = ArrayBuffer()
       val io = new UndefinedIO with SilentLogging{
         override def send(msg: PaxosMessage): Unit = messages += msg
 
@@ -487,7 +487,7 @@ class FollowerTests extends AllRolesTests {
         override def minPrepare: Prepare = Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
 
         override def deliver(payload: Payload): Any = payload match {
-          case Payload(_, c: ClientRequestCommandValue) => delivered += c
+          case Payload(_, c: DummyCommandValue) => delivered += c
           case _ =>
         }
 

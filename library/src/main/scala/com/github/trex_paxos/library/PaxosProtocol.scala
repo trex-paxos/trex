@@ -233,27 +233,39 @@ case object CheckTimeout extends PaxosMessage
 case object HeartBeat extends PaxosMessage
 
 /**
- * Response to a client when the node is not currently the leader. The client should retry the message to another node in the cluster. Note the leader may have crashed and the responding node may become the leader next.
+ * Response to a client when the node is not currently the leader. The client should retry the message to another node
+ * in the cluster. Note the leader may have crashed and the responding node may become the leader next.
  * @param nodeId The node replying that it is not the leader.
  * @param msgId The client message identifier which the node is responding to.
  */
 case class NotLeader(val nodeId: Int, val msgId: Long) extends PaxosMessage
 
+/**
+  * Response to a client when the nodes is not currently a follower. As the leader is write bottleneck applications that
+  * can tolerate stale can reads can opt to spread some reads across all the replicas. This message is return in response
+  * to such follower reads. The client can retry other nodes (or even this node) until it gets a response.
+  *
+  * @param nodeId The node replying that it is has become the leader.
+  * @param msgId The client message which the node is responding to.
+  */
+case class NotFollower(val nodeId: Int, val msgId: Long) extends PaxosMessage
 
 /**
- * Response to a client when the nodes has lost its leadership during a fail-over.
- * The outcome of the client operation indicated by msgId is unknown as the operation may or may not be committed by the new leader.
+ * Response to a client when the nodes has lost its leadership whilst servicing a request during a fail-over due to
+ * either a network partition or a long stall. The outcome of the client operation indicated by msgId is unknown as the
+ * operation may or may not be committed by the new leader. The application will have to query data to learn whether the
+ * operation did actually work. Note that semantically this is no different from sending a tcp request to an open socket
+ * and not getting back a response; its not known whether the request was processed as there has been neither positive
+ * nor negative acknowledgement. Since we don't know if it is safe to retry the operation nor how to query to check it
+ * the host application will have to decided what to do next. Note that this may be thrown for read only work if the
+ * application used strong or single reads as those avoid returning stale data which may occur doing a leader failover.
+ *
  * @param nodeId The node replying that it is has lost the leader.
  * @param msgId The client message which the node is responding to.
  */
 case class NoLongerLeaderException(val nodeId: Int, val msgId: Long) extends RuntimeException with PaxosMessage {
   override def toString() = s"NoLongerLeaderException($nodeId,$msgId)"
 }
-
-/**
- * Client request command has an id to correlate to the server response.
- */
-case class ClientRequestCommandValue(msgId: Long, val bytes: Array[Byte]) extends CommandValue
 
 /**
  *

@@ -1,23 +1,19 @@
 package com.github.trex_paxos
 
 import java.io.FileWriter
-import java.util
-import java.util.Collections
 import java.util.concurrent.CopyOnWriteArrayList
 
 import akka.actor._
 import com.github.trex_paxos.internals.PaxosActor.TraceData
-import com.github.trex_paxos.internals.{PaxosActorWithTimeout, PaxosActor}
+import com.github.trex_paxos.internals.{ClientRequestCommandValue, PaxosActor, PaxosActorWithTimeout}
 import com.github.trex_paxos.library._
 import com.typesafe.config.Config
 
 import scala.annotation.tailrec
 import scala.collection.immutable.{Seq, SortedMap}
 import scala.collection.mutable
-import scala.concurrent.JavaConversions
 import scala.language.postfixOps
 import scala.util.Try
-
 
 class TestJournal extends Journal {
   private val _progress = Box(Journal.minBookwork.copy())

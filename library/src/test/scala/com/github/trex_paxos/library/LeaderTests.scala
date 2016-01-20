@@ -116,7 +116,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
     }
 
     def `should be defined for a client command message` {
-      assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, ClientRequestCommandValue(0L, Array.empty[Byte]))))
+      assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue(0))))
     }
 
     def `should be defined for a late PrepareResponse`  {
@@ -180,9 +180,9 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       // given some client commands
       val expectedString3 = "Lamport"
       val expectedBytes3 = expectedString3.getBytes
-      val c1 = ClientRequestCommandValue(0, expectedBytes)
-      val c2 = ClientRequestCommandValue(0, expectedBytes2)
-      val c3 = ClientRequestCommandValue(0, expectedBytes3)
+      val c1 = DummyCommandValue(1)
+      val c2 = DummyCommandValue(2)
+      val c3 = DummyCommandValue(3)
       // and a verifiable IO
       val stubJournal: Journal = stub[Journal]
       val sent = ArrayBuffer[PaxosMessage]()
@@ -263,13 +263,13 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       // and a leader who has committed slot 98 and broadcast slot 99
       val lastCommitted = Identifier(0, epoch, 98L)
       val id99 = Identifier(0, epoch, 99L)
-      val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
+      val a99 = Accept(id99, DummyCommandValue(99))
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
       val responses = acceptResponsesLens.set(initialData, votes)
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
       val data = responses.copy(progress = committed)
       val agent = PaxosAgent(0, Leader, data)
-      val accept = Accept(id99, ClientRequestCommandValue(0, expectedBytes))
+      val accept = Accept(id99, DummyCommandValue(99))
       inMemoryJournal.a.put(99L, (0L -> accept))
       // when it gets an ack giving it a majority
       val ack = AcceptAck(id99, 1, initialData.progress)
@@ -281,7 +281,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       }
       // it delivers the value
       Option(lastDelivered.get()) match {
-        case Some(ClientRequestCommandValue(0, expectedBytes)) => // good
+        case Some(DummyCommandValue(99)) => // good
         case f => fail(f.toString)
       }
       // and journal bookwork
@@ -320,9 +320,9 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       // and a leader who has committed slot 98 and broadcast slot 99 and 100
       val lastCommitted = Identifier(0, epoch, 98L)
       val id99 = Identifier(0, epoch, 99L)
-      val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
+      val a99 = Accept(id99, DummyCommandValue(99))
       val id100 = Identifier(0, epoch, 100L)
-      val a100 = Accept(id100, ClientRequestCommandValue(0, expectedBytes2))
+      val a100 = Accept(id100, DummyCommandValue(100))
 
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress)))) +
         (id100 -> AcceptResponsesAndTimeout(0L, a100, Map(0 -> AcceptAck(id100, 0, initialData.progress))))
@@ -331,9 +331,9 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
       val data = responses.copy(progress = committed)
       val agent = PaxosAgent(0, Leader, data)
-      val accept99 = Accept(id99, ClientRequestCommandValue(0, expectedBytes))
+      val accept99 = Accept(id99, DummyCommandValue(99))
       inMemoryJournal.a.put(99L, (0L -> accept99))
-      val accept100 = Accept(id100, ClientRequestCommandValue(0, expectedBytes2))
+      val accept100 = Accept(id100, DummyCommandValue(100))
       inMemoryJournal.a.put(100L, (0L -> accept100))
       // when it gets on accept giving it a majority but on 100 slot
       val ack1 = AcceptAck(id100, 1, initialData.progress)
@@ -350,12 +350,12 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       }
       // it delivers the values in order
       delivered.headOption.value match {
-        case ClientRequestCommandValue(0, expectedBytes) => // good
+        case DummyCommandValue(99) => // good
         case f => fail(f.toString)
       }
       // it delivers the values in order
       delivered.tail.headOption.value match {
-        case ClientRequestCommandValue(0, expectedBytes2) => // good
+        case DummyCommandValue(100) => // good
         case f => fail(f.toString)
       }
       // and journal bookwork
@@ -423,14 +423,14 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       // and a leader who has committed slot 98 and broadcast slot 99
       val lastCommitted = Identifier(0, epoch, 98L)
       val id99 = Identifier(0, epoch, 99L)
-      val a99 = Accept(id99, ClientRequestCommandValue(0, Array[Byte](1, 1)))
+      val a99 = Accept(id99, DummyCommandValue(99))
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
       val responses = acceptResponsesLens.set(initialData, votes)
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
-      val clientCommands: Map[Identifier, (CommandValue, String)] = Map(id99 -> (ClientRequestCommandValue(0, expectedBytes), "1"))
+      val clientCommands: Map[Identifier, (CommandValue, String)] = Map(id99 -> (DummyCommandValue(99), "1"))
       val data = responses.copy(progress = committed, clientCommands = clientCommands)
       val agent = PaxosAgent(0, Leader, data)
-      val accept = Accept(id99, ClientRequestCommandValue(0, expectedBytes))
+      val accept = Accept(id99, DummyCommandValue(99))
       inMemoryJournal.a.put(99L, (0L -> accept))
       // when it gets the messages
       val follower = messages.foldLeft(agent) {
