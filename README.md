@@ -7,7 +7,7 @@ sbt coverageReport
 ```
 [![Build Status](https://travis-ci.org/trex-paxos/trex.svg?branch=master)](https://travis-ci.org/trex-paxos/trex)
 [![Codacy Badge](https://www.codacy.com/project/badge/73b345d5a4c74a4d9d458596e64fe212)](https://www.codacy.com/app/simbo1905remixed/trex)
-[![Join the chat at https://gitter.im/trex-paxos](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/trex-paxos?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Join the chat at https://gitter.im/trex-paxos/trex](https://badges.gitter.im/trex-paxos/trex.svg)](https://gitter.im/trex-paxos/trex?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ## What is this? 
 
@@ -23,35 +23,36 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 - [x] overrideable send methods
 - [x] fix the fixmes
 - [x] extract a core functional library with no dependencies
-- [ ] retire monolithic tests and increase unit test coverage
-- [ ] nemesis (jepsen style destruction testing)
+- [x] breakup monolithic actor and increase unit test coverage
+- [ ] weak reads
+- [ ] java demo
+- [ ] jepsen destruction tests
 
 0.6 - practical
 
-- [ ] java demo
-- [ ] complete the TODOs
-- [ ] dynamic cluster membership  
+- [ ] dynamic cluster membership
+- [ ] noop heartbeats (less duels and partitioned leader detection)
 - [ ] snapshots and out of band retransmission
 - [ ] metrics/akka-tracing
 - [ ] binary tracing 
 - [ ] jumbo UDP packets
-- [ ] learners
+- [ ] learners / scale-out multicast
+- [ ] complete the TODOs
 
 0.7 - performance
 
+- [ ] optimised journal 
 - [ ] batching 
-- [ ] remove remote actor use akka tcp
-- [ ] multicast 
-- [ ] strong read optimisation
-- [ ] noop heartbeats to suppress duels
+- [ ] remove remote actor from client driver
+- [ ] replica strong reads
 - [ ] compression 
 - [ ] journal truncation by size 
+- [ ] periodically leader number boosting
 
 0.8 
 
-- [ ] final API 
-- [ ] mapdb compression
-- [ ] weak reads demo
+- [ ] final API
+- [ ] forwarded reads
 
 M1
 
