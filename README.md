@@ -29,6 +29,7 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 0.6 - practical
 
 - [ ] dynamic cluster membership
+- [ ] forced reconfigurations
 - [ ] timeline reads
 - [ ] noop heartbeats (less duels and partitioned leader detection)
 - [ ] snapshots and out of band retransmission
