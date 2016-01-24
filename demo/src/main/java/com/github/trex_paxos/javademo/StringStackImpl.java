@@ -1,11 +1,11 @@
 package com.github.trex_paxos.javademo;
 
-public class StringStackImpl implements StringStack {
+public class StringStackImpl implements StringStack
+{
     private java.util.Stack<String> stack = new java.util.Stack<String>();
 
     @Override
     public String push(String item) {
-        System.err.println("push: "+item);
         return stack.push(item);
     }
 
