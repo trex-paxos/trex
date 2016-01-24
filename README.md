@@ -24,6 +24,7 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 - [x] fix the fixmes
 - [x] extract a core functional library with no dependencies
 - [x] breakup monolithic actor and increase unit test coverage
+- [x] java demo
 - [ ] jepsen destruction tests
 
 0.6 - practical
