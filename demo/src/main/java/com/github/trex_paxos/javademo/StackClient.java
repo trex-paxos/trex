@@ -30,7 +30,7 @@ public class StackClient {
         System.exit(returned);
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
 
         if (args.length == 0) {
             usage(1);
@@ -68,7 +68,16 @@ public class StackClient {
                     } else {
                         System.out.println(stack.pop());
                     }
-                } else {
+
+                } else if (input.startsWith("peek")) {
+                    if (stack.empty()) {
+                        System.err.println("empty");
+                    } else {
+                        System.out.println(stack.peek());
+                    }
+
+                }
+                else {
                     System.err.println("not implemented: " + input);
                 }
             }

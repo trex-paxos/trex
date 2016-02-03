@@ -28,10 +28,10 @@ public class StackClusterNode {
             usage(1);
         }
 
-        final StringStack stack = new StringStackImpl();
-
         final String configName = args[0];
         final Integer nodeId = Integer.valueOf(args[1]);
+
+        final StringStack stack = new StringStackImpl(new File(System.getProperty("java.io.tmpdir")+"/stack"+nodeId.toString()));
 
         Config config = ConfigFactory.load(configName);
         Cluster cluster = Cluster.parseConfig(config);
