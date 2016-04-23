@@ -1,3 +1,11 @@
+## What is this? 
+
+Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more information else the wiki here on Github.
+
+## Releases
+
+Trex is now released to [Central] (http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22com.github.trex-paxos%22).
+
 ## Building
 
 ```
@@ -8,10 +16,6 @@ sbt coverageReport
 [![Build Status](https://travis-ci.org/trex-paxos/trex.svg?branch=master)](https://travis-ci.org/trex-paxos/trex)
 [![Codacy Badge](https://www.codacy.com/project/badge/73b345d5a4c74a4d9d458596e64fe212)](https://www.codacy.com/app/simbo1905remixed/trex)
 [![Join the chat at https://gitter.im/trex-paxos/trex](https://badges.gitter.im/trex-paxos/trex.svg)](https://gitter.im/trex-paxos/trex?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
-## What is this? 
-
-Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more information.
 
 ## Status /  Work Plan
 
