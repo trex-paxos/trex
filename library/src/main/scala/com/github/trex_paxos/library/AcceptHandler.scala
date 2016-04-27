@@ -4,13 +4,12 @@ trait AcceptHandler extends PaxosLenses {
 
   def handleAccept(io: PaxosIO, agent: PaxosAgent, accept: Accept): PaxosAgent = {
 
+    def lowerAccept(id: Identifier) = id.number < agent.data.progress.highestPromised
+
+    def higherAcceptForCommittedSlot(id: Identifier) = id.number > agent.data.progress.highestPromised && id.logIndex <= agent.data.progress.highestCommitted.logIndex
+
     accept.id match {
-      case id if id.number < agent.data.progress.highestPromised =>
-        // nack lower accept
-        io.send(AcceptNack(id, agent.nodeUniqueId, agent.data.progress))
-        agent
-      case id if id.number > agent.data.progress.highestPromised && id.logIndex <= agent.data.progress.highestCommitted.logIndex =>
-        // nack higher accept for slot which is committed
+      case id if lowerAccept(id) || higherAcceptForCommittedSlot(id) =>
         io.send(AcceptNack(id, agent.nodeUniqueId, agent.data.progress))
         agent
       case id if agent.data.progress.highestPromised <= id.number =>

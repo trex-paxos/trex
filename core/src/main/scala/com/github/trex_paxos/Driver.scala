@@ -151,11 +151,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
           overAttempt.client ! new TimeoutException(s"Exceeded maxAttempts $maxAttempts")
         }
         underAttempts foreach { out =>
-          val in = out.copy(attempt = out.attempt + 1, timeoutTime = now + timeoutMillis)
-          swap(out, in)
-          val target = resolveActorSelectorForIndex((leaderCounter % clusterSize).toInt)
-          target ! in.command
-          log.debug("resent request from {} to {} is {}", sender(), target, in.command)
+          resend(out)
         }
       }
 
@@ -170,11 +166,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
         case out: Request =>
           // FIXME check "leaderCounter % clusterSize == node" before incrementing the leader counter!
           leaderCounter = leaderCounter + 1
-          val in = out.copy(attempt = out.attempt + 1, timeoutTime = now + timeoutMillis)
-          swap(out, in)
-          val target = resolveActorSelectorForIndex((leaderCounter % clusterSize).toInt)
-          target ! in.command
-          log.debug("resent request from {} to {} is {}", sender(), target, in.command)
+          resend(out)
         case _ =>
           log.error("unreachable code but the code analyzer nags me about incomplete matches")
       }
@@ -194,6 +186,14 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
 
     case msg: Any =>
       outboundClientWork(leaderCounter, msg.asInstanceOf[AnyRef])
+  }
+
+  def resend(out: Request): Unit = {
+    val in = out.copy(attempt = out.attempt + 1, timeoutTime = now + timeoutMillis)
+    swap(out, in)
+    val target = resolveActorSelectorForIndex((leaderCounter % clusterSize).toInt)
+    target ! in.command
+    log.debug("resent request from {} to {} is {}", sender(), target, in.command)
   }
 
   def outboundClientWork(counter: Long, work: AnyRef): Unit = {
