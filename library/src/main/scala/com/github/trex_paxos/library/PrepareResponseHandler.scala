@@ -39,7 +39,7 @@ trait PrepareResponseHandler extends PaxosLenses with BackdownAgent {
         // register the vote
         val votes = map + (vote.from -> vote)
 
-        count(agent.data.clusterSize, votes.values, prepareVoteDiscriminator) match {
+        count(agent.data.clusterSize(), votes.values, prepareVoteDiscriminator) match {
           case Some(MajorityAck) =>
             // issue new prepare messages if others have accepted higher slot indexes
             val expandedPreparesData = expandedPrepareSlotRange(io, this, agent, votes)

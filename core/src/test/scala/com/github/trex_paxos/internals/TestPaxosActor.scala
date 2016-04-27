@@ -6,8 +6,8 @@ import com.github.trex_paxos.library._
 
 import scala.collection.mutable.ArrayBuffer
 
-class TestPaxosActor(config: PaxosActor.Configuration, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, val delivered: ArrayBuffer[CommandValue], tracer: Option[PaxosActor.Tracer])
-  extends PaxosActor(config, nodeUniqueId, broadcastRef, journal) {
+class TestPaxosActor(config: PaxosActor.Configuration, clusterSize: () => Int, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, val delivered: ArrayBuffer[CommandValue], tracer: Option[PaxosActor.Tracer])
+  extends PaxosActor(config, clusterSize, nodeUniqueId, broadcastRef, journal) {
 
   /**
    * Helper to initialize actor responses map. Converts actor refs to string and store the lookup for string to actor ref in the internal map

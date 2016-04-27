@@ -51,6 +51,8 @@ class UndefinedPrepareResponse extends PrepareResponse {
   override def progress: Progress = throw new AssertionError("deliberately not implemented")
 
   override def from: Int = throw new AssertionError("deliberately not implemented")
+
+  override def to: Int = throw new AssertionError("deliberately not implemented")
 }
 
 class UndefinedJournal extends Journal {
@@ -87,6 +89,8 @@ class UndefinedAcceptResponse extends AcceptResponse {
   override def from: Int = throw new AssertionError("deliberately not implemented")
 
   override def progress: Progress = throw new AssertionError("deliberately not implemented")
+
+  override def to: Int = throw new AssertionError("deliberately not implemented")
 }
 
 case class TimeAndParameter(time: Long, parameter: Any)
@@ -134,7 +138,7 @@ object TestHelpers extends PaxosLenses{
     ),
     leaderHeartbeat = 0,
     timeout = 0,
-    clusterSize = 3, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, String)])
+    clusterSize = () => 3, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, String)])
 
   val undefinedPrepareResponse = new UndefinedPrepareResponse
 
@@ -193,7 +197,7 @@ object TestHelpers extends PaxosLenses{
   val initialDataCommittedSlotOne = PaxosData(
     Progress(
       BallotNumber(lowValue, lowValue), Identifier(0, BallotNumber(lowValue, lowValue), 1)
-    ), 0, 0, 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, String)])
+    ), 0, 0, () => 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, String)])
 
   val a101 = Accept(identifier101, DummyCommandValue(101))
 
@@ -221,18 +225,18 @@ object TestHelpers extends PaxosLenses{
   val highPrepareEpoch = Some(recoverHighPrepare.id.number)
   val prepareSelfNack = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
     Seq((recoverHighPrepare.id -> Map(0 -> PrepareNack(recoverHighPrepare.id, 0, initialData.progress, 0, 0))))
-  val selfNackPrepares = initialData.copy(clusterSize = 3, epoch = highPrepareEpoch, prepareResponses = prepareSelfNack, acceptResponses = SortedMap.empty)
+  val selfNackPrepares = initialData.copy(clusterSize = () => 3, epoch = highPrepareEpoch, prepareResponses = prepareSelfNack, acceptResponses = SortedMap.empty)
 
   val prepareSelfAck = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
     Seq((recoverHighPrepare.id -> Map(0 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None))))
-  val selfAckPrepares = initialData.copy(clusterSize = 3, epoch = highPrepareEpoch, prepareResponses = prepareSelfAck, acceptResponses = SortedMap.empty)
+  val selfAckPrepares = initialData.copy(clusterSize = () => 3, epoch = highPrepareEpoch, prepareResponses = prepareSelfAck, acceptResponses = SortedMap.empty)
 
   val prepareSelfAck2 = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
     Seq(
       (recoverHighPrepare.id -> Map(0 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None))),
       (recoverHighPrepare2.id -> Map(0 -> PrepareAck(recoverHighPrepare2.id, 0, initialData.progress, 0, 0, None)))
     )
-  val selfAckPrepares2 = initialData.copy(clusterSize = 5, epoch = highPrepareEpoch, prepareResponses = prepareSelfAck2, acceptResponses = SortedMap.empty)
+  val selfAckPrepares2 = initialData.copy(clusterSize = () => 5, epoch = highPrepareEpoch, prepareResponses = prepareSelfAck2, acceptResponses = SortedMap.empty)
 
   val initialData97 = PaxosData(
     progress = Progress(
@@ -241,7 +245,7 @@ object TestHelpers extends PaxosLenses{
     ),
     leaderHeartbeat = 0,
     timeout = 0,
-    clusterSize = 3, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, String)])
+    clusterSize = () => 3, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, String)])
 
   val initialData96 = initialData97.copy(progress = progress96)
 

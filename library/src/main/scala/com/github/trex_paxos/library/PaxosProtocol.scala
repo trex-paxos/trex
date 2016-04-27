@@ -102,7 +102,7 @@ trait PrepareResponse extends PaxosMessage {
   def requestId: Identifier
 
   /**
-   * @return The node responding.
+   * @return The respondent nodeIdentifier
    */
   def from: Int
 
@@ -120,6 +120,11 @@ trait PrepareResponse extends PaxosMessage {
    * @return The last seen leader heartbeat. Used to detect a working leader behind a partial network partition to prevent unnecessary leader failover attempts. 
    */
   def leaderHeartbeat: Long
+
+  /**
+    * @return The recipient nodeIdentifier
+    */
+  def to: Int
 }
 
 /**
@@ -127,12 +132,16 @@ trait PrepareResponse extends PaxosMessage {
  *
  * @param highestAcceptedIndex The highest uncommitted log index accepted by the responding node.
  */
-case class PrepareAck(requestId: Identifier, from: Int, progress: Progress, highestAcceptedIndex: Long, leaderHeartbeat: Long, highestUncommitted: Option[Accept]) extends PrepareResponse
+case class PrepareAck(requestId: Identifier, from: Int, progress: Progress, highestAcceptedIndex: Long, leaderHeartbeat: Long, highestUncommitted: Option[Accept]) extends PrepareResponse {
+  override def to: Int = requestId.from
+}
 
 /**
  * Negatively acknowledge a [[Prepare]] message. See [[PrepareResponse]]
  */
-case class PrepareNack(requestId: Identifier, from: Int, progress: Progress, highestAcceptedIndex: Long, leaderHeartbeat: Long) extends PrepareResponse
+case class PrepareNack(requestId: Identifier, from: Int, progress: Progress, highestAcceptedIndex: Long, leaderHeartbeat: Long) extends PrepareResponse {
+  override def to: Int = requestId.from
+}
 
 /**
  * Accept proposes a value into a log index position. Followers must:
@@ -161,7 +170,7 @@ trait AcceptResponse extends PaxosMessage {
   def requestId: Identifier
 
   /**
-   * @return The unique identifier of the respondent
+   * @return The respondent nodeIdentifier
    */
   def from: Int
 
@@ -169,6 +178,11 @@ trait AcceptResponse extends PaxosMessage {
    * @return The high commit mark and high promise mark of the responding node.
    */
   def progress: Progress
+
+  /**
+    * @return The recipient nodeIdentifier
+    */
+  def to: Int
 }
 
 /**
@@ -176,7 +190,9 @@ trait AcceptResponse extends PaxosMessage {
  * @param requestId The request being positively acknowledged.
  * @param from The unique identifier of the respondent
  */
-case class AcceptAck(requestId: Identifier, from: Int, progress: Progress) extends AcceptResponse
+case class AcceptAck(requestId: Identifier, from: Int, progress: Progress) extends AcceptResponse {
+  override def to: Int = requestId.from
+}
 
 /**
  * Negative acknowledgement that the request has been rejected by the respondent. The progress in the reply gives an indication of the reason: either the respondent has made a higher promise else the respondent has committed the proposed slot.
@@ -184,7 +200,9 @@ case class AcceptAck(requestId: Identifier, from: Int, progress: Progress) exten
  * @param from The unique identifier of the respondent
  * @param progress The high commit mark and last promise of the responding node.
  */
-case class AcceptNack(requestId: Identifier, from: Int, progress: Progress) extends AcceptResponse
+case class AcceptNack(requestId: Identifier, from: Int, progress: Progress) extends AcceptResponse {
+  override def to: Int = requestId.from
+}
 
 /**
  * Commit messages indicate the highest committed log stream number. The leader shall heartbeat this message type to indicate that it is alive. Followers must:
@@ -256,14 +274,15 @@ case class NotFollower(val nodeId: Int, val msgId: Long) extends PaxosMessage
  * operation may or may not be committed by the new leader. The application will have to query data to learn whether the
  * operation did actually work. Note that semantically this is no different from sending a tcp request to an open socket
  * and not getting back a response; its not known whether the request was processed as there has been neither positive
- * nor negative acknowledgement. Since we don't know if it is safe to retry the operation nor how to query to check it
- * the host application will have to decided what to do next. Note that this may be thrown for read only work if the
- * application used strong or single reads as those avoid returning stale data which may occur doing a leader failover.
+ * nor negative acknowledgement. Trex doesn't know if it is safe to retry the operation nor how to query to check it
+ * happened so the host application will have to decided what to do next. Note that this may be thrown for read only
+ * work if the application used strong or single reads as those avoid returning stale data which may occur doing a
+ * leader failover.
  *
  * @param nodeId The node replying that it is has lost the leader.
  * @param msgId The client message which the node is responding to.
  */
-case class NoLongerLeaderException(val nodeId: Int, val msgId: Long) extends RuntimeException with PaxosMessage {
+case class LostLeadershipException(val nodeId: Int, val msgId: Long) extends RuntimeException with PaxosMessage {
   override def toString() = s"NoLongerLeaderException($nodeId,$msgId)"
 }
 

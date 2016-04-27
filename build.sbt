@@ -1,13 +1,13 @@
 
-val mapdbVersion = "1.0.8"
+val mapdbVersion = "1.0.9"
 val scalatestVersion = "2.2.5"
 val scalmockVersion = "3.2.2"
-val akkaVersion = "2.3.14"
+val akkaVersion = "2.3.15"
 
 lazy val commonSettings = Seq(
-  scalaVersion := "2.11.7",
+  scalaVersion := "2.11.8",
   organization := "com.github.trex-paxos",
-  version := "0.1",
+  version := "0.6",
   scalacOptions := Seq("-feature", "-deprecation", "-Xfatal-warnings")
 )
 

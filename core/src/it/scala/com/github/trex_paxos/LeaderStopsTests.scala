@@ -44,7 +44,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
       // it commits and sends by the response of -1.toByte
       expectMsgPF(2 second) {
         case bytes: Array[Byte] if bytes(0) == -1 * data() => // okay
-        case nlle: NoLongerLeaderException => // okay
+        case nlle: LostLeadershipException => // okay
         case x => fail(x.toString)
       }
 

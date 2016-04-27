@@ -3,7 +3,7 @@ package com.github.trex_paxos.demo
 import akka.actor._
 import akka.util.Timeout
 import com.github.trex_paxos.internals.{FileJournal, PaxosActor}
-import com.github.trex_paxos.{Cluster, StaticClusterDriver, TrexServer}
+import com.github.trex_paxos._
 import com.typesafe.config._
 import org.mapdb.{DB, DBMaker}
 
@@ -110,7 +110,7 @@ object TrexKVStore {
     val node = cluster.nodeMap.getOrElse(nodeId, throw new IllegalArgumentException(s"No node $nodeId in $cluster"))
 
     println(cluster)
-    val nodeMap = cluster.nodes.map(node => (node.id, node)).toMap
+    val nodeMap = cluster.nodes.map(node => (node.membershipId, node)).toMap
 
     nodeMap.get(nodeId) match {
       case Some(node) =>
@@ -133,8 +133,10 @@ object TrexKVStore {
         println(systemConfig.toString)
         // actor system with the node config
         val system = ActorSystem(cluster.name, systemConfig)
-        // generic entry point accepts TypedActor MethodCall messages and reflectively invokes them on our client app
-        system.actorOf(Props(classOf[TrexServer], cluster, PaxosActor.Configuration(config, cluster.nodes.size), node.id, journal, target))
+
+        val conf: PaxosActor.Configuration = new PaxosActor.Configuration(config)
+
+        system.actorOf(TrexStaticMembershipServer(cluster, conf, nodeId, journal, target))
 
       case None => err.println(s"$nodeId is not a valid node number in cluster $cluster")
     }

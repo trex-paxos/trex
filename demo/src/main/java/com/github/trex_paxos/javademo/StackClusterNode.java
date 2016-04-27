@@ -4,7 +4,9 @@ import akka.actor.ActorSystem;
 import akka.actor.Props;
 import com.github.trex_paxos.Cluster;
 import com.github.trex_paxos.Node;
-import com.github.trex_paxos.TrexServer;
+//import com.github.trex_paxos.TrexStaticMembershipServer;
+import com.github.trex_paxos.TrexStaticMembershipServer;
+import com.github.trex_paxos.TrexStaticMembershipServer$;
 import com.github.trex_paxos.internals.FileJournal;
 import com.github.trex_paxos.internals.PaxosActor;
 import com.github.trex_paxos.library.Journal;
@@ -49,8 +51,8 @@ public class StackClusterNode {
 
         final ActorSystem system = ActorSystem.create(cluster.name(), systemConfig);
 
-        PaxosActor.Configuration conf = new PaxosActor.Configuration(config, cluster.nodes().size());
+        PaxosActor.Configuration conf = new PaxosActor.Configuration(config);
 
-        system.actorOf(Props.create(TrexServer.class, cluster, conf, nodeId, journal, stack));
+        system.actorOf(TrexStaticMembershipServer$.MODULE$.apply(cluster, conf, nodeId, journal, stack));
     }
 }

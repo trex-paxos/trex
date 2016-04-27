@@ -35,8 +35,8 @@ class TestJournal extends Journal {
   }
 }
 
-class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: mutable.Buffer[Payload], tracer: Option[PaxosActor.Tracer])
-  extends PaxosActorWithTimeout(config, nodeUniqueId, broadcastRef, journal) {
+class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, clusterSize: () => Int, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: mutable.Buffer[Payload], tracer: Option[PaxosActor.Tracer])
+  extends PaxosActorWithTimeout(config, clusterSize, nodeUniqueId, broadcastRef, journal) {
 
   def broadcast(msg: Any): Unit = send(broadcastRef, msg)
 
@@ -103,7 +103,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
     journal(journal() + (i -> node))
     val deliver: mutable.Buffer[Payload] = collection.JavaConversions.asScalaBuffer(new CopyOnWriteArrayList[Payload])
     delivered(delivered() + (i -> deliver))
-    val actor: ActorRef = context.actorOf(Props(classOf[TestPaxosActorWithTimeout], PaxosActor.Configuration(config, size), i, self, node, deliver, Some(recordTraceData _)))
+    val actor: ActorRef = context.actorOf(Props(classOf[TestPaxosActorWithTimeout], PaxosActor.Configuration(config), () => size, i, self, node, deliver, Some(recordTraceData _)))
     children(children() + (i -> actor))
     log.info(s"$i -> $actor")
     lastRespondingLeader(actor)
@@ -177,7 +177,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
     /**
       * A node that we sent to have lost a leadership election due to stalls so we forward that onto the client.
       */
-    case nlle: NoLongerLeaderException =>
+    case nlle: LostLeadershipException =>
       log.info("got {} with valueByMsgId {} and valuesToClients {}", nlle, this.valueByMsgId, this.valuesToClients)
       val value = this.valueByMsgId()(nlle.msgId)
       value.bytes.headOption match {
@@ -201,7 +201,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       }
     case p: PrepareResponse =>
       children() foreach {
-        case (id, actor) if id == p.requestId.from =>
+        case (id, actor) if id == p.to =>
           log.info(s"$id <- $p : $actor <- $sender")
           actor ! p
         case _ =>
@@ -215,7 +215,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       }
     case a: AcceptResponse =>
       children() foreach {
-        case (id, actor) if id == a.requestId.from =>
+        case (id, actor) if id == a.to =>
           log.info(s"$id <- $a : $actor <- $sender")
           actor ! a
         case _ =>

@@ -51,13 +51,13 @@ class FileJournalSpec extends WordSpecLike with Matchers with BeforeAndAfter wit
         assert(new String(parsed.value.asInstanceOf[ClientRequestCommandValue].bytes, "UTF8") == "hello")
       }
       {
-        val accept = Accept(Identifier(1, minValue, 0), MembershipCommandValue(99L, Seq(ClusterMember(0, "zero", true), ClusterMember(1, "one", false))))
+        val accept = Accept(Identifier(1, minValue, 0), MembershipCommandValue(99L, Seq(ClusterMember(0, "zero", Active), ClusterMember(1, "one", Departed))))
         val bytes = Pickle.pack(accept)
         val parsed = Pickle.unpack(bytes).asInstanceOf[Accept]
         assert(parsed.id == accept.id)
         val membership: MembershipCommandValue = parsed.value.asInstanceOf[MembershipCommandValue]
         assert(membership.msgId == 99L)
-        assert(membership.members == Seq(ClusterMember(0, "zero", true), ClusterMember(1, "one", false)))
+        assert(membership.members == Seq(ClusterMember(0, "zero", Active), ClusterMember(1, "one", Departed)))
       }
     }
   }

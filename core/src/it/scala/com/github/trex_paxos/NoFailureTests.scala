@@ -3,7 +3,7 @@ package com.github.trex_paxos
 import akka.actor._
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import com.github.trex_paxos.internals.ClientRequestCommandValue
-import com.github.trex_paxos.library.{Payload, NoLongerLeaderException, CommandValue}
+import com.github.trex_paxos.library.{Payload, LostLeadershipException, CommandValue}
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.{BeforeAndAfterAll, _}
 
@@ -57,7 +57,7 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
     // it commits and sends by the response of -1.toByte else replies that it has lost the leadership
     expectMsgPF(12 second) {
       case bytes: Array[Byte] if bytes(0) == -1 => // okay first leader committed
-      case ex: NoLongerLeaderException if ex.msgId == expectedMsgId => // also okay first leader lost leadership
+      case ex: LostLeadershipException if ex.msgId == expectedMsgId => // also okay first leader lost leadership
       case x => fail(x.toString)
     }
 

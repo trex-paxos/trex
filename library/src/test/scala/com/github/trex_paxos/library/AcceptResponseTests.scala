@@ -188,7 +188,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       val numberOfNodes = 3
       val selfAcceptResponses = emptyAcceptResponses98 +
         (a98.id -> AcceptResponsesAndTimeout(50L, a98, Map(0 -> AcceptAck(a98.id, 0, progress97))))
-      val data = initialData.copy(clusterSize = numberOfNodes,
+      val data = initialData.copy(clusterSize = () => numberOfNodes,
         progress = progress97,
         epoch = Some(a98.id.number),
         acceptResponses = selfAcceptResponses)
@@ -253,7 +253,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
     "deals with a split vote in even number sized cluster" in {
       // given
       val handler = new Object with AcceptResponseHandler
-      val agent = PaxosAgent(0, Leader, initialData97.copy(clusterSize = 4, acceptResponses = acceptkAndTwoNack98))
+      val agent = PaxosAgent(0, Leader, initialData97.copy(clusterSize = () => 4, acceptResponses = acceptkAndTwoNack98))
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
       }
@@ -272,7 +272,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       val handler = new Object with AcceptResponseHandler
       // an agent committed up to slot 96 awaiting responses only on slot 98 so got illegal gap at slot 97
       val (id, AcceptResponsesAndTimeout(_, accept, responses)) = acceptkAndTwoNack98.headOption.value
-      val agent = PaxosAgent(0, Leader, initialData96.copy(clusterSize = 3, acceptResponses = acceptkAndTwoNack98))
+      val agent = PaxosAgent(0, Leader, initialData96.copy(clusterSize = () => 3, acceptResponses = acceptkAndTwoNack98))
       val errorLog = ArrayBuffer[String]()
       val ioRandomTimeout = new UndefinedIO {
         override def randomTimeout: Long = Long.MaxValue

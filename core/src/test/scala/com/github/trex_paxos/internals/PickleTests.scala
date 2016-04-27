@@ -95,7 +95,7 @@ class PickleTests extends WordSpecLike with Matchers {
         }
       }
       {
-        val a = Accept(Identifier(1, BallotNumber(2, 3), 4L), MembershipCommandValue(99L, Seq(ClusterMember(1, "x", true), ClusterMember(2, "y", false))))
+        val a = Accept(Identifier(1, BallotNumber(2, 3), 4L), MembershipCommandValue(99L, Seq(ClusterMember(1, "x", Active), ClusterMember(2, "y", Departed))))
         Pickle.unpack(Pickle.pack(a)) match {
           case `a` =>
           case f => fail(f.toString)

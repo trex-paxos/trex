@@ -171,7 +171,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
     val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
       Seq((recoverHighPrepare.id -> Map(0 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None))))
 
-    val data = initialData.copy(clusterSize = numberOfNodes, epoch = Some(recoverHighPrepare.id.number),
+    val data = initialData.copy(clusterSize = () => numberOfNodes, epoch = Some(recoverHighPrepare.id.number),
       prepareResponses = prepareSelfVotes, acceptResponses = SortedMap.empty)
 
     val agent = PaxosAgent(0, Recoverer, data)

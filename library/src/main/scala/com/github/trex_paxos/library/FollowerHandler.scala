@@ -57,7 +57,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
         case Some(map) =>
           val votes = map + (vote.from -> vote)
 
-          val haveMajorityResponse = votes.size > agent.data.clusterSize / 2
+          val haveMajorityResponse = votes.size > agent.data.clusterSize() / 2
 
           if (haveMajorityResponse) {
 
@@ -153,7 +153,7 @@ object FollowerHandler {
     // in a three node cluster if our link to the leader goes down we will see
     // one heartbeat from the follower we can see and that plus the leader we
     // cannot see is the majority evidence of a leader behind a network partition
-    def sufficientHeartbeatEvidence = largerHeartbeatCount + 1 > data.clusterSize / 2
+    def sufficientHeartbeatEvidence = largerHeartbeatCount + 1 > data.clusterSize() / 2
 
     def noLargerHeartbeatEvidence = largerHeartbeats.isEmpty
 

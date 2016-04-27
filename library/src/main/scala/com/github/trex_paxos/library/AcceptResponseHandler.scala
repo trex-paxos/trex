@@ -49,7 +49,7 @@ with CommitHandler {
 
   def handleFreshResponse(io: PaxosIO, agent: PaxosAgent, votes: Map[Int, AcceptResponse], accept: Accept, vote: AcceptResponse) = {
 
-    count(agent.data.clusterSize, votes.values, acceptVoteDiscriminator) match {
+    count(agent.data.clusterSize(), votes.values, acceptVoteDiscriminator) match {
       case Some(MajorityNack) =>
         io.logger.info("Node {} {} received a majority accept nack so has lost leadership becoming a follower.", agent.nodeUniqueId, agent.role)
         backdownAgent(io, agent)

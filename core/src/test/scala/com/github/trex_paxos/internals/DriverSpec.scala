@@ -87,9 +87,9 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
         case ClientRequestCommandValue(1, bytes) if fromBinary(bytes) == "hello" => // good
         case x => fail(x.toString)
       }
-      testProbe1.send(ref, new NoLongerLeaderException(2,1))
+      testProbe1.send(ref, new LostLeadershipException(2,1))
       clientProbe.expectMsgPF(1 seconds) {
-        case nlle: NoLongerLeaderException if nlle.msgId == 1 && nlle.nodeId == 2=> // success
+        case nlle: LostLeadershipException if nlle.msgId == 1 && nlle.nodeId == 2=> // success
         case x => fail(x.toString)
       }
     }

@@ -66,10 +66,40 @@ case class MembershipCommandValue(msgId: Long, members: Seq[ClusterMember]) exte
   override def bytes: Array[Byte] = emptyArray
 }
 
+object MemberStatus {
+  def resolve(id: Int) = id match {
+    case 0 => Unjoined
+    case 1 => Joining
+    case 2 => Active
+    case 3 => Leaving
+    case 4 => Departed
+  }
+}
+
+sealed trait MemberStatus {
+  def id: Int
+
+}
+case object Unjoined extends MemberStatus {
+  val id: Int = 0
+}
+case object Joining extends MemberStatus {
+  val id: Int = 1
+}
+case object Active extends MemberStatus {
+  val id: Int = 2
+}
+case object Leaving extends MemberStatus {
+  val id: Int = 3
+}
+case object Departed extends MemberStatus {
+  val id: Int = 4
+}
+
 /**
   * Placeholder currently not implemented.
   */
-private[trex_paxos] case class ClusterMember(nodeUniqueId: Int, location: String, active: Boolean)
+private[trex_paxos] case class ClusterMember(nodeUniqueId: Int, location: String, active: MemberStatus)
 
 /**
   * Placeholder currently not implemented.

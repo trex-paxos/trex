@@ -130,20 +130,17 @@ object Pickle extends LazyLogging {
   }
 
   def pickleClusterMember(m: ClusterMember) = {
-    val bool = if (m.active) ByteString(1.toByte) else ByteString(0.toByte)
-    pickleInt(m.nodeUniqueId) ++ pickleInt(m.location.getBytes("UTF8").length) ++ ByteString(m.location.getBytes("UTF8")) ++ bool
+    pickleInt(m.nodeUniqueId) ++ pickleInt(m.location.getBytes("UTF8").length) ++ ByteString(m.location.getBytes("UTF8")) ++ pickleInt(m.active.id)
   }
 
   def unpickleClusterMember(bytes: ByteString): (ClusterMember, ByteString) = {
     val (nodeUniqueId, r1) = bytes.splitAt(lengthOfInt)
     val (length, r2) = r1.splitAt(lengthOfInt)
     val l = unpickleInt(length)
-    val (location, bool) = r2.splitAt(l)
-    val active = bool.take(1).lastOption match {
-      case Some(b) if b == 0 => false
-      case _ => true
-    }
-    (ClusterMember(unpickleInt(nodeUniqueId), new String(location.toArray, "UTF8"), active), bool.drop(1))
+    val (location, r3) = r2.splitAt(l)
+    val (state, rest) = r3.splitAt(lengthOfInt)
+    val id = unpickleInt(state)
+    (ClusterMember(unpickleInt(nodeUniqueId), new String(location.toArray, "UTF8"), MemberStatus.resolve(id)), rest)
   }
 
   def pickleMembershipValue(m: MembershipCommandValue) = pickleLong(m.msgId) ++ pickleInt(m.members.size) ++ m.members.foldLeft(ByteString())((bs, m) => bs ++ pickleClusterMember(m))
