@@ -1,14 +1,13 @@
 package com.github.trex_paxos.javademo;
 
 import akka.actor.ActorSystem;
-import akka.actor.Props;
 import com.github.trex_paxos.Cluster;
 import com.github.trex_paxos.Node;
 //import com.github.trex_paxos.TrexStaticMembershipServer;
-import com.github.trex_paxos.TrexStaticMembershipServer;
 import com.github.trex_paxos.TrexStaticMembershipServer$;
 import com.github.trex_paxos.internals.FileJournal;
 import com.github.trex_paxos.internals.PaxosActor;
+import com.github.trex_paxos.internals.PaxosActorNoTimeout;
 import com.github.trex_paxos.library.Journal;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;

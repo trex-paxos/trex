@@ -2,7 +2,7 @@ package com.github.trex_paxos.internals
 
 import java.security.SecureRandom
 
-import akka.actor.{Actor, ActorLogging, ActorRef}
+import akka.actor.{Actor, ActorLogging, ActorRef, Cancellable}
 import PaxosActor._
 import com.github.trex_paxos.library._
 import com.typesafe.config.Config
@@ -21,7 +21,7 @@ import scala.util.Try
  * @param broadcastRef An ActorRef through which the current cluster can be messaged.
  * @param journal The durable journal required to store the state of the node in a stable manner between crashes.
  */
-abstract class PaxosActor(config: Configuration, clusterSize: () => Int, val nodeUniqueId: Int, broadcastRef: ActorRef, val journal: Journal) extends Actor
+abstract class PaxosActorNoTimeout(config: PaxosActor.Configuration, clusterSize: () => Int, val nodeUniqueId: Int, broadcastRef: ActorRef, val journal: Journal) extends Actor
 with PaxosIO
 with ActorLogging
 with AkkaLoggingAdapter {
@@ -117,6 +117,7 @@ with AkkaLoggingAdapter {
 
   /**
    * The deliver method is called when a command is committed after having been selected by consensus.
+ *
    * @param payload The selected value and a delivery id that can be used to deduplicate deliveries during crash recovery.
    * @return The response to the value command that has been delivered. May be an empty array.
    */
@@ -171,8 +172,8 @@ with AkkaLoggingAdapter {
  * For testability the timeout behavior is not part of the baseclass
  * This class reschedules a random interval CheckTimeout used to timeout on responses and an evenly spaced Paxos.HeartBeat which is used by a leader.
  */
-abstract class PaxosActorWithTimeout(config: Configuration, clusterSize: () => Int, nodeUniqueId: Int, broadcast: ActorRef, journal: Journal)
-  extends PaxosActor(config, clusterSize, nodeUniqueId, broadcast, journal) {
+abstract class PaxosActor(config: Configuration, clusterSize: () => Int, nodeUniqueId: Int, broadcast: ActorRef, journal: Journal)
+  extends PaxosActorNoTimeout(config, clusterSize, nodeUniqueId, broadcast, journal) {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.duration._
@@ -193,7 +194,7 @@ abstract class PaxosActorWithTimeout(config: Configuration, clusterSize: () => I
 
   def heartbeatInterval = config.leaderTimeoutMin / 4
 
-  val leaderHeartbeat = {
+  val leaderHeartbeat: Cancellable = { // TODO possibly a var and some callbacks on state changes to canel and restart
     log.info("Node {} setting heartbeat interval to {}", nodeUniqueId, heartbeatInterval)
     context.system.scheduler.schedule(Duration(5, MILLISECONDS), Duration(heartbeatInterval, MILLISECONDS), self, HeartBeat)
   }
@@ -206,7 +207,8 @@ object PaxosActor {
 
   class Configuration(config: Config) {
     /**
-     * You *must* test your max GC under extended peak load and set this as some multiple of observed GC pause to ensure cluster stability.
+     * To ensure cluster stability you *must* test your max GC under extended peak load and set this as some multiple
+      * of observed GC pause.
      */
     val leaderTimeoutMin = Try {
       config.getInt(leaderTimeoutMinKey)

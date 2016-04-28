@@ -3,7 +3,7 @@ package com.github.trex_paxos
 import akka.actor.{ActorRef, TypedActor}
 import akka.actor.TypedActor.MethodCall
 import akka.serialization.SerializationExtension
-import com.github.trex_paxos.internals.{PaxosActor, PaxosActorWithTimeout}
+import com.github.trex_paxos.internals.{PaxosActorNoTimeout, PaxosActorNoTimeout$, PaxosActor}
 import com.github.trex_paxos.library.{CommandValue, Journal, Payload, ServerResponse}
 
 import scala.util.Try
@@ -12,7 +12,7 @@ import scala.util.Try
 class TypedActorPaxosEndpoint(config: PaxosActor.Configuration, clusterSize: () => Int,
                               broadcastReference: ActorRef, nodeUniqueId: Int,
                               journal: Journal, target: AnyRef)
-  extends PaxosActorWithTimeout(config, clusterSize, nodeUniqueId, broadcastReference, journal) {
+  extends PaxosActor(config, clusterSize, nodeUniqueId, broadcastReference, journal) {
 
   def broadcast(msg: Any): Unit = send(broadcastReference, msg)
 

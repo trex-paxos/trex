@@ -5,7 +5,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 import akka.actor._
 import com.github.trex_paxos.internals.PaxosActor.TraceData
-import com.github.trex_paxos.internals.{ClientRequestCommandValue, PaxosActor, PaxosActorWithTimeout}
+import com.github.trex_paxos.internals.{ClientRequestCommandValue, PaxosActor}
 import com.github.trex_paxos.library._
 import com.typesafe.config.Config
 
@@ -35,8 +35,8 @@ class TestJournal extends Journal {
   }
 }
 
-class TestPaxosActorWithTimeout(config: PaxosActor.Configuration, clusterSize: () => Int, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: mutable.Buffer[Payload], tracer: Option[PaxosActor.Tracer])
-  extends PaxosActorWithTimeout(config, clusterSize, nodeUniqueId, broadcastRef, journal) {
+class TestPaxosActor(config: PaxosActor.Configuration, clusterSize: () => Int, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: mutable.Buffer[Payload], tracer: Option[PaxosActor.Tracer])
+  extends PaxosActor(config, clusterSize, nodeUniqueId, broadcastRef, journal) {
 
   def broadcast(msg: Any): Unit = send(broadcastRef, msg)
 
@@ -103,7 +103,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
     journal(journal() + (i -> node))
     val deliver: mutable.Buffer[Payload] = collection.JavaConversions.asScalaBuffer(new CopyOnWriteArrayList[Payload])
     delivered(delivered() + (i -> deliver))
-    val actor: ActorRef = context.actorOf(Props(classOf[TestPaxosActorWithTimeout], PaxosActor.Configuration(config), () => size, i, self, node, deliver, Some(recordTraceData _)))
+    val actor: ActorRef = context.actorOf(Props(classOf[TestPaxosActor], PaxosActor.Configuration(config), () => size, i, self, node, deliver, Some(recordTraceData _)))
     children(children() + (i -> actor))
     log.info(s"$i -> $actor")
     lastRespondingLeader(actor)
@@ -128,7 +128,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
 
   def receive: Receive = {
     /**
-      Spray a client request at any node in the cluster
+      * Spray a client request at any node in the cluster
      */
     case r@ClientRequestCommandValue(msgId, bytes) =>
       r.bytes(0) match {
@@ -143,7 +143,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       }
 
     /**
-      Got a response from a leader. Recorded who this leader is so we may kill it if asked to.
+      * Got a response from a leader. Recorded who this leader is so we may kill it if asked to.
     */
     case response: Array[Byte] =>
       response(0) match {

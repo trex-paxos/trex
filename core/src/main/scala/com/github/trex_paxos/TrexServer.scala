@@ -10,7 +10,7 @@ import com.github.trex_paxos.library._
 object TrexServer {
 
   def targetPropsFactory(config: PaxosActor.Configuration,
-                         clazz: Class[_ <: PaxosActor],
+                         clazz: Class[_ <: PaxosActorNoTimeout],
                          clusterSize: () => Int,
                          nodeUniqueId: Int,
                          journal: Journal,
@@ -78,10 +78,10 @@ object TrexStaticMembershipServer {
 }
 
 private[trex_paxos] class TrexStaticMembershipServer(cluster: Cluster,
-                                 config: PaxosActor.Configuration,
-                                 nodeUniqueId: Int,
-                                 journal: Journal,
-                                 target: AnyRef)
+                                                     config: PaxosActor.Configuration,
+                                                     nodeUniqueId: Int,
+                                                     journal: Journal,
+                                                     target: AnyRef)
   extends TrexRouting {
 
   val selfNode = cluster.nodeMap(nodeUniqueId)
@@ -105,9 +105,48 @@ private[trex_paxos] class TrexStaticMembershipServer(cluster: Cluster,
   override def networkListener: ActorRef = listenerRef
 
   def targetProps: (ActorRef) => Props =
-    TrexServer.targetPropsFactory(config, classOf[TypedActorPaxosEndpoint], cluster.nodeMap.size _, nodeUniqueId, journal, target)
+    TrexServer.targetPropsFactory(config,
+      classOf[TypedActorPaxosEndpoint],
+      cluster.nodeMap.size _,
+      nodeUniqueId,
+      journal,
+      target)
 
   val targetActorRef: ActorRef = context.system.actorOf(targetProps(self), "PaxosActor")
 
   override def paxosActor: ActorRef = targetActorRef
+}
+
+/**
+  * Cluster membership durable store.
+  * Currently the implimentation must be thread safe so that it can be updated by the main actor thread sychronously
+  * whilst it is read by the router.
+  */
+trait TrexMembershipStore {
+  def save(membership: Seq[Membership])
+  def load(): Seq[Membership]
+}
+
+private[trex_paxos] class TrexServer(membershipStore: TrexMembershipStore,
+                                     selfNode: Node,
+                                     config: PaxosActor.Configuration,
+                                     nodeUniqueId: Int,
+                                     journal: Journal,
+                                     target: AnyRef)
+  extends TrexRouting {
+
+  val listenerRef = context.system.actorOf(Props(classOf[UdpListener],
+  new InetSocketAddress(selfNode.host, selfNode.nodePort), self))
+
+  override def networkListener: ActorRef = listenerRef
+
+  /**
+    * @return The current cluster membership some of which may be passive observers.
+    */
+  override def peers: Map[Int, ActorRef] = ???
+
+  /**
+    * @return Outbound traffic originals from this paxos actor.
+    */
+  override def paxosActor: ActorRef = ???
 }

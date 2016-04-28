@@ -2,7 +2,7 @@ package com.github.trex_paxos.demo
 
 import akka.actor._
 import akka.util.Timeout
-import com.github.trex_paxos.internals.{FileJournal, PaxosActor}
+import com.github.trex_paxos.internals.{FileJournal, PaxosActor, PaxosActorNoTimeout}
 import com.github.trex_paxos._
 import com.typesafe.config._
 import org.mapdb.{DB, DBMaker}

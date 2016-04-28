@@ -10,7 +10,8 @@ import org.mapdb.{DB, DBMaker}
 import scala.collection.JavaConversions
 
 /**
- * A file based journal which retains a minimum committed history of values for retransmission. The underlying implementation is a MapDB BTree. 
+ * A file based journal which retains a minimum committed history of values for retransmission.
+  * The underlying implementation is a MapDB BTree.
  *
  * @param storeFile File to journal into. 
  * @param retained Minimum number of committed slots to retain for retransmission
