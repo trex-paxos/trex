@@ -11,6 +11,9 @@ import scala.collection.immutable.TreeMap
 import scala.collection.mutable.ArrayBuffer
 
 trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
+
+  val paxosAlgorithm = new PaxosAlgorithm
+
   def shouldIngoreLowerCommit(role: PaxosRole) {
     require(role == Leader || role == Recoverer)
     val agent = PaxosAgent(0, role, initialDataCommittedSlotOne)

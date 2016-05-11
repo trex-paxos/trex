@@ -19,13 +19,13 @@ trait Journal {
    * Synchronously journal progress bookwork. 
    * @param progress The highest committed and highest promised of this cluster node. 
    */
-  def save(progress: Progress): Unit
+  def saveProgress(progress: Progress): Unit
   
   /**
    * Load progress bookwork. 
    * @return The maximum promise and the highest commit identifier. 
    */
-  def load(): Progress
+  def loadProgress(): Progress
 
   /**
    * Synchronously save an accept message in its slot specified by the logIndex in the [[Identifier]] of the message.

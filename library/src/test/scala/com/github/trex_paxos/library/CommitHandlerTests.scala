@@ -163,7 +163,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val handler = new Object with CommitHandler
       // and a gap in the journal
       val stubJournal: Journal = stub[Journal]
-      (stubJournal.load _) when() returns (Journal.minBookwork)
+      (stubJournal.loadProgress _) when() returns (Journal.minBookwork)
 
       // given slots 1 thru 3 have been accepted under the same number as previously committed slot 0 shown in initialData
       val otherNodeId = 1
@@ -202,7 +202,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val node1 = 1
       val node2 = 2
       val stubJournal: Journal = stub[Journal]
-      (stubJournal.load _) when() returns (Progress(BallotNumber(99, node1), Identifier(node2, BallotNumber(98, node2), 0L)))
+      (stubJournal.loadProgress _) when() returns (Progress(BallotNumber(99, node1), Identifier(node2, BallotNumber(98, node2), 0L)))
 
       // given slots 1 and 3 match the promise but slot 2 has old value from failed leader.
 
@@ -250,7 +250,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
     "should commit next slow on different number and set new timeout" in {
       // given we have a11 thru a14 in the journal
       val stubJournal: Journal = new UndefinedJournal {
-        override def save(progress: Progress): Unit = ()
+        override def saveProgress(progress: Progress): Unit = ()
 
         override def accepted(logIndex: Long): Option[Accept] = journaled11thru14(logIndex)
       }
@@ -274,7 +274,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
     "should perform a fast-forward commit and set new timeout" in {
       // given we have a11 thru a14 in the journal
       val stubJournal: Journal = new UndefinedJournal {
-        override def save(progress: Progress): Unit = ()
+        override def saveProgress(progress: Progress): Unit = ()
 
         override def accepted(logIndex: Long): Option[Accept] = journaled11thru14(logIndex)
       }

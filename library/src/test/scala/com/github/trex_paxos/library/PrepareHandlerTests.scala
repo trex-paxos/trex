@@ -41,7 +41,7 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
 
     def `should have the new promise in the output agent data` {
       val mockJournal = stub[Journal]
-      (mockJournal.save _ ).when(*)
+      (mockJournal.saveProgress _ ).when(*)
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
       val io = new TestIO(mockJournal)
       testPromiseHandler.handlePrepare(io, agentPromise10, Prepare(Identifier(0, BallotNumber(11, 11), 10))) match {
@@ -56,7 +56,7 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
         prepareResponses = TreeMap(id -> Map.empty),
         acceptResponses = emptyAcceptResponses98)
       val mockJournal = stub[Journal]
-      (mockJournal.save _ ).when(*)
+      (mockJournal.saveProgress _ ).when(*)
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
       val io = new TestIO(mockJournal)
       testPromiseHandler.handlePrepare(io, agentPromise10.copy(data = recoverLikeData, role = Recoverer), Prepare(Identifier(0, BallotNumber(11, 11), 10))) match {
@@ -75,7 +75,7 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
       val clientCommands: Map[Identifier, (CommandValue, String)] = Map(id -> (NoOperationCommandValue -> DummyRemoteRef()))
       val clientCommandsData = initialData.copy(clientCommands = clientCommands)
       val mockJournal = stub[Journal]
-      (mockJournal.save _ ).when(*)
+      (mockJournal.saveProgress _ ).when(*)
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
       val sentNoLongerLeader = Box(false)
       val io = new TestIO(mockJournal) {

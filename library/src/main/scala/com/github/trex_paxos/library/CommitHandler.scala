@@ -30,7 +30,7 @@ trait CommitHandler extends PaxosLenses {
           (a.id, bytes)
         }
         val newProgress = Progress.highestCommittedLens.set(agent.data.progress, newHighestCommitted.id)
-        io.journal.save(newProgress)
+        io.journal.saveProgress(newProgress)
         (newProgress, results)
       case x =>
         (agent.data.progress, Seq.empty[(Identifier, Any)])

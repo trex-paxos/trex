@@ -100,7 +100,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
             io.logger.info("Node {} Follower broadcast {} prepare messages with {} transitioning Recoverer max slot index {}.", agent.nodeUniqueId, prepares.size, selfPromise, maxAcceptedSlot)
             // make a promise to self not to accept higher numbered messages and journal that
             val newData = highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens.set(agent.data, (selfPromise, io.randomTimeout, epoch, prepareSelfVotes, SortedMap.empty))
-            io.journal.save(newData.progress)
+            io.journal.saveProgress(newData.progress)
             prepares.foreach(io.send(_))
             agent.copy(role = Recoverer,
               data = newData)

@@ -18,7 +18,7 @@ trait RetransmitHandler extends PaxosLenses {
         io.deliver(p)
     }
 
-    io.journal.save(retransmission.newProgress)
+    io.journal.saveProgress(retransmission.newProgress)
     io.journal.accept(retransmission.accepts: _*)
 
     agent.copy(data = progressLens.set(agent.data, retransmission.newProgress))

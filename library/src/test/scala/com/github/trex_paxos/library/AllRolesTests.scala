@@ -11,7 +11,7 @@ class InMemoryJournal extends Journal {
   val lastSaveTime = new AtomicLong()
   val p: Box[(Long, Progress)] = new Box(None)
 
-  override def save(progress: Progress): Unit = {
+  override def saveProgress(progress: Progress): Unit = {
     val n = System.nanoTime()
     lastSaveTime.set(n)
     p((n, progress))
@@ -24,7 +24,7 @@ class InMemoryJournal extends Journal {
     JournalBounds(slots.min, slots.max)
   }
 
-  override def load(): Progress = p() match {
+  override def loadProgress(): Progress = p() match {
     case (_, p) => p
     case f => throw new IllegalArgumentException(f.toString)
   }
@@ -63,9 +63,9 @@ class TestAcceptMapJournal extends Journal {
 
   val progress: Box[Progress] = new Box(None)
 
-  def load(): Progress = progress()
+  def loadProgress(): Progress = progress()
 
-  def save(p: Progress): Unit = progress(p)
+  def saveProgress(p: Progress): Unit = progress(p)
 }
 
 class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValues with MockFactory {
@@ -95,6 +95,7 @@ class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValue
   }
 
   def shouldIngoreLatePrepareResponse(role: PaxosRole) {
+    val paxosAlgorithm = new PaxosAlgorithm
     val agent1 = PaxosAgent(0, role, initialDataCommittedSlotOne)
     val event1 = PaxosEvent(undefinedIO, agent1, PrepareNack(minPrepare.id, 2, initialData.progress, initialData.progress.highestCommitted.logIndex, Long.MaxValue))
     val PaxosAgent(_, newRole, data) = paxosAlgorithm(event1)

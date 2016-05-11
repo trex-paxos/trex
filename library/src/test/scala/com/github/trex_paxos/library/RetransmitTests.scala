@@ -85,7 +85,7 @@ with OptionValues {
       val saveTs = new AtomicLong
       val acceptTs = new AtomicLong
       val stubJournal: Journal = new UndefinedJournal {
-        override def save(progress: Progress): Unit = {
+        override def saveProgress(progress: Progress): Unit = {
           saveTs.set(System.nanoTime())
         }
 

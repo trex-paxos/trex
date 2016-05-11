@@ -129,18 +129,18 @@ object Pickle extends LazyLogging {
     NotLeader(unpickleInt(nodeId), unpickleLong(msgId))
   }
 
-  def pickleClusterMember(m: ClusterMember) = {
+  def pickleClusterMember(m: Member) = {
     pickleInt(m.nodeUniqueId) ++ pickleInt(m.location.getBytes("UTF8").length) ++ ByteString(m.location.getBytes("UTF8")) ++ pickleInt(m.active.id)
   }
 
-  def unpickleClusterMember(bytes: ByteString): (ClusterMember, ByteString) = {
+  def unpickleClusterMember(bytes: ByteString): (Member, ByteString) = {
     val (nodeUniqueId, r1) = bytes.splitAt(lengthOfInt)
     val (length, r2) = r1.splitAt(lengthOfInt)
     val l = unpickleInt(length)
     val (location, r3) = r2.splitAt(l)
     val (state, rest) = r3.splitAt(lengthOfInt)
     val id = unpickleInt(state)
-    (ClusterMember(unpickleInt(nodeUniqueId), new String(location.toArray, "UTF8"), MemberStatus.resolve(id)), rest)
+    (Member(unpickleInt(nodeUniqueId), new String(location.toArray, "UTF8"), MemberStatus.resolve(id)), rest)
   }
 
   def pickleMembershipValue(m: MembershipCommandValue) = pickleLong(m.msgId) ++ pickleInt(m.members.size) ++ m.members.foldLeft(ByteString())((bs, m) => bs ++ pickleClusterMember(m))
@@ -149,7 +149,7 @@ object Pickle extends LazyLogging {
     val (id, msg) = b.splitAt(lengthOfLong)
     val (size, remainder) = msg.splitAt(lengthOfInt)
     val s = unpickleInt(size)
-    def take(b: ByteString, members: Seq[ClusterMember], count: Int): Seq[ClusterMember] = {
+    def take(b: ByteString, members: Seq[Member], count: Int): Seq[Member] = {
       count match {
         case 0 =>
           members
@@ -170,7 +170,7 @@ object Pickle extends LazyLogging {
     // TODO consolidate with unpickleMembershipValue
     val (size, remainder) = b.splitAt(lengthOfInt)
     val s = unpickleInt(size)
-    def take(b: ByteString, members: Seq[ClusterMember], count: Int): Seq[ClusterMember] = {
+    def take(b: ByteString, members: Seq[Member], count: Int): Seq[Member] = {
       count match {
         case 0 =>
           members

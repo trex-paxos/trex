@@ -21,6 +21,18 @@ class ServerSpec extends TestKit(ActorSystem("ServerSpec", ServerSpec.config))
     TestKit.shutdownActorSystem(system)
   }
 
+  object `member pattern` {
+    def `will parse string`: Unit = {
+      import Member.pattern
+      val pattern(host, port) = "localhost:1234"
+      host shouldBe "localhost"
+      port shouldBe "1234"
+      val pattern(host2, port2) = "127.0.0.1:9876"
+      host2 shouldBe "127.0.0.1"
+      port2 shouldBe "9876"
+    }
+  }
+
   object `trex routing` {
 
     def testableRouting = {

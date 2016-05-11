@@ -7,6 +7,8 @@ import akka.io.Udp.CommandFailed
 import akka.io.{IO, Udp}
 import com.github.trex_paxos.internals.Pickle
 
+// TODO do we really need a UdpSender wrapper seems like its many actors possibly talking to one "IO(Udp)" else many to
+// many in which case why this intermediary.
 class UdpSender(remote: InetSocketAddress) extends Actor with ActorLogging {
 
   import context.system
@@ -17,7 +19,7 @@ class UdpSender(remote: InetSocketAddress) extends Actor with ActorLogging {
     case "status" =>
       sender ! false // not yet ready
     case Udp.SimpleSenderReady =>
-      log.info("ready to send")
+      log.info("ready to send to {}", remote)
       context.become(ready(sender()))
     case unknown => // we drop messages if we are not connected as paxos makes this safe
       log.warning("Unready UdpSender to {} dropping message {}", remote, unknown)
@@ -36,6 +38,7 @@ class UdpSender(remote: InetSocketAddress) extends Actor with ActorLogging {
   }
 }
 
+// TODO do we really need this wrapper class why not talk directly to the "IO(Udp)" respondant?
 class UdpListener(socket: InetSocketAddress, nextActor: ActorRef) extends Actor with ActorLogging {
 
   import context.system
@@ -53,7 +56,7 @@ class UdpListener(socket: InetSocketAddress, nextActor: ActorRef) extends Actor 
       log.error(s"failed to bind to $socket due to {}", c)
       context.stop(self)
     case unknown =>
-      log.error("bound listener for {} unknown message {}", socket, unknown.getClass)
+      log.error("unbound listener for {} cannot yet send message {}", socket, unknown.getClass)
   }
 
   def ready(s: ActorRef): Receive = {

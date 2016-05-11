@@ -160,7 +160,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       val handler = new TestFollowerHandler
       val highPrepares = ArrayBuffer[Prepare]()
       val journal = new UndefinedJournal {
-        override def save(progress: Progress): Unit = {}
+        override def saveProgress(progress: Progress): Unit = {}
 
         override def accepted(logIndex: Long): Option[Accept] = None
       }

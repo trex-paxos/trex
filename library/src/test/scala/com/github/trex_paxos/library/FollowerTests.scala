@@ -18,6 +18,8 @@ class FollowerTests extends AllRolesTests {
 
   object `The FollowingFunction` {
 
+    val paxosAlgorithm = new PaxosAlgorithm
+
     val commit = Commit(Identifier(0, BallotNumber(0, 0), 0))
 
     def `should be defined for a follower and a commit message` {
@@ -113,6 +115,7 @@ class FollowerTests extends AllRolesTests {
   }
 
   object `The Follower Function` {
+    val paxosAlgorithm = new PaxosAlgorithm
     def `should be defined for a client command message` {
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue(0))))
     }
@@ -175,6 +178,7 @@ class FollowerTests extends AllRolesTests {
   }
 
   object `A Follower` {
+    val paxosAlgorithm = new PaxosAlgorithm
     def `responds is not leader` {
       respondsIsNotLeader(Follower)
     }

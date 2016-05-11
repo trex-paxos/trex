@@ -4,25 +4,25 @@ package com.github.trex_paxos.internals
 import java.io.{Closeable, File}
 
 import akka.util.ByteString
-import com.github.trex_paxos.library.{Journal, JournalBounds, Accept, Progress, Identifier}
+import com.github.trex_paxos.TrexMembership
+import com.github.trex_paxos.library.{Accept, Identifier, Journal, JournalBounds, Progress}
 import org.mapdb.{DB, DBMaker}
 
 import scala.collection.JavaConversions
 
 /**
- * A file based journal which retains a minimum committed history of values for retransmission.
-  * The underlying implementation is a MapDB BTree.
- *
- * @param storeFile File to journal into. 
- * @param retained Minimum number of committed slots to retain for retransmission
- */
-class FileJournal(storeFile: File, retained: Int) extends Journal with Closeable {
+  * A MapDB storage engine. Note that you must call close on the file for a clean shutdown.
+  *
+  * @param journalFile File to journal into.
+  * @param retained    Minimum number of committed slots to retain for retransmission
+  */
+class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMembership with Closeable {
 
   // whether store needs initializing
-  val emptyStoreFile = storeFile.length == 0
+  val emptyStoreFile = journalFile.length == 0
 
   // MapDB store
-  val db: DB = DBMaker.newFileDB(storeFile).make();
+  val db: DB = DBMaker.newFileDB(journalFile).make()
 
   // holds the current bookwork such as highest committed index and other progress
   val bookworkMap: java.util.concurrent.ConcurrentNavigableMap[String, Array[Byte]] =
@@ -32,21 +32,13 @@ class FileJournal(storeFile: File, retained: Int) extends Journal with Closeable
   val storeMap: java.util.concurrent.ConcurrentNavigableMap[Long, Array[Byte]] =
     db.getTreeMap("VALUES")
 
-  // stores the cluster membership at a given slot position
-  val clusterMap: java.util.concurrent.ConcurrentNavigableMap[Long, String] =
-    db.getTreeMap("CLUSTER")
-
-  // stores accept messages at a given slot index
-  val memberMap: java.util.concurrent.ConcurrentNavigableMap[Long, Array[Byte]] =
-    db.getTreeMap("MEMBERS")
-
   protected def init(): Unit = {
-    save(Journal.minBookwork)
+    saveProgress(Journal.minBookwork)
   }
 
   if (emptyStoreFile) init()
 
-  def save(progress: Progress): Unit = {
+  def saveProgress(progress: Progress): Unit = {
     // save the bookwork
     val bytes = Pickle.pickle(progress)
     bookworkMap.put("FileJournal", bytes.toArray)
@@ -57,13 +49,9 @@ class FileJournal(storeFile: File, retained: Int) extends Journal with Closeable
       if (storeMap.containsKey(i))
         storeMap.remove(i)
     }
-    JavaConversions.asScalaSet(clusterMap.navigableKeySet).takeWhile(_ < logIndex - retained).foreach { i =>
-      if (clusterMap.containsKey(i))
-        clusterMap.remove(i)
-    }
   }
 
-  def load(): Progress = {
+  def loadProgress(): Progress = {
     val bytes = bookworkMap.get("FileJournal")
     Pickle.unpickleProgress(ByteString(bytes))
   }
@@ -75,7 +63,7 @@ class FileJournal(storeFile: File, retained: Int) extends Journal with Closeable
         val bytes = Pickle.pickle(a)
         storeMap.put(logIndex, bytes.toArray)
     }
-    if( a.nonEmpty ) db.commit()
+    if (a.nonEmpty) db.commit()
   }
 
   def accepted(logIndex: Long): Option[Accept] = {
@@ -99,5 +87,29 @@ class FileJournal(storeFile: File, retained: Int) extends Journal with Closeable
     else {
       JournalBounds(keysAscending.iterator().next(), keysAscending.descendingSet().iterator().next())
     }
+  }
+
+  // stores the current cluster membership at a given slot
+  val memberMap: java.util.concurrent.ConcurrentNavigableMap[Long, Array[Byte]] =
+    db.getTreeMap("MEMBERS")
+
+  override def loadMembership(): Option[Membership] = {
+    import scala.collection.JavaConverters._
+    val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
+    lastSlotOption map { s =>
+      Pickle.unpickleMembership(ByteString(memberMap.get(s)))
+    }
+  }
+
+  override def saveMembership(slot: Long, membership: Membership): Unit = {
+    import scala.collection.JavaConverters._
+    val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
+    lastSlotOption foreach {
+      case last if last < slot => // good
+      case last => throw new IllegalArgumentException(s"slot ${slot} is not higher than last ${last}")
+    }
+    memberMap.put(slot, Pickle.pickleMembership(membership).toArray)
+    db.commit()
+    // TODO consider gc of old values
   }
 }

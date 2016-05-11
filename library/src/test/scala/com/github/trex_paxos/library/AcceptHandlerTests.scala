@@ -49,7 +49,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val journal = new UndefinedJournal {
         override def accept(a: Accept*): Unit = {}
 
-        override def save(progress: Progress): Unit = saveTs.set(System.nanoTime)
+        override def saveProgress(progress: Progress): Unit = saveTs.set(System.nanoTime)
       }
       val agent = PaxosAgent(1, Follower, TestHelpers.initialData)
       val io = new TestIO(journal)

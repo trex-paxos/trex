@@ -106,7 +106,7 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
       val saveJournalTime = Box(0L)
       val acceptJournalTime = Box(0L)
       val tempJournal = new UndefinedJournal {
-        override def save(progress: Progress): Unit = saveJournalTime(System.nanoTime())
+        override def saveProgress(progress: Progress): Unit = saveJournalTime(System.nanoTime())
 
         override def accept(a: Accept*): Unit = acceptJournalTime(System.nanoTime())
       }

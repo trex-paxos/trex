@@ -26,7 +26,7 @@ trait ResendHandler extends PaxosLenses {
     val AcceptsAndData(accepts, newData) = computeResendAccepts(io, agent, time)
     // if we have bumped the epoch we need to save fresh accepts and journal the new progress
     if (newData.epoch != agent.data.epoch) {
-      io.journal.save(newData.progress)
+      io.journal.saveProgress(newData.progress)
       io.journal.accept(accepts.toSeq: _*)
     }
     // broadcast the requests

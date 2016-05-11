@@ -2,15 +2,27 @@ package com.github.trex_paxos
 
 import java.util.concurrent.TimeoutException
 
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection}
+import akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, ActorSelection}
 import akka.serialization.{SerializationExtension, Serializer}
 import akka.util.Timeout
+import com.github.trex_paxos.BaseDriver.SelectionUrlFactory
 import com.github.trex_paxos.internals.ClientRequestCommandValue
 import com.github.trex_paxos.library.{LostLeadershipException, _}
 
 import scala.collection.SortedMap
 import scala.compat.Platform
 import scala.concurrent.duration._
+
+object BaseDriver {
+  type SelectionUrlFactory = (ActorContext, Cluster) => Map[Int, String]
+
+  def defaultSelectionUrlFactory(context: ActorContext, cluster: Cluster): Map[Int, String] = {
+    val nodeAndUrl = cluster.nodes.map { node =>
+      (node.nodeUniqueId, s"akka.tcp://${cluster.name}@${node.host}:${node.clientPort}/user/PaxosActor")
+    }
+    (cluster.nodes.indices zip nodeAndUrl.map( {case (_, s) => s} )).toMap
+  }
+}
 
 /**
   * Driver baseclass logic forwards messages to a trex cluster switching nodes until it finds the leader.
@@ -213,24 +225,27 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
   * @param timeout The client timeout. It is recommended that this is significantly longer than the cluster failover timeout.
   * @param cluster The static cluster members.
   */
-class StaticClusterDriver(timeout: Timeout, cluster: Cluster, maxAttempts: Int) extends BaseDriver(timeout, maxAttempts) with ActorLogging {
+class StaticClusterDriver(timeout: Timeout,
+                          cluster: Cluster,
+                          maxAttempts: Int,
+                          factory: SelectionUrlFactory = BaseDriver.defaultSelectionUrlFactory _ )
+  extends BaseDriver(timeout, maxAttempts) with ActorLogging {
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
   // TODO inject these timings from config
   context.system.scheduler.schedule(Duration(5, MILLISECONDS), Duration(1000, MILLISECONDS), self, CheckTimeout)
 
-  // FIXME string should be from config
-  def selections = cluster.nodes.map { node =>
-    (node.membershipId, s"akka.tcp://${cluster.name}@${node.host}:${node.clientPort}/user/PaxosActor")
-  }
-
-  val selectionUrls: Map[Int, String] = (cluster.nodes.indices zip selections.map( {case (_, s) => s} )).toMap
+  val selectionUrls = factory(context, cluster)
 
   log.info("selections are: {}", selectionUrls)
 
   // cluster membership is static
-  def resolveActorSelectorForIndex(node: Int): ActorSelection = context.actorSelection(selectionUrls(node))
+  def resolveActorSelectorForIndex(node: Int): ActorSelection = {
+    val url = selectionUrls(node)
+    val result = context.actorSelection(url)
+    result
+  }
 
   /**
     * Returns the current cluster size.

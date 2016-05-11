@@ -1,15 +1,12 @@
 package com.github.trex_paxos.internals
 
-import java.util.concurrent.atomic.AtomicReference
-
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import com.github.trex_paxos.internals.PaxosActor.Configuration
 import com.github.trex_paxos.library._
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
 
-import scala.collection.immutable.{SortedMap, TreeMap}
+import scala.collection.immutable.SortedMap
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -27,9 +24,9 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
     val _progress = Box(Journal.minBookwork.copy())
     val _map = Box(SortedMap[Long, Accept]())
 
-    def save(progress: Progress): Unit = _progress(progress)
+    def saveProgress(progress: Progress): Unit = _progress(progress)
 
-    def load(): Progress = _progress()
+    def loadProgress(): Progress = _progress()
 
     def accept(accepted: Accept*): Unit = accepted foreach { a =>
       _map(_map() + (a.id.logIndex -> a))
@@ -55,10 +52,10 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       expectNoMsg(25 millisecond)
       // given node zero
       val node0 = new TestJournal
-      val actor0 = TestActorRef(new TestPaxosActorNoTimeout(Configuration(InteractionSpec.config), () => 3, 0, self, node0, ArrayBuffer.empty, None))
+      val actor0 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 0, self, node0, ArrayBuffer.empty, None))
       // and node one
       val node1 = new TestJournal
-      val actor1 = TestActorRef(new TestPaxosActorNoTimeout(Configuration(InteractionSpec.config), () => 3, 1, self, node1, ArrayBuffer.empty, None))
+      val actor1 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 1, self, node1, ArrayBuffer.empty, None))
       // when node zero times-out
       actor0 ! CheckTimeout
       // it issues a low prepare
@@ -169,11 +166,11 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
     def `should return a response to the correct client` {
       // given node zero leader
       val node0 = new TestJournal
-      val actor0 = TestActorRef(new TestPaxosActorNoTimeout(Configuration(InteractionSpec.config), () => 3, 0, self, node0, ArrayBuffer.empty, None))
+      val actor0 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 0, self, node0, ArrayBuffer.empty, None))
       actor0.underlyingActor.setAgent(Leader, actor0.underlyingActor.data.copy(clientCommands = Map.empty, acceptResponses = SortedMap.empty, epoch = Some(BallotNumber(1, 1))))
       // and node one
       val node1 = new TestJournal
-      val actor1 = TestActorRef(new TestPaxosActorNoTimeout(Configuration(InteractionSpec.config), () => 3, 1, self, node1, ArrayBuffer.empty, None))
+      val actor1 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 1, self, node1, ArrayBuffer.empty, None))
       // different responses go back to different actors
       performConsensus(actor0, actor1, new TestProbe(system), 22)
       performConsensus(actor0, actor1, new TestProbe(system), 33)
@@ -215,21 +212,21 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
     def `should return NoLongerLeader during a failover` {
       // given node0 leader
       val node0 = new TestJournal
-      val actor0 = TestActorRef(new TestPaxosActorNoTimeout(Configuration(InteractionSpec.config), () => 3, 0, self, node0, ArrayBuffer.empty, None))
+      val actor0 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 0, self, node0, ArrayBuffer.empty, None))
       actor0.underlyingActor.setAgent(Leader, actor0.underlyingActor.data.copy(clientCommands = Map.empty, acceptResponses = SortedMap.empty, epoch = Some(BallotNumber(counter = Int.MinValue + 1, nodeIdentifier = 0))))
 
       // and some higher promise
-      val node0progress = node0.load()
+      val node0progress = node0.loadProgress()
       val higherPromise = node0progress.copy(highestPromised = node0progress.highestPromised.copy(counter = node0progress.highestPromised.counter + 1, nodeIdentifier = 1))
 
       // and node1 which has made the higher promise
       val node1 = new TestJournal
-      node1.save(higherPromise)
-      val actor1 = TestActorRef(new TestPaxosActorNoTimeout(Configuration(InteractionSpec.config), () => 3, 1, self, node1, ArrayBuffer.empty, None))
+      node1.saveProgress(higherPromise)
+      val actor1 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 1, self, node1, ArrayBuffer.empty, None))
       // and node2 which has made the higher promise
       val node2 = new TestJournal
-      node2.save(higherPromise)
-      val actor2 = TestActorRef(new TestPaxosActorNoTimeout(Configuration(InteractionSpec.config), () => 3, 2, self, node2, ArrayBuffer.empty, None))
+      node2.saveProgress(higherPromise)
+      val actor2 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 2, self, node2, ArrayBuffer.empty, None))
 
       // when a client sends to actor0
       val client = new TestProbe(system)
@@ -282,7 +279,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       expectNoMsg(25 millisecond)
       // given node zero
       val journal0 = new TestJournal
-      val actor0 = TestActorRef(new TestPaxosActorNoTimeout(Configuration(InteractionSpec.config), () => 3, 0, self, journal0, ArrayBuffer.empty, None))
+      val actor0 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 0, self, journal0, ArrayBuffer.empty, None))
       // and node one with a three accepted values but no committed
       val journal1 = new TestJournal
       val v1 = ClientRequestCommandValue(11, Array[Byte] {
@@ -298,7 +295,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       val a2 = Accept(Identifier(0, BallotNumber(Int.MinValue + 1, Int.MinValue + 1), 2L), v2)
       val a3 = Accept(Identifier(0, BallotNumber(Int.MinValue + 1, Int.MinValue + 1), 3L), v3)
       journal1.accept(Seq(a1, a2, a3): _*)
-      val actor1 = TestActorRef(new TestPaxosActorNoTimeout(Configuration(InteractionSpec.config), () => 3, 1, self, journal1, ArrayBuffer.empty, None))
+      val actor1 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 1, self, journal1, ArrayBuffer.empty, None))
       // when node zero times-out
       actor0 ! CheckTimeout
       // it issues a low prepare

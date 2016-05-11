@@ -95,7 +95,7 @@ with CommitHandler {
 
     io.logger.debug("Node {} committed {} with new progress {} and results {}", agent.nodeUniqueId, lastId, newProgress, results)
 
-    io.journal.save(newProgress)
+    io.journal.saveProgress(newProgress)
 
     io.send(Commit(newProgress.highestCommitted))
 

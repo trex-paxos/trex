@@ -62,49 +62,53 @@ case class OutdatableReadWork(val raw: AnyRef) extends OptimizableReadOnlyWork
 /**
   * Placeholder currently not implemented.
   */
-case class MembershipCommandValue(msgId: Long, members: Seq[ClusterMember]) extends CommandValue {
+case class MembershipCommandValue(msgId: Long, members: Seq[Member]) extends CommandValue {
   override def bytes: Array[Byte] = emptyArray
 }
 
 object MemberStatus {
   def resolve(id: Int) = id match {
-    case 0 => Unjoined
-    case 1 => Joining
-    case 2 => Active
-    case 3 => Leaving
-    case 4 => Departed
+    case 0 => Learning
+    case 1 => Accepting
+    case 2 => Departed
   }
 }
 
 sealed trait MemberStatus {
   def id: Int
-
 }
-case object Unjoined extends MemberStatus {
+
+case object Learning extends MemberStatus {
   val id: Int = 0
 }
-case object Joining extends MemberStatus {
+
+case object Accepting extends MemberStatus {
   val id: Int = 1
 }
-case object Active extends MemberStatus {
+
+case object Departed extends MemberStatus {
   val id: Int = 2
 }
-case object Leaving extends MemberStatus {
-  val id: Int = 3
-}
-case object Departed extends MemberStatus {
-  val id: Int = 4
+
+object Member {
+  val pattern = "(.+):([0-9]+)".r
 }
 
 /**
-  * Placeholder currently not implemented.
+  * Details of a member of the current paxos cluster.
+ *
+  * @param nodeUniqueId The unique paxos number for this membership
+  * @param location     The location typically given as "host:port".
+  * @param active       The status of the member.
   */
-private[trex_paxos] case class ClusterMember(nodeUniqueId: Int, location: String, active: MemberStatus)
+private[trex_paxos] case class Member(nodeUniqueId: Int, location: String, active: MemberStatus)
 
 /**
-  * Placeholder currently not implemented.
+  * A complete Paxos cluster.
+ *
+  * @param members The unique members of the cluster.
   */
-private[trex_paxos] case class Membership(members: Seq[ClusterMember])
+private[trex_paxos] case class Membership(members: Seq[Member])
 
 /**
   * Placeholder currently not implemented.

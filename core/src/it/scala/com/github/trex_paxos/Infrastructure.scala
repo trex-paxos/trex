@@ -5,7 +5,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 import akka.actor._
 import com.github.trex_paxos.internals.PaxosActor.TraceData
-import com.github.trex_paxos.internals.{ClientRequestCommandValue, PaxosActor}
+import com.github.trex_paxos.internals.{ClientRequestCommandValue, PaxosActor, PaxosProperties}
 import com.github.trex_paxos.library._
 import com.typesafe.config.Config
 
@@ -19,9 +19,9 @@ class TestJournal extends Journal {
   private val _progress = Box(Journal.minBookwork.copy())
   private val _map = Box(SortedMap[Long, Accept]())
 
-  def save(progress: Progress): Unit = _progress(progress)
+  def saveProgress(progress: Progress): Unit = _progress(progress)
 
-  def load(): Progress = _progress()
+  def loadProgress(): Progress = _progress()
 
   def accept(accepted: Accept*): Unit = accepted foreach { a =>
     _map(_map() + (a.id.logIndex -> a))
@@ -35,10 +35,10 @@ class TestJournal extends Journal {
   }
 }
 
-class TestPaxosActor(config: PaxosActor.Configuration, clusterSize: () => Int, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: mutable.Buffer[Payload], tracer: Option[PaxosActor.Tracer])
-  extends PaxosActor(config, clusterSize, nodeUniqueId, broadcastRef, journal) {
+class TestPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: mutable.Buffer[Payload], tracer: Option[PaxosActor.Tracer])
+  extends PaxosActor(config, nodeUniqueId, journal) {
 
-  def broadcast(msg: Any): Unit = send(broadcastRef, msg)
+  override def broadcast(msg: PaxosMessage): Unit = send(broadcastRef, msg)
 
   // does nothing but makes this class concrete for testing
   val deliverClient: PartialFunction[Payload, AnyRef] = {
@@ -59,6 +59,9 @@ class TestPaxosActor(config: PaxosActor.Configuration, clusterSize: () => Int, n
   override def heartbeatInterval = 33
 
   override def trace(event: PaxosEvent, sender: String, sent: Seq[PaxosMessage]): Unit = tracer.foreach(t => t(TraceData(System.nanoTime(), nodeUniqueId, event.agent.role, event.agent.data, sender, event.message, sent)))
+
+  override def clusterSize: Int = clusterSizeF()
+
 }
 
 object ClusterHarness {
@@ -103,7 +106,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
     journal(journal() + (i -> node))
     val deliver: mutable.Buffer[Payload] = collection.JavaConversions.asScalaBuffer(new CopyOnWriteArrayList[Payload])
     delivered(delivered() + (i -> deliver))
-    val actor: ActorRef = context.actorOf(Props(classOf[TestPaxosActor], PaxosActor.Configuration(config), () => size, i, self, node, deliver, Some(recordTraceData _)))
+    val actor: ActorRef = context.actorOf(Props(classOf[TestPaxosActor], PaxosProperties(config), () => size, i, self, node, deliver, Some(recordTraceData _)))
     children(children() + (i -> actor))
     log.info(s"$i -> $actor")
     lastRespondingLeader(actor)

@@ -1,13 +1,12 @@
 package com.github.trex_paxos.internals
 
 import akka.actor.ActorRef
-import PaxosActor.TraceData
 import com.github.trex_paxos.library._
 
 import scala.collection.mutable.ArrayBuffer
 
-class TestPaxosActorNoTimeout(config: PaxosActor.Configuration, clusterSize: () => Int, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, val delivered: ArrayBuffer[CommandValue], tracer: Option[PaxosActor.Tracer])
-  extends PaxosActorNoTimeout(config, clusterSize, nodeUniqueId, broadcastRef, journal) {
+class TestPaxosActorNoTimeout(config: PaxosProperties, clusterSizeF: () => Int, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, val delivered: ArrayBuffer[CommandValue], tracer: Option[PaxosActor.Tracer])
+  extends PaxosActorNoTimeout(config, nodeUniqueId, journal) {
 
   /**
    * Helper to initialize actor responses map. Converts actor refs to string and store the lookup for string to actor ref in the internal map
@@ -44,4 +43,8 @@ class TestPaxosActorNoTimeout(config: PaxosActor.Configuration, clusterSize: () 
   def role = this.paxosAgent.role
 
   def data = this.paxosAgent.data
+
+  override def clusterSize: Int = clusterSizeF()
+
+  override def broadcast(msg: PaxosMessage): Unit = send(broadcastRef, msg)
 }

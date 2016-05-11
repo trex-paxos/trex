@@ -9,7 +9,19 @@ import com.github.trex_paxos.library._
 
 object TrexServer {
 
-  def targetPropsFactory(config: PaxosActor.Configuration,
+  def apply(config: PaxosProperties,
+            clazz: Class[_ <: PaxosActorNoTimeout],
+            selfNode: Node,
+            membershipStore: TrexMembership,
+            journal: Journal,
+            target: AnyRef): Props = Props(clazz,
+    config,
+    selfNode,
+    membershipStore,
+    journal,
+    target)
+
+  def targetPropsFactory(config: PaxosProperties,
                          clazz: Class[_ <: PaxosActorNoTimeout],
                          clusterSize: () => Int,
                          nodeUniqueId: Int,
@@ -71,14 +83,14 @@ trait TrexRouting extends Actor with ActorLogging {
 
 object TrexStaticMembershipServer {
   def apply(cluster: Cluster,
-            config: PaxosActor.Configuration,
+            config: PaxosProperties,
             nodeUniqueId: Int,
             journal: Journal,
             target: AnyRef): Props = Props.create(classOf[TrexStaticMembershipServer], cluster, config, int2Integer(nodeUniqueId), journal, target)
 }
 
 private[trex_paxos] class TrexStaticMembershipServer(cluster: Cluster,
-                                                     config: PaxosActor.Configuration,
+                                                     config: PaxosProperties,
                                                      nodeUniqueId: Int,
                                                      journal: Journal,
                                                      target: AnyRef)
@@ -90,17 +102,17 @@ private[trex_paxos] class TrexStaticMembershipServer(cluster: Cluster,
     val log = Logging.getLogger(system, this)
     log.info("{} creating senders for nodes {}", selfNode, nodes)
     nodes.map { n =>
-      n.membershipId -> system.actorOf(Props(classOf[UdpSender],
-        new java.net.InetSocketAddress(n.host, n.nodePort)))
+      n.nodeUniqueId -> system.actorOf(Props(classOf[UdpSender],
+        new java.net.InetSocketAddress(n.host, n.nodePort)), s"UdpSender${n.nodeUniqueId}")
     }.toMap
   }
 
-  val others = senders(context.system, cluster.nodes.filterNot(_.membershipId == nodeUniqueId))
+  val others = senders(context.system, cluster.nodes.filterNot(_.nodeUniqueId == nodeUniqueId))
 
   override def peers: Map[Int, ActorRef] = others
 
   val listenerRef = context.system.actorOf(Props(classOf[UdpListener],
-    new InetSocketAddress(selfNode.host, selfNode.nodePort), self))
+    new InetSocketAddress(selfNode.host, selfNode.nodePort), self), s"UdpListener${selfNode.nodeUniqueId}")
 
   override def networkListener: ActorRef = listenerRef
 
@@ -119,17 +131,16 @@ private[trex_paxos] class TrexStaticMembershipServer(cluster: Cluster,
 
 /**
   * Cluster membership durable store.
-  * Currently the implimentation must be thread safe so that it can be updated by the main actor thread sychronously
-  * whilst it is read by the router.
   */
-trait TrexMembershipStore {
-  def save(membership: Seq[Membership])
-  def load(): Seq[Membership]
+trait TrexMembership {
+  def saveMembership(slot: Long, membership: Membership): Unit
+
+  def loadMembership(): Option[Membership]
 }
 
-private[trex_paxos] class TrexServer(membershipStore: TrexMembershipStore,
+private[trex_paxos] class TrexServer(membershipStore: TrexMembership,
                                      selfNode: Node,
-                                     config: PaxosActor.Configuration,
+                                     config: PaxosProperties,
                                      nodeUniqueId: Int,
                                      journal: Journal,
                                      target: AnyRef)

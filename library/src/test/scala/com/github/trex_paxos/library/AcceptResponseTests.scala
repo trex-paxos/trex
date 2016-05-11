@@ -203,7 +203,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       }
 
       val testJournal = new UndefinedJournal {
-        override def save(progress: Progress): Unit = saveTime(System.nanoTime())
+        override def saveProgress(progress: Progress): Unit = saveTime(System.nanoTime())
       }
       val PaxosAgent(_, _, _) = handler.handleAcceptResponse(new TestIO(testJournal) {
         override def send(msg: PaxosMessage): Unit = sendTime(System.nanoTime())

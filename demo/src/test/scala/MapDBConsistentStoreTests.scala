@@ -18,9 +18,9 @@ class InMemoryJournal extends Journal {
   var _progress = Journal.minBookwork.copy()
   var _map: SortedMap[Long, Accept] = TreeMap.empty
 
-  def save(progress: Progress): Unit = _progress = progress
+  def saveProgress(progress: Progress): Unit = _progress = progress
 
-  def load(): Progress = _progress
+  def loadProgress(): Progress = _progress
 
   def accept(accepted: Accept*): Unit = accepted foreach { a =>
     _map = _map + (a.id.logIndex -> a)

@@ -12,22 +12,22 @@ import scala.collection.mutable
 import scala.util.Try
 
 /**
- * Note that for testing this class does not schedule and manage its own timeouts. Extend a subclass which schedules
+ * Note that for testing this class does not schedule and manage its own timeouts. Use the subclass which schedules
  * its timeout rather than this baseclass.
  *
  * @param config Configuration such as timeout durations.
- * @param clusterSize Function that returns the current active cluster size.
  * @param nodeUniqueId The unique identifier of this node. This *must* be unique in the cluster which is required as of the Paxos algorithm to work properly and be safe.
- * @param broadcastRef An ActorRef through which the current cluster can be messaged.
  * @param journal The durable journal required to store the state of the node in a stable manner between crashes.
  */
-abstract class PaxosActorNoTimeout(config: PaxosActor.Configuration, clusterSize: () => Int, val nodeUniqueId: Int, broadcastRef: ActorRef, val journal: Journal) extends Actor
+abstract class PaxosActorNoTimeout(config: PaxosProperties, val nodeUniqueId: Int, val journal: Journal) extends Actor
 with PaxosIO
 with ActorLogging
 with AkkaLoggingAdapter {
   log.info("timeout min {}, timeout max {}", config.leaderTimeoutMin, config.leaderTimeoutMax)
 
-  var paxosAgent = new PaxosAgent(nodeUniqueId, Follower, PaxosData(journal.load(), 0, 0, clusterSize,
+  def clusterSize: Int
+
+  var paxosAgent = new PaxosAgent(nodeUniqueId, Follower, PaxosData(journal.loadProgress(), 0, 0, clusterSize _,
     SortedMap.empty[Identifier, Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering), None,
     SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering),
     Map.empty[Identifier, (CommandValue, String)]))
@@ -62,7 +62,7 @@ with AkkaLoggingAdapter {
       trace(event, sender().toString(), sent)
       transmit(sender())
       paxosAgent = agent
-    case f => logger.error("Recieved unknown messages type ", f)
+    case f => logger.error("Received unknown messages type ", f)
   }
 
   val minPrepare = Prepare(Identifier(nodeUniqueId, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
@@ -73,6 +73,7 @@ with AkkaLoggingAdapter {
     sent = sent :+ msg
   }
 
+  // FIXME this routing needs to be pulled out
   def transmit(sender: ActorRef): Unit = {
     this.sent foreach {
       case m@(_: RetransmitRequest | _: RetransmitResponse | _: AcceptResponse | _: PrepareResponse | _: NotLeader ) =>
@@ -85,7 +86,7 @@ with AkkaLoggingAdapter {
     this.sent = collection.immutable.Seq()
   }
 
-  def broadcast(msg: PaxosMessage): Unit = broadcastRef ! msg
+  def broadcast(msg: PaxosMessage): Unit
 
   // tests can override this
   def clock() = {
@@ -94,7 +95,8 @@ with AkkaLoggingAdapter {
 
   def highestAcceptedIndex = journal.bounds.max
 
-  def event(io: PaxosIO, stateName: PaxosRole, data: PaxosData, msg: PaxosMessage): PaxosEvent = PaxosEvent(io, PaxosAgent(nodeUniqueId, stateName, data), msg)
+  def event(io: PaxosIO, stateName: PaxosRole, data: PaxosData, msg: PaxosMessage): PaxosEvent =
+    PaxosEvent(io, PaxosAgent(nodeUniqueId, stateName, data), msg)
 
   def randomInterval: Long = {
     config.leaderTimeoutMin + ((config.leaderTimeoutMax - config.leaderTimeoutMin) * random.nextDouble()).toLong
@@ -135,7 +137,7 @@ with AkkaLoggingAdapter {
    * The cluster membership finite state machine. The new membership has been chosen but will come into effect
    * only for the next message for which we generate an accept message.
    */
-  val deliverMembership: PartialFunction[Payload, Array[Byte]] = {
+  val deliverMembership: PartialFunction[Payload, Any] = {
     case Payload(_, m@MembershipCommandValue(_, members)) =>
       throw new AssertionError("not yet implemented")
   }
@@ -169,11 +171,11 @@ with AkkaLoggingAdapter {
 }
 
 /**
- * For testability the timeout behavior is not part of the baseclass
- * This class reschedules a random interval CheckTimeout used to timeout on responses and an evenly spaced Paxos.HeartBeat which is used by a leader.
+ * This class reschedules a random interval CheckTimeout used to timeout on responses and an evenly spaced
+ * Paxos.HeartBeat which is used by a leader.
  */
-abstract class PaxosActor(config: Configuration, clusterSize: () => Int, nodeUniqueId: Int, broadcast: ActorRef, journal: Journal)
-  extends PaxosActorNoTimeout(config, clusterSize, nodeUniqueId, broadcast, journal) {
+abstract class PaxosActor(config: PaxosProperties, nodeUniqueId: Int, journal: Journal)
+  extends PaxosActorNoTimeout(config, nodeUniqueId, journal) {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.duration._
@@ -200,16 +202,12 @@ abstract class PaxosActor(config: Configuration, clusterSize: () => Int, nodeUni
   }
 }
 
-object PaxosActor {
-
-  val leaderTimeoutMinKey = "trex.leader-timeout-min"
-  val leaderTimeoutMaxKey = "trex.leader-timeout-max"
-
-  class Configuration(config: Config) {
+object PaxosProperties {
+  def apply(config: Config) = {
     /**
-     * To ensure cluster stability you *must* test your max GC under extended peak load and set this as some multiple
+      * To ensure cluster stability you *must* test your max GC under extended peak load and set this as some multiple
       * of observed GC pause.
-     */
+      */
     val leaderTimeoutMin = Try {
       config.getInt(leaderTimeoutMinKey)
     } getOrElse (1000)
@@ -218,12 +216,21 @@ object PaxosActor {
       config.getInt(leaderTimeoutMaxKey)
     } getOrElse (3 * leaderTimeoutMin)
 
+
     require(leaderTimeoutMax > leaderTimeoutMin)
+
+    new PaxosProperties(leaderTimeoutMin, leaderTimeoutMax)
   }
 
-  object Configuration {
-    def apply(config: Config) = new Configuration(config)
-  }
+  def apply() = new PaxosProperties(1000, 3000)
+}
+
+case class PaxosProperties(val leaderTimeoutMin: Long, val leaderTimeoutMax: Long)
+
+object PaxosActor {
+
+  val leaderTimeoutMinKey = "trex.leader-timeout-min"
+  val leaderTimeoutMaxKey = "trex.leader-timeout-max"
 
   val random = new SecureRandom
 

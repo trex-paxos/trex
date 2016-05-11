@@ -3,6 +3,7 @@ val mapdbVersion = "1.0.9"
 val scalatestVersion = "2.2.5"
 val scalmockVersion = "3.2.2"
 val akkaVersion = "2.3.15"
+val logbackVersion = "1.1.7"
 
 lazy val commonSettings = Seq(
   scalaVersion := "2.11.8",
@@ -35,18 +36,20 @@ lazy val core = project.dependsOn(library).
 		  "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
 		  "org.mapdb" % "mapdb" % mapdbVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
-		  "org.scalatest" % "scalatest_2.11" % scalatestVersion % "test,it",
-		  "org.scalamock" %% "scalamock-scalatest-support" % scalmockVersion % "test,it"
+      "org.scalatest" % "scalatest_2.11" % scalatestVersion % "test,it",
+		  "org.scalamock" %% "scalamock-scalatest-support" % scalmockVersion % "test,it",
+      "com.typesafe.akka" %% "akka-remote" % akkaVersion
 		  )
   )
   
 lazy val demo = project.dependsOn(core).
 	settings(commonSettings: _*).
 	settings( name := "trex-demo").
-  //settings(mainClass in (Compile, run) := Some("com.github.simbo1905.trexdemo.TrexKVStore")).
   settings(
     libraryDependencies ++= Seq(
       "org.scala-lang" % "scala-compiler" % scalaVersion.value,
+      "com.typesafe.akka" % "akka-slf4j_2.11" % akkaVersion,
+      "ch.qos.logback" % "logback-classic" % logbackVersion,
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-remote" % akkaVersion,
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,

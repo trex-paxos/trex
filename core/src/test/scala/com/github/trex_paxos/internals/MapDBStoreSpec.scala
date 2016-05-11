@@ -5,9 +5,9 @@ import com.github.trex_paxos.library._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfter, Matchers, WordSpecLike}
 
-class FileJournalSpec extends WordSpecLike with Matchers with BeforeAndAfter with MockFactory {
+class MapDBStoreSpec extends WordSpecLike with Matchers with BeforeAndAfter with MockFactory {
 
-  // logical store file creates two other files .p and .t which we delete
+  // MapDB 1.0.x logical store file creates two other files .p and .t which we delete
   val storeFile = new File("store.trex")
   val storeFileP = new File("store.trex.p")
   val storeFileT = new File("store.trex.t")
@@ -51,13 +51,13 @@ class FileJournalSpec extends WordSpecLike with Matchers with BeforeAndAfter wit
         assert(new String(parsed.value.asInstanceOf[ClientRequestCommandValue].bytes, "UTF8") == "hello")
       }
       {
-        val accept = Accept(Identifier(1, minValue, 0), MembershipCommandValue(99L, Seq(ClusterMember(0, "zero", Active), ClusterMember(1, "one", Departed))))
+        val accept = Accept(Identifier(1, minValue, 0), MembershipCommandValue(99L, Seq(Member(0, "zero", Accepting), Member(1, "one", Departed))))
         val bytes = Pickle.pack(accept)
         val parsed = Pickle.unpack(bytes).asInstanceOf[Accept]
         assert(parsed.id == accept.id)
         val membership: MembershipCommandValue = parsed.value.asInstanceOf[MembershipCommandValue]
         assert(membership.msgId == 99L)
-        assert(membership.members == Seq(ClusterMember(0, "zero", Active), ClusterMember(1, "one", Departed)))
+        assert(membership.members == Seq(Member(0, "zero", Accepting), Member(1, "one", Departed)))
       }
     }
   }
@@ -67,19 +67,19 @@ class FileJournalSpec extends WordSpecLike with Matchers with BeforeAndAfter wit
 
   def actualString(bytes: Array[Byte]) = new String(bytes)
 
-  "FileJournal" should {
+  "MapDBStore" should {
     "make bookwork durable" in {
       val number = BallotNumber(10, 2)
       val bookwork = Progress(number.copy(counter = number.counter), Identifier(1, number, 88L))
 
       {
-        val j = new FileJournal(storeFile, 10)
-        j.save(bookwork)
+        val j = new MapDBStore(storeFile, 10)
+        j.saveProgress(bookwork)
         j.close()
       }
 
-      val j = new FileJournal(storeFile, 10)
-      val readBackData = j.load()
+      val j = new MapDBStore(storeFile, 10)
+      val readBackData = j.loadProgress()
       j.close()
       assert(bookwork == readBackData)
     }
@@ -90,12 +90,12 @@ class FileJournalSpec extends WordSpecLike with Matchers with BeforeAndAfter wit
       val accept = Accept(identifier, ClientRequestCommandValue(0, expectedBytes))
 
       {
-        val j = new FileJournal(storeFile, 10)
+        val j = new MapDBStore(storeFile, 10)
         j.accept(accept)
         j.close()
       }
 
-      val j = new FileJournal(storeFile, 10)
+      val j = new MapDBStore(storeFile, 10)
       val readBackAccept = j.accepted(logIndex).getOrElse(fail("should be defined"))
       j.close()
       assert(java.util.Arrays.equals(Pickle.pickle(accept).toArray, Pickle.pickle(readBackAccept).toArray))
@@ -110,11 +110,11 @@ class FileJournalSpec extends WordSpecLike with Matchers with BeforeAndAfter wit
         Accept(identifier, ClientRequestCommandValue(0, expectedBytes))
       }
 
-      val j = new FileJournal(storeFile, 2)
+      val j = new MapDBStore(storeFile, 2)
 
       for (a <- 0 to 9) j.accept(next)
 
-      j.save(Progress(BallotNumber(n(), n()), Identifier(1, BallotNumber(n(), n()), 5)))
+      j.saveProgress(Progress(BallotNumber(n(), n()), Identifier(1, BallotNumber(n(), n()), 5)))
 
       val found = 1 to 10 flatMap {
         j.accepted(_)
@@ -147,13 +147,49 @@ class FileJournalSpec extends WordSpecLike with Matchers with BeforeAndAfter wit
         Accept(identifier, ClientRequestCommandValue(0, expectedBytes))
       }
 
-      val j = new FileJournal(storeFile, 2)
+      val j = new MapDBStore(storeFile, 2)
 
       for (a <- 0 to 9) j.accept(next)
 
       assert(j.bounds == JournalBounds(100, 109))
 
       j.close()
+    }
+    "load nothing when empty" in {
+      val store = new MapDBStore(storeFile, 2)
+      store.loadMembership() shouldBe None
+    }
+    "make a membership durable" in {
+      val m = Membership(Seq(Member(1, "one", Learning), Member(2, "two", Accepting)))
+
+      {
+        val store = new MapDBStore(storeFile, 2)
+        store.saveMembership(0L, m)
+      }
+
+      {
+        val store = new MapDBStore(storeFile, 2)
+        store.loadMembership() shouldBe Some(m)
+      }
+    }
+    "should throw an exception for an overwrite" in {
+      val m = Membership(Seq(Member(1, "one", Learning), Member(2, "two", Accepting)))
+      val store = new MapDBStore(storeFile, 2)
+      store.saveMembership(0L, m)
+      try {
+        store.saveMembership(0L, m)
+        fail
+      } catch {
+        case _ :Exception => // good
+      }
+    }
+    "should return the highest value saved" in {
+      val m1 = Membership(Seq(Member(1, "one", Learning), Member(2, "two", Accepting)))
+      val m2 = Membership(Seq(Member(2, "two", Departed), Member(3, "three", Accepting)))
+      val store = new MapDBStore(storeFile, 2)
+      store.saveMembership(99L, m1)
+      store.saveMembership(999L, m2)
+      store.loadMembership() shouldBe Some(m2)
     }
   }
 }

@@ -32,7 +32,7 @@ trait AcceptHandler extends PaxosLenses {
     io.journal.accept(accept)
     val updatedData = if (accept.id.number > agent.data.progress.highestPromised) {
       val dataNewPromise = highestPromisedLens.set(agent.data, accept.id.number)
-      io.journal.save(dataNewPromise.progress)
+      io.journal.saveProgress(dataNewPromise.progress)
       dataNewPromise
     } else {
       agent.data

@@ -56,11 +56,11 @@ class UndefinedPrepareResponse extends PrepareResponse {
 }
 
 class UndefinedJournal extends Journal {
-  override def save(progress: Progress): Unit = throw new AssertionError("deliberately not implemented")
+  override def saveProgress(progress: Progress): Unit = throw new AssertionError("deliberately not implemented")
 
   override def bounds: JournalBounds = throw new AssertionError("deliberately not implemented")
 
-  override def load(): Progress = throw new AssertionError("deliberately not implemented")
+  override def loadProgress(): Progress = throw new AssertionError("deliberately not implemented")
 
   override def accepted(logIndex: Long): Option[Accept] = throw new AssertionError("deliberately not implemented")
 
@@ -108,11 +108,11 @@ object TestHelpers extends PaxosLenses{
   }
 
   val noopJournal = new Journal {
-    override def save(progress: Progress): Unit = {}
+    override def saveProgress(progress: Progress): Unit = {}
 
     override def bounds: JournalBounds = JournalBounds(0L, 0L)
 
-    override def load(): Progress = TestHelpers.initialData.progress
+    override def loadProgress(): Progress = TestHelpers.initialData.progress
 
     override def accepted(logIndex: Long): Option[Accept] = None
 
@@ -126,8 +126,6 @@ object TestHelpers extends PaxosLenses{
   val maxClockIO = new UndefinedIO {
     override def clock: Long = Long.MaxValue
   }
-
-  val paxosAlgorithm = new PaxosAlgorithm
 
   val lowValue = Int.MinValue + 1
 

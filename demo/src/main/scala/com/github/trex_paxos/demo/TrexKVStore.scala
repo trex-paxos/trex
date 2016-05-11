@@ -2,7 +2,7 @@ package com.github.trex_paxos.demo
 
 import akka.actor._
 import akka.util.Timeout
-import com.github.trex_paxos.internals.{FileJournal, PaxosActor, PaxosActorNoTimeout}
+import com.github.trex_paxos.internals._
 import com.github.trex_paxos._
 import com.typesafe.config._
 import org.mapdb.{DB, DBMaker}
@@ -110,7 +110,7 @@ object TrexKVStore {
     val node = cluster.nodeMap.getOrElse(nodeId, throw new IllegalArgumentException(s"No node $nodeId in $cluster"))
 
     println(cluster)
-    val nodeMap = cluster.nodes.map(node => (node.membershipId, node)).toMap
+    val nodeMap = cluster.nodes.map(node => (node.nodeUniqueId, node)).toMap
 
     nodeMap.get(nodeId) match {
       case Some(node) =>
@@ -126,7 +126,7 @@ object TrexKVStore {
         val target = new MapDBConsistentKVStore(db)
         val logFile = new java.io.File(folder.getCanonicalPath + "/paxos")
         println(s"paxos data log is ${logFile.getCanonicalPath}")
-        val journal = new FileJournal(logFile, cluster.retained)
+        val journal = new MapDBStore(logFile, cluster.retained)
         val systemConfig = ConfigFactory.load(configName)
           .withValue("akka.remote.netty.tcp.port", ConfigValueFactory.fromAnyRef(node.clientPort))
           .withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(node.host))
@@ -134,9 +134,22 @@ object TrexKVStore {
         // actor system with the node config
         val system = ActorSystem(cluster.name, systemConfig)
 
-        val conf: PaxosActor.Configuration = new PaxosActor.Configuration(config)
+        val conf: PaxosProperties = PaxosProperties(config)
 
-        system.actorOf(TrexStaticMembershipServer(cluster, conf, nodeId, journal, target))
+        journal.loadMembership() match {
+          case None =>
+            println(s"initializing cluster membership from config")
+            val members: Seq[Member] = cluster.nodes map {
+              case Node(nodeUniqueId, host, _, port) => Member(nodeUniqueId, s"${host}:${port}", Accepting)
+            }
+            val m = Membership(members)
+            println(s"saving membership ${m} at logIndex Long.MinValue")
+            journal.saveMembership(Long.MinValue, m)
+          case Some(m) =>
+            println(s"loaded cluster membership is ${m}")
+        }
+
+        system.actorOf(TrexServer(conf, classOf[TypedActorPaxosEndpoint2], node, journal, journal, target))
 
       case None => err.println(s"$nodeId is not a valid node number in cluster $cluster")
     }

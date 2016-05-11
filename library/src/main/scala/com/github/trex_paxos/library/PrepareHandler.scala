@@ -34,7 +34,7 @@ trait PrepareHandler extends PaxosLenses with BackdownAgent {
     // update promise
     val data = progressLens.set(a.data, Progress.highestPromisedLens.set(a.data.progress, prepare.id.number))
     // journal promise
-    io.journal.save(data.progress)
+    io.journal.saveProgress(data.progress)
     // ack the prepare
     io.send(PrepareAck(prepare.id, a.nodeUniqueId, data.progress, io.journal.bounds.max, data.leaderHeartbeat, io.journal.accepted(prepare.id.logIndex)))
     // retain the promise in-memory
