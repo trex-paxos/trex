@@ -6,10 +6,11 @@ import akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, ActorSelection}
 import akka.serialization.{SerializationExtension, Serializer}
 import akka.util.Timeout
 import com.github.trex_paxos.BaseDriver.SelectionUrlFactory
-import com.github.trex_paxos.internals.ClientRequestCommandValue
+import com.github.trex_paxos.internals._
 import com.github.trex_paxos.library.{LostLeadershipException, _}
 
 import scala.collection.SortedMap
+import scala.collection.immutable.IndexedSeq
 import scala.compat.Platform
 import scala.concurrent.duration._
 
@@ -20,7 +21,7 @@ object BaseDriver {
     val nodeAndUrl = cluster.nodes.map { node =>
       (node.nodeUniqueId, s"akka.tcp://${cluster.name}@${node.host}:${node.clientPort}/user/PaxosActor")
     }
-    (cluster.nodes.indices zip nodeAndUrl.map( {case (_, s) => s} )).toMap
+    (cluster.nodes.indices zip nodeAndUrl.map({ case (_, s) => s })).toMap
   }
 }
 
@@ -32,7 +33,7 @@ object BaseDriver {
   * we should have a map of what client messages types are known safe to retry (e.g. read-only) and only retry those.
   *
   * @param requestTimeout Timeout on individual requests.
-  * @param maxAttempts The maximum number of timeout retry attempts on any message.
+  * @param maxAttempts    The maximum number of timeout retry attempts on any message.
   */
 abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Actor with ActorLogging {
 
@@ -45,7 +46,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
     *
     * @param memberIndex The index of the node in the cluster to resolve.
     */
-  protected def resolveActorSelectorForIndex(memberIndex: Int): ActorSelection
+  protected def resolveActorSelectorForIndex(memberIndex: Int): Option[ActorSelection]
 
   /**
     * Returns the current cluster size.
@@ -196,60 +197,125 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
           drop(request)
       }
 
-    case msg: Any =>
-      outboundClientWork(leaderCounter, msg.asInstanceOf[AnyRef])
+    case work: AnyRef =>
+      val bytes = getSerializer(work.getClass).toBinary(work)
+      val commandValue = ClientRequestCommandValue(incrementAndGetRequestId(), bytes)
+      val request = Request(Platform.currentTime + timeoutMillis, sender(), commandValue, 1)
+      transmit(leaderCounter, request)
+
+  }
+
+  /**
+    * Send a message to the cluster
+    * @param counter A counter which is used to pick a node to transmit to.
+    * @param request A request to send.
+    */
+  def transmit(counter: Long, request: Request) = {
+    val target = resolveActorSelectorForIndex((counter % clusterSize).toInt)
+    target match {
+      case Some(t) =>
+        t ! request.command
+        hold(request)
+        log.debug("sent request from {} to {} is {}", sender(), target, request.command)
+      case None =>
+        log.warning("unable to send work as target is None")
+    }
   }
 
   def resend(out: Request): Unit = {
     val in = out.copy(attempt = out.attempt + 1, timeoutTime = now + timeoutMillis)
     swap(out, in)
     val target = resolveActorSelectorForIndex((leaderCounter % clusterSize).toInt)
-    target ! in.command
-    log.debug("resent request from {} to {} is {}", sender(), target, in.command)
+    target match {
+      case Some(t) =>
+        t ! in.command;
+        log.debug("resent request from {} to {} is {}", sender(), t, in.command)
+      case None =>
+        log.warning("unable to send request as target is None")
+    }
   }
 
-  def outboundClientWork(counter: Long, work: AnyRef): Unit = {
-    val bytes = getSerializer(work.getClass).toBinary(work)
-    val commandValue = ClientRequestCommandValue(incrementAndGetRequestId(), bytes)
-    val request = Request(Platform.currentTime + timeoutMillis, sender(), commandValue, 1)
-    val target = resolveActorSelectorForIndex((counter % clusterSize).toInt)
-    target ! commandValue
-    hold(request)
-    log.debug("sent normal request from {} to {} is {} containing {}", sender(), target, commandValue, work)
+}
+
+object DynamicClusterDriver {
+  case class Initialize(membership: Membership)
+  def apply(cluster: Cluster) = {
+    DynamicClusterDriver.Initialize(Membership(cluster.name, cluster.nodes.map { node =>
+      Member(node.nodeUniqueId, s"${node.host}:${node.nodePort}", s"${node.host}:${node.clientPort}", Accepting)
+    }))
   }
 }
 
 /**
-  * A concrete driver which uses akka.tcp to send messages. Note akka documentation says that akka.tcp is not firewall friendly.
+  * A concrete driver which uses akka.tcp to send messages. FIXME Note akka documentation says that akka.tcp is not firewall friendly.
   *
   * @param timeout The client timeout. It is recommended that this is significantly longer than the cluster failover timeout.
-  * @param cluster The static cluster members.
+  * @param maxAttempts The number of retries before the driver fails. Should be set greater or equal to the max cluster size.
   */
-class StaticClusterDriver(timeout: Timeout,
-                          cluster: Cluster,
-                          maxAttempts: Int,
-                          factory: SelectionUrlFactory = BaseDriver.defaultSelectionUrlFactory _ )
-  extends BaseDriver(timeout, maxAttempts) with ActorLogging {
+class DynamicClusterDriver(timeout: Timeout, maxAttempts: Int) extends BaseDriver(timeout, maxAttempts) with ActorLogging {
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
   // TODO inject these timings from config
   context.system.scheduler.schedule(Duration(5, MILLISECONDS), Duration(1000, MILLISECONDS), self, CheckTimeout)
 
-  val selectionUrls = factory(context, cluster)
+  var membership: Option[CommittedMembership] = None // TODO do we warn if this is None and the actor is uninitialised
 
-  log.info("selections are: {}", selectionUrls)
+  case object CheckMembership
 
-  // cluster membership is static
-  def resolveActorSelectorForIndex(node: Int): ActorSelection = {
-    val url = selectionUrls(node)
-    val result = context.actorSelection(url)
-    result
+  // TODO inject these timings from config
+  context.system.scheduler.schedule(Duration(505, MILLISECONDS), Duration(1000, MILLISECONDS), self, CheckMembership)
+
+  def localReceive: Receive = {
+    case i: DynamicClusterDriver.Initialize =>
+      membership = Option(CommittedMembership(Long.MinValue, i.membership))
+      log.info("membership initialized to {}", membership)
+    case CheckMembership =>
+      // FIXME
+      // pick a random node and tell it about our latest knowledge of committed membership. if we are out of date it will reply
+      /*
+      membership foreach {
+        case c: CommittedMembership =>
+          resolveActorSelectorForIndex(((Math.random() * 1024) % clusterSize).toInt) foreach {
+            _ ! c
+          }
+      }*/
+    case work: Membership =>
+      log.info("received membership change request {}", work)
+      val commandValue = MembershipCommandValue(incrementAndGetRequestId(), work)
+      val request = Request(Platform.currentTime + timeoutMillis, sender(), commandValue, 1)
+      transmit(leaderCounter, request)
+    case m: CommittedMembership =>
+      // update our knowledge of the commitment membership of the cluster
+      membership = Option(m)
+      log.info(s"membership changed to ${m}")
   }
+
+  override def receive: Receive = localReceive orElse super.receive
 
   /**
     * Returns the current cluster size.
     */
-  override protected def clusterSize: Int = cluster.nodes.size
-}
+  override protected def clusterSize: Int = membership match {
+    case None => 1 // TODO zero here gives divide by zero. 1 here is handled else where in the stack.
+    case Some(m) => m.membership.members.size
+  }
 
+  /**
+    * Returns an ActorSelection mapped to the passed cluster membership index.
+    * This is abstract so that there can be a subclass which knows about cluster membership changes.
+    * Counter can be incremented to round-robin to find the new stable leader.
+    *
+    * @param memberIndex The index of the node in the cluster to resolve. Usually computed as counter%size
+    */
+  override protected def resolveActorSelectorForIndex(memberIndex: Int): Option[ActorSelection] = {
+
+    membership map { m =>
+      val urls = m.membership.members.map { node =>
+         s"akka.tcp://${m.membership.name}@${node.clientLocation}/user/PaxosActor"
+       }
+      val indexToUrl = (m.membership.members.indices zip urls).toMap
+      context.actorSelection(indexToUrl(memberIndex))
+    }
+  }
+}

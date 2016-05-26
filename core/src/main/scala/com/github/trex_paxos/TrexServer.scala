@@ -21,14 +21,38 @@ object TrexServer {
     journal,
     target)
 
+  def apply(config: PaxosProperties,
+            selfNode: Node,
+            membershipStore: TrexMembership,
+            journal: Journal,
+            target: AnyRef): Props = Props(classOf[TypedActorPaxosEndpoint],
+    config,
+    selfNode,
+    membershipStore,
+    journal,
+    target)
+
   def targetPropsFactory(config: PaxosProperties,
                          clazz: Class[_ <: PaxosActorNoTimeout],
-                         clusterSize: () => Int,
                          nodeUniqueId: Int,
                          journal: Journal,
                          target: AnyRef)(broadcast: ActorRef): Props =
-    Props(clazz, config, clusterSize, broadcast, nodeUniqueId, journal, target)
+    Props(clazz, config, broadcast, nodeUniqueId, journal, target)
 
+  def initializeIfEmpty(cluster: Cluster, trexMembership: TrexMembership) = {
+    trexMembership.loadMembership() match {
+      case None =>
+        println(s"initializing cluster membership from config")
+        val members: Seq[Member] = cluster.nodes map {
+          case Node(nodeUniqueId, host, cport, nport) => Member(nodeUniqueId, s"${host}:${nport}", s"${host}:${cport}", Accepting)
+        }
+        val m = Membership(cluster.name, members)
+        println(s"saving membership ${m} at logIndex Long.MinValue")
+        trexMembership.saveMembership(CommittedMembership(Long.MinValue, m))
+      case Some(m) =>
+        println(s"loaded cluster membership is ${m}")
+    }
+  }
 }
 
 trait TrexRouting extends Actor with ActorLogging {
@@ -81,61 +105,13 @@ trait TrexRouting extends Actor with ActorLogging {
   }
 }
 
-object TrexStaticMembershipServer {
-  def apply(cluster: Cluster,
-            config: PaxosProperties,
-            nodeUniqueId: Int,
-            journal: Journal,
-            target: AnyRef): Props = Props.create(classOf[TrexStaticMembershipServer], cluster, config, int2Integer(nodeUniqueId), journal, target)
-}
-
-private[trex_paxos] class TrexStaticMembershipServer(cluster: Cluster,
-                                                     config: PaxosProperties,
-                                                     nodeUniqueId: Int,
-                                                     journal: Journal,
-                                                     target: AnyRef)
-  extends TrexRouting {
-
-  val selfNode = cluster.nodeMap(nodeUniqueId)
-
-  def senders(system: ActorSystem, nodes: Seq[Node]): Map[Int, ActorRef] = {
-    val log = Logging.getLogger(system, this)
-    log.info("{} creating senders for nodes {}", selfNode, nodes)
-    nodes.map { n =>
-      n.nodeUniqueId -> system.actorOf(Props(classOf[UdpSender],
-        new java.net.InetSocketAddress(n.host, n.nodePort)), s"UdpSender${n.nodeUniqueId}")
-    }.toMap
-  }
-
-  val others = senders(context.system, cluster.nodes.filterNot(_.nodeUniqueId == nodeUniqueId))
-
-  override def peers: Map[Int, ActorRef] = others
-
-  val listenerRef = context.system.actorOf(Props(classOf[UdpListener],
-    new InetSocketAddress(selfNode.host, selfNode.nodePort), self), s"UdpListener${selfNode.nodeUniqueId}")
-
-  override def networkListener: ActorRef = listenerRef
-
-  def targetProps: (ActorRef) => Props =
-    TrexServer.targetPropsFactory(config,
-      classOf[TypedActorPaxosEndpoint],
-      cluster.nodeMap.size _,
-      nodeUniqueId,
-      journal,
-      target)
-
-  val targetActorRef: ActorRef = context.system.actorOf(targetProps(self), "PaxosActor")
-
-  override def paxosActor: ActorRef = targetActorRef
-}
-
 /**
   * Cluster membership durable store.
   */
 trait TrexMembership {
-  def saveMembership(slot: Long, membership: Membership): Unit
+  def saveMembership(cm: CommittedMembership): Unit
 
-  def loadMembership(): Option[Membership]
+  def loadMembership(): Option[CommittedMembership]
 }
 
 private[trex_paxos] class TrexServer(membershipStore: TrexMembership,

@@ -56,7 +56,7 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
       val testProbe3 = TestProbe()
       val cluster: Map[Int, ActorSelection] = clusterOf(testProbe1.ref, testProbe2.ref, testProbe3.ref)
       (TestActorRef(new BaseDriver(timeout, retries) {
-        override def resolveActorSelectorForIndex(counter: Int): ActorSelection = cluster(counter % cluster.size)
+        override def resolveActorSelectorForIndex(counter: Int): Option[ActorSelection] = Option(cluster(counter % cluster.size))
 
         override protected def clusterSize: Int = cluster.size
 
@@ -66,6 +66,7 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
 
     object `will return the response that comes from the first node` {
       val (bd, clientProbe, testProbe1, testProbe2, testProbe3) = baseDriver
+
       implicit val ref = bd
       clientProbe.send(ref, "hello")
       testProbe1.expectMsgPF(1 seconds) {

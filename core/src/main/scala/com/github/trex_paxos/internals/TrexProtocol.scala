@@ -60,11 +60,19 @@ case class TimelineReadWork(val raw: AnyRef) extends OptimizableReadOnlyWork
 case class OutdatableReadWork(val raw: AnyRef) extends OptimizableReadOnlyWork
 
 /**
-  * Placeholder currently not implemented.
+  *
+  * @param msgId
+  * @param membership
   */
-case class MembershipCommandValue(msgId: Long, members: Seq[Member]) extends CommandValue {
-  override def bytes: Array[Byte] = emptyArray
+case class MembershipCommandValue(msgId: Long, membership: Membership) extends CommandValue {
+  override def bytes: Array[Byte] = Pickle.pickleMembership(membership).toArray
 }
+
+/**
+  * Used to poll for membership change. If the membership has changed since the
+  * @param slot
+  */
+case class MembershipQuery(slot: Long)
 
 object MemberStatus {
   def resolve(id: Int) = id match {
@@ -95,20 +103,34 @@ object Member {
 }
 
 /**
-  * Details of a member of the current paxos cluster.
- *
+  * Details of a member of the current paxos cluster. Note that the actual transports and discovery at abstract to
+  * this class it uses strings so that concrete implementations can use different protocols.
   * @param nodeUniqueId The unique paxos number for this membership
-  * @param location     The location typically given as "host:port".
+  * @param location     The location for server-to-server typically given as "host:port" but could be a url
+  * @param clientLocation The location for client-to-server typically given as "host:port" but could be a url
   * @param active       The status of the member.
   */
-private[trex_paxos] case class Member(nodeUniqueId: Int, location: String, active: MemberStatus)
+private[trex_paxos] case class Member(nodeUniqueId: Int, location: String, clientLocation: String, active: MemberStatus)
 
 /**
   * A complete Paxos cluster.
  *
+  * @param name The cluster name.
   * @param members The unique members of the cluster.
   */
-private[trex_paxos] case class Membership(members: Seq[Member])
+private[trex_paxos] case class Membership(name: String, members: Seq[Member])
+
+object Membership {
+  def apply(): Membership = new Membership("default", Seq())
+}
+
+/**
+  * A membership becomes committed at a slot index and a client can state the slot it last knew the membership. A
+  * server in the cluster can then know if it is stale and reply with the latest membership.
+  * @param slot The log index at which the membership was committed.
+  * @param membership The cluster membership.
+  */
+case class CommittedMembership(slot: Long,  membership: Membership)
 
 /**
   * Placeholder currently not implemented.

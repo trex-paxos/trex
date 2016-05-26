@@ -95,7 +95,7 @@ class PickleTests extends WordSpecLike with Matchers {
         }
       }
       {
-        val a = Accept(Identifier(1, BallotNumber(2, 3), 4L), MembershipCommandValue(99L, Seq(Member(1, "x", Accepting), Member(2, "y", Departed))))
+        val a = Accept(Identifier(1, BallotNumber(2, 3), 4L), MembershipCommandValue(99L, Membership("mycluster", Seq(Member(1, "x", "1", Accepting), Member(2, "y", "x", Departed)))))
         Pickle.unpack(Pickle.pack(a)) match {
           case `a` =>
           case f => fail(f.toString)
@@ -116,7 +116,29 @@ class PickleTests extends WordSpecLike with Matchers {
         case f => fail(f.toString)
       }
     }
-
+    "roundtrip member" in {
+      val m = Member(111, "one", "two", Learning)
+      val in = Pickle.pickle(m)
+      Pickle.unpickleMember(in) match {
+        case (`m`, _) =>
+        case f =>
+          fail(f.toString)
+      }
+    }
+    "roundtrip membership" in {
+      val m = Membership("mycluster", Seq(Member(111, "one", "two", Learning), Member(222, "three", "four", Departed)))
+      Pickle.unpack(Pickle.pack(m)) match {
+        case `m` =>
+        case f => fail(f.toString)
+      }
+    }
+    "roundtrip membership query" in {
+      val q = MembershipQuery(8888L)
+      Pickle.unpack(Pickle.pack(q)) match {
+        case `q` =>
+        case f => fail(f.toString)
+      }
+    }
     "roundtrip PrepareAck" in {
       {
         val p = PrepareAck(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), 12, 13, None)

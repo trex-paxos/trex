@@ -2,51 +2,17 @@ package com.github.trex_paxos
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, Props, TypedActor}
+import akka.actor.{ActorRef, PoisonPill, Props, TypedActor}
 import akka.actor.TypedActor.MethodCall
 import akka.serialization.SerializationExtension
 import com.github.trex_paxos.internals._
 import com.github.trex_paxos.library._
 
+import scala.compat.Platform
 import scala.util.Try
 
-// TODO should this be a MethodCall mix-in rather than a concrete class?
-class TypedActorPaxosEndpoint(config: PaxosProperties, clusterSizeF: () => Int,
-                              broadcastReference: ActorRef, nodeUniqueId: Int,
-                              journal: Journal, target: AnyRef)
-  extends PaxosActor(config, nodeUniqueId, journal) {
-
-  val serialization = SerializationExtension(context.system)
-  val serializer = serialization.serializerFor(classOf[MethodCall])
-
-  def deserialize(bytes: Array[Byte]): MethodCall = {
-    serializer.fromBinary(bytes, manifest = None).asInstanceOf[MethodCall]
-  }
-
-  override val deliverClient: PartialFunction[Payload, AnyRef] = {
-    case Payload(logIndex, c: CommandValue) =>
-      val mc@TypedActor.MethodCall(method, parameters) = deserialize(c.bytes)
-      log.debug("delivering slot {} value {}", logIndex, mc)
-      val result = Try {
-        val response = Option(method.invoke(target, parameters: _*))
-        log.debug(s"invoked ${method.getName} returned $response")
-        ServerResponse(c.msgId, response)
-      } recover {
-        case ex =>
-          log.error(ex, s"call to $method with $parameters got exception $ex")
-          ServerResponse(c.msgId, Option(ex))
-      }
-      result.get
-    case f => throw new AssertionError("unreachable code")
-  }
-
-  override def clusterSize: Int = clusterSizeF()
-
-  def broadcast(msg: PaxosMessage): Unit = send(broadcastReference, msg)
-}
-
 // TODO should this be a MethodCall mix-in rather than a concrete class
-class TypedActorPaxosEndpoint2(
+class TypedActorPaxosEndpoint(
                                 config: PaxosProperties,
                                 selfNode: Node,
                                 membershipStore: TrexMembership,
@@ -80,33 +46,40 @@ class TypedActorPaxosEndpoint2(
       result.get
   }
 
-  def senders(membership: Membership): Map[Int, ActorRef] = {
-    val others = membership.members.filterNot(_.nodeUniqueId == nodeUniqueId)
+  def senders(members: Seq[Member]): Map[Int, ActorRef] = {
+    val others = members.filterNot(_.nodeUniqueId == nodeUniqueId)
     log.info("{} creating senders for nodes {}", nodeUniqueId, others)
     others.map { n =>
       import Member.pattern
       val pattern(host, port) = n.location
       n.nodeUniqueId -> context.system.actorOf(Props(classOf[UdpSender],
-        new java.net.InetSocketAddress(host, port.toInt)), s"UdpSender${n.nodeUniqueId}")
+        new java.net.InetSocketAddress(host, port.toInt)), s"UdpSender${n.nodeUniqueId}-${Platform.currentTime}")
     }.toMap
   }
 
-  var others: Map[Int, ActorRef] = senders(membershipStore.loadMembership().getOrElse(Membership(Seq())))
+  def notNoneMembership = membershipStore.loadMembership().getOrElse(CommittedMembership(Long.MinValue, Membership()))
+
+  // FIXME this could IOError so we should move it to an Init method or the actor will stop.
+  var committedMembership = notNoneMembership
+  var others: Map[Int, ActorRef] = senders(committedMembership.membership.members)
 
   log.info(s"cluster members are ${others}")
 
   override val deliverMembership: PartialFunction[Payload, AnyRef] = {
-    case Payload(logIndex, m: MembershipCommandValue) =>
+    case Payload(logIndex, MembershipCommandValue(msgId, membership)) =>
       val result = Try {
-        val membership = Membership(m.members)
-        others = senders(membership)
-        membershipStore.saveMembership(logIndex, membership)
+        committedMembership = CommittedMembership(logIndex, membership)
+        membershipStore.saveMembership(committedMembership)
+        others.values foreach {
+          _ ! PoisonPill
+        }
+        others = senders(committedMembership.membership.members)
         log.info(s"membership at logIndex ${logIndex} is $membership")
-        ServerResponse(m.msgId, None)
+        ServerResponse(msgId, None)
       } recover {
         case ex =>
-          log.error(ex, s"call save membership at logIndex ${logIndex} with membership ${m.members} got exception $ex")
-          ServerResponse(m.msgId, Option(ex))
+          log.error(ex, s"call save membership at logIndex ${logIndex} with membership ${membership} got exception $ex")
+          ServerResponse(msgId, Option(ex))
       }
       result.get
   }
@@ -142,4 +115,5 @@ class TypedActorPaxosEndpoint2(
         log.warning("routed {} to {} but not found in {}", msg, route(msg), others)
     }
   }
+
 }

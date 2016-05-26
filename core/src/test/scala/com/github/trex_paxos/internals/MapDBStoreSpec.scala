@@ -51,13 +51,14 @@ class MapDBStoreSpec extends WordSpecLike with Matchers with BeforeAndAfter with
         assert(new String(parsed.value.asInstanceOf[ClientRequestCommandValue].bytes, "UTF8") == "hello")
       }
       {
-        val accept = Accept(Identifier(1, minValue, 0), MembershipCommandValue(99L, Seq(Member(0, "zero", Accepting), Member(1, "one", Departed))))
+        val membership = Membership("mycluster", Seq(Member(0, "zero", "xxx", Accepting), Member(1, "one", "yyy", Departed)))
+        val accept = Accept(Identifier(1, minValue, 0), MembershipCommandValue(99L, membership))
         val bytes = Pickle.pack(accept)
         val parsed = Pickle.unpack(bytes).asInstanceOf[Accept]
         assert(parsed.id == accept.id)
-        val membership: MembershipCommandValue = parsed.value.asInstanceOf[MembershipCommandValue]
-        assert(membership.msgId == 99L)
-        assert(membership.members == Seq(Member(0, "zero", Accepting), Member(1, "one", Departed)))
+        val mv: MembershipCommandValue = parsed.value.asInstanceOf[MembershipCommandValue]
+        assert(mv.msgId == 99L)
+        assert(mv.membership == membership)
       }
     }
   }
@@ -160,36 +161,36 @@ class MapDBStoreSpec extends WordSpecLike with Matchers with BeforeAndAfter with
       store.loadMembership() shouldBe None
     }
     "make a membership durable" in {
-      val m = Membership(Seq(Member(1, "one", Learning), Member(2, "two", Accepting)))
+      val m = Membership("default", Seq(Member(1, "one", "xxx", Learning), Member(2, "two", "yyy", Accepting)))
 
       {
         val store = new MapDBStore(storeFile, 2)
-        store.saveMembership(0L, m)
+        store.saveMembership(CommittedMembership(99L, m))
       }
 
       {
         val store = new MapDBStore(storeFile, 2)
-        store.loadMembership() shouldBe Some(m)
+        store.loadMembership() shouldBe Some(CommittedMembership(99L, m))
       }
     }
     "should throw an exception for an overwrite" in {
-      val m = Membership(Seq(Member(1, "one", Learning), Member(2, "two", Accepting)))
+      val m = Membership("default", Seq(Member(1, "one", "xxx", Learning), Member(2, "two", "yyy", Accepting)))
       val store = new MapDBStore(storeFile, 2)
-      store.saveMembership(0L, m)
+      store.saveMembership(CommittedMembership(0L, m))
       try {
-        store.saveMembership(0L, m)
+        store.saveMembership(CommittedMembership(0L, m))
         fail
       } catch {
         case _ :Exception => // good
       }
     }
     "should return the highest value saved" in {
-      val m1 = Membership(Seq(Member(1, "one", Learning), Member(2, "two", Accepting)))
-      val m2 = Membership(Seq(Member(2, "two", Departed), Member(3, "three", Accepting)))
+      val m1 = Membership("default", Seq(Member(1, "one", "xxx", Learning), Member(2, "two", "yyy", Accepting)))
+      val m2 = Membership("default", Seq(Member(2, "two", "yyy", Departed), Member(3, "three", "zzz", Accepting)))
       val store = new MapDBStore(storeFile, 2)
-      store.saveMembership(99L, m1)
-      store.saveMembership(999L, m2)
-      store.loadMembership() shouldBe Some(m2)
+      store.saveMembership(CommittedMembership(99L, m1))
+      store.saveMembership(CommittedMembership(999L, m2))
+      store.loadMembership() shouldBe Some(CommittedMembership(999L,m2))
     }
   }
 }

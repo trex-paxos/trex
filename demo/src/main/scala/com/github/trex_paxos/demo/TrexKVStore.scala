@@ -41,7 +41,11 @@ object TrexKVClient {
 
     val timeout = Timeout(100 millisecond)
 
-    val driver = system.actorOf(Props(classOf[StaticClusterDriver], timeout, cluster, 20), "TrexDriver")
+    val driver = system.actorOf(Props(classOf[DynamicClusterDriver], timeout, 20), "TrexDriver")
+
+    val initialize = DynamicClusterDriver(cluster)
+
+    driver ! initialize
 
     val typedActor: ConsistentKVStore =
       TypedActor(system).
@@ -136,20 +140,9 @@ object TrexKVStore {
 
         val conf: PaxosProperties = PaxosProperties(config)
 
-        journal.loadMembership() match {
-          case None =>
-            println(s"initializing cluster membership from config")
-            val members: Seq[Member] = cluster.nodes map {
-              case Node(nodeUniqueId, host, _, port) => Member(nodeUniqueId, s"${host}:${port}", Accepting)
-            }
-            val m = Membership(members)
-            println(s"saving membership ${m} at logIndex Long.MinValue")
-            journal.saveMembership(Long.MinValue, m)
-          case Some(m) =>
-            println(s"loaded cluster membership is ${m}")
-        }
+        TrexServer.initializeIfEmpty(cluster, journal)
 
-        system.actorOf(TrexServer(conf, classOf[TypedActorPaxosEndpoint2], node, journal, journal, target))
+        system.actorOf(TrexServer(conf, classOf[TypedActorPaxosEndpoint], node, journal, journal, target), "PaxosActor")
 
       case None => err.println(s"$nodeId is not a valid node number in cluster $cluster")
     }

@@ -7,10 +7,9 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.annotation.tailrec
 
 /**
- * Binary pickling. I did try scala pickling but had all sorts of runtime problems uncluding jvm crashes.
+ * Binary pickling. I did try scala pickling but had all sorts of runtime problems including jvm crashes.
  * Note that RetransmitResponse could be big so in the future we might send a handle and
- * have the responder connect back and stream it one accept over time over TCP. That would
- * fit in better with snapshotting.
+ * have the responder connect back and stream it one accept over time over TCP.
  */
 object Pickle extends LazyLogging {
   @inline def unsigned(b: Byte): Int = if (b >= 0) {
@@ -62,7 +61,8 @@ object Pickle extends LazyLogging {
     0xb.toByte -> (NoOperationCommandValue.getClass -> unpickleNoOpValue _),
     0xc.toByte -> (classOf[MembershipCommandValue] -> unpickleMembershipValue _),
     0xd.toByte -> (classOf[Progress] -> unpickleProgress _),
-    0xe.toByte -> (classOf[Membership] -> unpickleMembership _)
+    0xe.toByte -> (classOf[Membership] -> unpickleMembership _),
+    0xf.toByte -> (classOf[MembershipQuery] -> unpickleMembershipQuery _)
   )
 
   val toMap: Map[Class[_], Byte] = (config.map {
@@ -129,59 +129,62 @@ object Pickle extends LazyLogging {
     NotLeader(unpickleInt(nodeId), unpickleLong(msgId))
   }
 
-  def pickleClusterMember(m: Member) = {
-    pickleInt(m.nodeUniqueId) ++ pickleInt(m.location.getBytes("UTF8").length) ++ ByteString(m.location.getBytes("UTF8")) ++ pickleInt(m.active.id)
+  def pickleMember(m: Member) = {
+    pickleInt(m.nodeUniqueId) ++
+      pickleInt(m.location.getBytes("UTF8").length) ++
+      ByteString(m.location.getBytes("UTF8")) ++
+      pickleInt(m.clientLocation.getBytes("UTF8").length) ++
+      ByteString(m.clientLocation.getBytes("UTF8")) ++
+      pickleInt(m.active.id)
   }
 
-  def unpickleClusterMember(bytes: ByteString): (Member, ByteString) = {
-    val (nodeUniqueId, r1) = bytes.splitAt(lengthOfInt)
-    val (length, r2) = r1.splitAt(lengthOfInt)
-    val l = unpickleInt(length)
-    val (location, r3) = r2.splitAt(l)
-    val (state, rest) = r3.splitAt(lengthOfInt)
-    val id = unpickleInt(state)
-    (Member(unpickleInt(nodeUniqueId), new String(location.toArray, "UTF8"), MemberStatus.resolve(id)), rest)
+  def unpickleMember(bytes: ByteString): (Member, ByteString) = {
+    val (idBs, r1) = bytes.splitAt(lengthOfInt)
+    val id = unpickleInt(idBs)
+    val (sl1Bs, r2) = r1.splitAt(lengthOfInt)
+    val l1 = unpickleInt(sl1Bs)
+    val (location, r3) = r2.splitAt(l1)
+    val (sl2Bs, r4) = r3.splitAt(lengthOfInt)
+    val l2 = unpickleInt(sl2Bs)
+    val (clientLocation, r5) = r4.splitAt(l2)
+    val (stateBs, rest) = r5.splitAt(lengthOfInt)
+    val state = unpickleInt(stateBs)
+    (Member(id, new String(location.toArray, "UTF8"), new String(clientLocation.toArray, "UTF8"), MemberStatus.resolve(state)), rest)
   }
 
-  def pickleMembershipValue(m: MembershipCommandValue) = pickleLong(m.msgId) ++ pickleInt(m.members.size) ++ m.members.foldLeft(ByteString())((bs, m) => bs ++ pickleClusterMember(m))
+  def pickleMembershipValue(m: MembershipCommandValue) = pickleLong(m.msgId) ++ pickleMembership(m.membership)
 
   def unpickleMembershipValue(b: ByteString): MembershipCommandValue = {
     val (id, msg) = b.splitAt(lengthOfLong)
-    val (size, remainder) = msg.splitAt(lengthOfInt)
-    val s = unpickleInt(size)
-    def take(b: ByteString, members: Seq[Member], count: Int): Seq[Member] = {
-      count match {
-        case 0 =>
-          members
-        case _ =>
-          val (member, remainder) = unpickleClusterMember(b)
-          take(remainder, members :+ member, count - 1)
-      }
-    }
-    val members = take(remainder, Seq.empty, s)
-    MembershipCommandValue(unpickleLong(id), members)
+    MembershipCommandValue(unpickleLong(id), unpickleMembership(msg))
   }
 
-  def pickleMembership(m: Membership) =
+  def pickleMembership(m: Membership) =  pickleInt(m.name.getBytes("UTF8").length) ++ ByteString(m.name.getBytes("UTF8")) ++
     pickleInt(m.members.size) ++
-      m.members.foldLeft(ByteString())((bs, m) => bs ++ pickleClusterMember(m)) // TODO consolidate with pickleMembershipValue
+      m.members.foldLeft(ByteString())((bs, m) => bs ++ pickleMember(m))
 
   def unpickleMembership(b: ByteString): Membership = {
-    // TODO consolidate with unpickleMembershipValue
-    val (size, remainder) = b.splitAt(lengthOfInt)
+    val (sb, rb) = b.splitAt(lengthOfInt)
+    val length = unpickleInt(sb)
+    val (name,rb2) = rb.splitAt(length)
+    val (size, remainder) = rb2.splitAt(lengthOfInt)
     val s = unpickleInt(size)
     def take(b: ByteString, members: Seq[Member], count: Int): Seq[Member] = {
       count match {
         case 0 =>
           members
         case _ =>
-          val (member, remainder) = unpickleClusterMember(b)
+          val (member, remainder) = unpickleMember(b)
           take(remainder, members :+ member, count - 1)
       }
     }
     val members = take(remainder, Seq.empty, s)
-    Membership(members)
+    Membership(new String(name.toArray, "UTF8"), members)
   }
+
+  def pickleMembershipQuery(m: MembershipQuery): ByteString = pickleLong(m.slot)
+
+  def unpickleMembershipQuery(b: ByteString): MembershipQuery = MembershipQuery(unpickleLong(b))
 
   def picklePrepare(p: Prepare): ByteString = pickleIdentifier(p.id)
 
@@ -194,7 +197,8 @@ object Pickle extends LazyLogging {
     Accept(unpickleIdentifier(id), fromMap(value.take(1).last)(value.drop(1)).asInstanceOf[CommandValue])
   }
 
-  def pickleProgress(p: Progress): ByteString = pickleInt(p.highestPromised.counter) ++ pickleInt(p.highestPromised.nodeIdentifier) ++ pickleIdentifier(p.highestCommitted)
+  def pickleProgress(p: Progress): ByteString = pickleInt(p.highestPromised.counter) ++
+    pickleInt(p.highestPromised.nodeIdentifier) ++ pickleIdentifier(p.highestCommitted)
 
   def unpickleProgress(b: ByteString): Progress = {
     val (counter, r1) = b.splitAt(lengthOfInt)
@@ -202,7 +206,8 @@ object Pickle extends LazyLogging {
     Progress(BallotNumber(unpickleInt(counter), unpickleInt(nodeIdentifier)), unpickleIdentifier(highestCommitted))
   }
 
-  def pickleAcceptAck(a: AcceptAck): ByteString = pickleIdentifier(a.requestId) ++ pickleInt(a.from) ++ pickleProgress(a.progress)
+  def pickleAcceptAck(a: AcceptAck): ByteString = pickleIdentifier(a.requestId) ++
+    pickleInt(a.from) ++ pickleProgress(a.progress)
 
   def unpickleAcceptAck(b: ByteString): AcceptAck = {
     val (requestId, r1) = b.splitAt(sizeOfIdentifier)
@@ -210,7 +215,8 @@ object Pickle extends LazyLogging {
     AcceptAck(unpickleIdentifier(requestId), unpickleInt(from), unpickleProgress(progress))
   }
 
-  def pickleAcceptNack(a: AcceptNack): ByteString = pickleIdentifier(a.requestId) ++ pickleInt(a.from) ++ pickleProgress(a.progress)
+  def pickleAcceptNack(a: AcceptNack): ByteString = pickleIdentifier(a.requestId) ++ pickleInt(a.from) ++
+    pickleProgress(a.progress)
 
   def unpickleAcceptNack(b: ByteString): AcceptNack = {
     val (requestId, r1) = b.splitAt(sizeOfIdentifier)
@@ -311,6 +317,8 @@ object Pickle extends LazyLogging {
     case p: Progress => pickleProgress(p)
     case m: MembershipCommandValue => pickleMembershipValue(m)
     case m: Membership => pickleMembership(m)
+    case m: Member => pickleMember(m)
+    case m: MembershipQuery => pickleMembershipQuery(m)
     case x =>
       logger.warn(s"don't know how to pickle $x so returning empty ByteString")
       ByteString()

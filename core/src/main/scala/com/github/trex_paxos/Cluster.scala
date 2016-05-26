@@ -3,6 +3,7 @@ package com.github.trex_paxos
 import com.typesafe.config.Config
 
 /**
+  * FIXME the location visible to the client may be a completely different host/interface so one host and two ports doesnt cut it.
   * A node is an immutable addressable process within the cluster. If a process is moved to another location, such
   * that its address changes, it just leave the cluster and rejoin at another address, with a new node membershipId.
   *

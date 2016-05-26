@@ -27,10 +27,7 @@ with AkkaLoggingAdapter {
 
   def clusterSize: Int
 
-  var paxosAgent = new PaxosAgent(nodeUniqueId, Follower, PaxosData(journal.loadProgress(), 0, 0, clusterSize _,
-    SortedMap.empty[Identifier, Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering), None,
-    SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering),
-    Map.empty[Identifier, (CommandValue, String)]))
+  var paxosAgent = initialAgent(nodeUniqueId, journal.loadProgress(), clusterSize _)
 
   val logger = this
 
@@ -39,7 +36,7 @@ with AkkaLoggingAdapter {
   protected val actorRefWeakMap = new mutable.WeakHashMap[String,ActorRef]
 
   // for the algorithm to have no dependency on akka we need to assign a String IDs
-  // to pass into the algorithm then later resolve the ActorRef by ID
+  // to pass into the algorithm then later resolve the ActorRef by ID FIXME side effects so should have braces in the call
   override def senderId: String = {
     val ref = sender()
     val pathAsString = ref.path.toString
@@ -62,7 +59,7 @@ with AkkaLoggingAdapter {
       trace(event, sender().toString(), sent)
       transmit(sender())
       paxosAgent = agent
-    case f => logger.error("Received unknown messages type ", f)
+    case f => logger.error("Received unknown messages type {}", f)
   }
 
   val minPrepare = Prepare(Identifier(nodeUniqueId, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
@@ -130,7 +127,7 @@ with AkkaLoggingAdapter {
    */
   val filteredDeliverClient: PartialFunction[Payload, Any] = {
     case Payload(_, NoOperationCommandValue) => NoOperationCommandValue.bytes
-    case p => deliverClient(p)
+    case p@Payload(_, c: ClientRequestCommandValue) => deliverClient(p)
   }
 
   /**
@@ -194,7 +191,7 @@ abstract class PaxosActor(config: PaxosProperties, nodeUniqueId: Int, journal: J
     timeout
   }
 
-  def heartbeatInterval = config.leaderTimeoutMin / 4
+  def heartbeatInterval = config.leaderTimeoutMin / 4 // TODO set this value by config else default
 
   val leaderHeartbeat: Cancellable = { // TODO possibly a var and some callbacks on state changes to canel and restart
     log.info("Node {} setting heartbeat interval to {}", nodeUniqueId, heartbeatInterval)
@@ -241,5 +238,13 @@ object PaxosActor {
   val freshAcceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering)
 
   val minJournalBounds = JournalBounds(Long.MinValue, Long.MinValue)
+
+  def initialAgent(nodeUniqueId: Int, progress: Progress, clusterSize: () => Int) =
+    new PaxosAgent(nodeUniqueId, Follower, PaxosData(progress, 0, 0, clusterSize,
+    SortedMap.empty[Identifier, Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering), None,
+    SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering),
+    Map.empty[Identifier, (CommandValue, String)]))
+
+
 }
 

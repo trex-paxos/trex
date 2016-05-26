@@ -3,13 +3,10 @@ package com.github.trex_paxos.javademo;
 import akka.actor.ActorSystem;
 import com.github.trex_paxos.Cluster;
 import com.github.trex_paxos.Node;
-//import com.github.trex_paxos.TrexStaticMembershipServer;
-import com.github.trex_paxos.TrexStaticMembershipServer$;
+import com.github.trex_paxos.TrexServer$;
 import com.github.trex_paxos.internals.MapDBStore;
-import com.github.trex_paxos.internals.PaxosActor;
 import com.github.trex_paxos.internals.PaxosProperties;
 import com.github.trex_paxos.internals.PaxosProperties$;
-import com.github.trex_paxos.library.Journal;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigValueFactory;
@@ -44,7 +41,7 @@ public class StackClusterNode {
             System.err.println(folder.getCanonicalPath() + " does not exist or do not have permission to read and write. Exiting.");
             System.exit(-1);
         }
-        Journal journal = new MapDBStore(new File(folder, "journal"), cluster.retained());
+        MapDBStore journal = new MapDBStore(new File(folder, "journal"), cluster.retained());
         Config systemConfig = ConfigFactory.load(configName)
                 .withValue("akka.remote.netty.tcp.port", ConfigValueFactory.fromAnyRef(node.clientPort()))
                 .withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(node.host()));
@@ -53,6 +50,9 @@ public class StackClusterNode {
 
         PaxosProperties conf = PaxosProperties$.MODULE$.apply(config);
 
-        system.actorOf(TrexStaticMembershipServer$.MODULE$.apply(cluster, conf, nodeId, journal, stack));
+        TrexServer$.MODULE$.initializeIfEmpty(cluster, journal);
+
+        system.actorOf(TrexServer$.MODULE$.apply(conf, node, journal, journal, stack), "PaxosActor");
+
     }
 }
