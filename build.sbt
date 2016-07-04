@@ -1,4 +1,5 @@
 
+val nettyVersion = "4.1.1.Final"
 val mapdbVersion = "1.0.9"
 val scalatestVersion = "2.2.5"
 val scalmockVersion = "3.2.2"
@@ -32,9 +33,10 @@ lazy val core = project.dependsOn(library).
   settings(name := "trex-core").
   settings(
 		libraryDependencies ++= Seq(
-		  "com.typesafe.akka" %% "akka-actor" % akkaVersion,
-		  "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
-		  "org.mapdb" % "mapdb" % mapdbVersion,
+      "org.mapdb" % "mapdb" % mapdbVersion,
+      "io.netty" % "netty-all" % nettyVersion,
+      "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+      "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
       "org.scalatest" % "scalatest_2.11" % scalatestVersion % "test,it",
 		  "org.scalamock" %% "scalamock-scalatest-support" % scalmockVersion % "test,it",

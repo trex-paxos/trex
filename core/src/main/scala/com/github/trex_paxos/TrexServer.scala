@@ -3,9 +3,9 @@ package com.github.trex_paxos
 import java.net.InetSocketAddress
 
 import akka.actor._
-import akka.event.Logging
 import com.github.trex_paxos.internals._
 import com.github.trex_paxos.library._
+import com.github.trex_paxos.onakka.{PaxosActorNoTimeout, PaxosProperties}
 
 object TrexServer {
 

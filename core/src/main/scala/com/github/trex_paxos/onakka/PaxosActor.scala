@@ -1,13 +1,14 @@
-package com.github.trex_paxos.internals
+package com.github.trex_paxos.onakka
 
 import java.security.SecureRandom
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Cancellable}
-import PaxosActor._
+import com.github.trex_paxos.internals.{ClientRequestCommandValue, MembershipCommandValue}
 import com.github.trex_paxos.library._
+import com.github.trex_paxos.onakka.PaxosActor._
 import com.typesafe.config.Config
 
-import scala.collection.immutable.{SortedMap, TreeMap}
+import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 import scala.util.Try
 

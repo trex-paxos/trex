@@ -7,6 +7,7 @@ import akka.actor.TypedActor.MethodCall
 import akka.serialization.SerializationExtension
 import com.github.trex_paxos.internals._
 import com.github.trex_paxos.library._
+import com.github.trex_paxos.onakka.{PaxosActor, PaxosProperties}
 
 import scala.compat.Platform
 import scala.util.Try

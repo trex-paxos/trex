@@ -4,6 +4,7 @@ import akka.actor._
 import akka.util.Timeout
 import com.github.trex_paxos.internals._
 import com.github.trex_paxos._
+import com.github.trex_paxos.onakka.PaxosProperties
 import com.typesafe.config._
 import org.mapdb.{DB, DBMaker}
 
@@ -55,7 +56,7 @@ object TrexKVClient {
 
     println("commands:\n\n\tget key\n\tput key value\n\tput key value version\n\tremove key\n\tremove key version\n\nlooping on stdin for your commands...")
 
-    for (ln <- io.Source.stdin.getLines()) {
+    for (ln <- scala.io.Source.stdin.getLines()) {
       val args = ln.split("\\s+")
 
       args(0) match {

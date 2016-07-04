@@ -4,9 +4,10 @@ import java.io.FileWriter
 import java.util.concurrent.CopyOnWriteArrayList
 
 import akka.actor._
-import com.github.trex_paxos.internals.PaxosActor.TraceData
-import com.github.trex_paxos.internals.{ClientRequestCommandValue, PaxosActor, PaxosProperties}
+import com.github.trex_paxos.internals.ClientRequestCommandValue
 import com.github.trex_paxos.library._
+import com.github.trex_paxos.onakka.PaxosActor.TraceData
+import com.github.trex_paxos.onakka.{PaxosActor, PaxosProperties}
 import com.typesafe.config.Config
 
 import scala.annotation.tailrec

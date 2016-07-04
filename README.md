@@ -8,7 +8,11 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 
 ## Releases
 
-[Trex 0.1](https://github.com/trex-paxos/trex/tree/1.0) is now released to [Central] (http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22com.github.trex-paxos%22)! This release has what is believed to be a correct and [functional paxos library] (http://search.maven.org/#artifactdetails%7Ccom.github.trex-paxos%7Ctrex-library_2.11%7C0.1%7Cjar). The other jars ( `core` server and `demo` module) are only enough to run simple demos. A key missing features is that `core` has no logic for dynamic cluster membership.  
+[Trex 0.1](https://github.com/trex-paxos/trex/tree/1.0)
+is now released to [Central] (http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22com.github.trex-paxos%22)! This release
+has what is believed to be a correct and [functional paxos library] (http://search.maven.org/#artifactdetails%7Ccom.github.trex-paxos%7Ctrex-library_2.11%7C0.1%7Cjar).
+The other jars ( `core` server and `demo` module) are only enough to run simple demos using akka for networking.
+A key missing features is that `core` has no logic for dynamic cluster membership.
 
 ## Building
 
@@ -31,17 +35,21 @@ sbt coverageReport
 - [x] breakup monolithic actor and increase unit test coverage
 - [x] java demo
 
-0.6 - practical
+0.2 - minimal server
 
+- [ ] netty udp multicast server
 - [ ] dynamic cluster membership
 - [ ] forced reconfigurations
+- [ ] move akka to be a test dependency only
+
+0.6 - practical
+
 - [ ] learners / scale-out multicast
 - [ ] timeline reads
 - [ ] noop heartbeats (less duels and partitioned leader detection)
 - [ ] snapshots and out of band retransmission
-- [ ] metrics/akka-tracing
+- [ ] metrics
 - [ ] binary tracing 
-- [ ] jumbo UDP packets
 - [ ] complete the TODOs
 
 0.7 - performance
@@ -50,7 +58,6 @@ sbt coverageReport
 - [ ] outdated reads
 - [ ] optimised journal 
 - [ ] batching 
-- [ ] remove remote actor from client driver
 - [ ] replica strong reads
 - [ ] compression 
 - [ ] journal truncation by size 

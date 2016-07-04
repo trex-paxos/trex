@@ -5,12 +5,10 @@ import java.util.concurrent.TimeoutException
 import akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, ActorSelection}
 import akka.serialization.{SerializationExtension, Serializer}
 import akka.util.Timeout
-import com.github.trex_paxos.BaseDriver.SelectionUrlFactory
 import com.github.trex_paxos.internals._
 import com.github.trex_paxos.library.{LostLeadershipException, _}
 
 import scala.collection.SortedMap
-import scala.collection.immutable.IndexedSeq
 import scala.compat.Platform
 import scala.concurrent.duration._
 

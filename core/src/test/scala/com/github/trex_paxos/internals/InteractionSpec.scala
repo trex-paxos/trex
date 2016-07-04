@@ -3,6 +3,7 @@ package com.github.trex_paxos.internals
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.github.trex_paxos.library._
+import com.github.trex_paxos.onakka.PaxosProperties
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
 

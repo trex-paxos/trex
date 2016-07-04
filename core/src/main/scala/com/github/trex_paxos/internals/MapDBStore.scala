@@ -6,6 +6,7 @@ import java.io.{Closeable, File}
 import akka.util.ByteString
 import com.github.trex_paxos.TrexMembership
 import com.github.trex_paxos.library.{Accept, Identifier, Journal, JournalBounds, Progress}
+import com.github.trex_paxos.onakka.PaxosActor
 import org.mapdb.{DB, DBMaker}
 
 import scala.collection.JavaConversions

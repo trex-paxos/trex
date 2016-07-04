@@ -84,7 +84,7 @@ object KVStoreClient {
               TypedProps[ConsistentKVStore],
               actorRefToRemoteActor)
 
-        for (ln <- io.Source.stdin.getLines()) {
+        for (ln <- scala.io.Source.stdin.getLines()) {
           val args = ln.split("\\s+")
 
           args(0) match {
