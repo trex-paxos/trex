@@ -57,7 +57,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
         case Some(map) =>
           val votes = map + (vote.from -> vote)
 
-          val haveMajorityResponse = votes.size > agent.data.clusterSize() / 2
+          val haveMajorityResponse = votes.size > agent.quorumStrategy.promiseQuorumSize
 
           if (haveMajorityResponse) {
 
@@ -75,7 +75,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
   }
 
   def handleMajorityResponse(io: PaxosIO, agent: PaxosAgent, votes: Map[Int, PrepareResponse]): PaxosAgent = {
-    computeFailover(io.logger, agent.nodeUniqueId, agent.data, votes) match {
+    computeFailover(io.logger, agent.nodeUniqueId, agent.data, votes, agent.quorumStrategy) match {
       case FailoverResult(failover, _) if failover =>
         val highestNumber = Seq(agent.data.progress.highestPromised, agent.data.progress.highestCommitted.number).max
         val maxCommittedSlot = agent.data.progress.highestCommitted.logIndex
@@ -138,7 +138,7 @@ object FollowerHandler {
     if (prepares.nonEmpty) prepares else Seq(Prepare(Identifier(nodeUniqueId, higherNumber, highestCommittedIndex + 1)))
   }
 
-  def computeFailover(log: PaxosLogging, nodeUniqueId: Int, data: PaxosData, votes: Map[Int, PrepareResponse]): FailoverResult = {
+  def computeFailover(log: PaxosLogging, nodeUniqueId: Int, data: PaxosData, votes: Map[Int, PrepareResponse], quorumStrategy: QuorumStrategy): FailoverResult = {
 
     val largerHeartbeats: Iterable[Long] = votes.values flatMap {
       case PrepareNack(_, _, _, _, evidenceHeartbeat) if evidenceHeartbeat > data.leaderHeartbeat =>
@@ -153,7 +153,7 @@ object FollowerHandler {
     // in a three node cluster if our link to the leader goes down we will see
     // one heartbeat from the follower we can see and that plus the leader we
     // cannot see is the majority evidence of a leader behind a network partition
-    def sufficientHeartbeatEvidence = largerHeartbeatCount + 1 > data.clusterSize() / 2
+    def sufficientHeartbeatEvidence = largerHeartbeatCount + 1 > quorumStrategy.promiseQuorumSize
 
     def noLargerHeartbeatEvidence = largerHeartbeats.isEmpty
 

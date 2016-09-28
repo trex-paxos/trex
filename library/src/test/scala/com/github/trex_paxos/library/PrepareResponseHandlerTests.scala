@@ -303,7 +303,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       val vote = PrepareAck(recoverHighPrepare.id, 2, initialData.progress, 0, 0, Some(a2))
 
       // and our agent ready to choose the highest accept
-      val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = () => 5, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress), initialQuorumStrategy)
+      val agent = PaxosAgent(0, Recoverer, initialData.copy(epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress), initialQuorumStrategy5)
 
       // and a capturing IO
       val buffer = ArrayBuffer[PaxosMessage]()
@@ -346,7 +346,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
     val vote = PrepareAck(recoverHighPrepare.id, 2, initialData.progress, 0, 0, None)
 
     // and our agent ready to choose the highest accept
-    val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = () => 5, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress), initialQuorumStrategy)
+    val agent = PaxosAgent(0, Recoverer, initialData.copy(epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress), initialQuorumStrategy5)
 
     // and a capturing IO
     val buffer = ArrayBuffer[PaxosMessage]()
@@ -387,7 +387,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
     val vote = PrepareNack(recoverHighPrepare.id, 4, initialData.progress, 0, 0)
 
     // and our agent ready to choose back down on a split vote as cluster size is 4
-    val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = () => 4, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress), initialQuorumStrategy4)
+    val agent = PaxosAgent(0, Recoverer, initialData.copy(epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress), initialQuorumStrategy4)
 
     // and a do nothing IO
     val io = new TestIO(noopJournal) {
@@ -426,7 +426,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
     val vote = PrepareNack(recoverHighPrepare.id, 2, initialData.progress, 0, 0)
 
     // and our agent ready to choose the highest accept
-    val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = () => 5, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress), initialQuorumStrategy)
+    val agent = PaxosAgent(0, Recoverer, initialData.copy(epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress), initialQuorumStrategy5)
 
     // when we get the majority
     val PaxosAgent(_, role, data, _) = handler.handlePrepareResponse(undefinedSilentIO, agent, vote)
@@ -447,8 +447,8 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
 
     // and an agent ready to choose the highest accept
     val agent: PaxosAgent =
-      PaxosAgent(0, Recoverer, initialData.copy(clusterSize = () => 5, epoch = Some(recoverHighNumber),
-        progress = progress), initialQuorumStrategy)
+      PaxosAgent(0, Recoverer, initialData.copy(epoch = Some(recoverHighNumber),
+        progress = progress), initialQuorumStrategy5)
 
     val lenses: PaxosLenses = new TestPrepareResponseHandlerNoRetransmission
 

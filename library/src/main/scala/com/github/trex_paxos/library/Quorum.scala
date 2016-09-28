@@ -11,12 +11,15 @@ case object SplitVote extends Outcome
 trait QuorumStrategy {
   def assessPromises(promises: Iterable[PrepareResponse]): Option[Outcome]
   def assessAccepts(accepts: Iterable[AcceptResponse]): Option[Outcome]
+  def promiseQuorumSize: Int
 }
 
 class DefaultQuorumStrategy(clusterSize: () => Int) extends QuorumStrategy{
   def assessPromises(promises: Iterable[PrepareResponse]): Option[Outcome] = DefaultQuorumStrategy.assessPromises(clusterSize(), promises)
 
   def assessAccepts(accepts: Iterable[AcceptResponse]): Option[Outcome] = DefaultQuorumStrategy.assessAccepts(clusterSize(), accepts)
+
+  override def promiseQuorumSize: Int = clusterSize() / 2
 }
 
 object DefaultQuorumStrategy {

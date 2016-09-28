@@ -122,7 +122,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       // when it sees that response and does not have a majority as cluster size is 5
       handler.handleLowPrepareResponse(new TestIO(new UndefinedJournal){
         override def minPrepare: Prepare = TestFollowerHandler.minPrepare
-      }, PaxosAgent(0, Follower, initialDataWithTimeoutAndPrepareResponses.copy(clusterSize = () => 5), initialQuorumStrategy), vote) match {
+      }, PaxosAgent(0, Follower, initialDataWithTimeoutAndPrepareResponses, initialQuorumStrategy5), vote) match {
         case PaxosAgent(_, Follower, data, _) => // it stays as follower
           data.prepareResponses.getOrElse(minPrepare.id, Map.empty).get(otherNodeUniqueId) match {
               case Some(`vote`) => // and has recorded the other nodes vote
@@ -134,7 +134,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
     "knows to failover when there are no other larger leader heartbeats" in {
       val nack1 = PrepareNack(minPrepare.id, 0, initialData.progress, 0, 999)
       val nack2 = PrepareNack(minPrepare.id, 0, initialData.progress, 0, 999)
-      FollowerHandler.computeFailover(NoopPaxosLogging, 0, initialData.copy(leaderHeartbeat = 1000), Map(1 -> nack1, 2 -> nack2) ) match {
+      FollowerHandler.computeFailover(NoopPaxosLogging, 0, initialData.copy(leaderHeartbeat = 1000), Map(1 -> nack1, 2 -> nack2) , initialQuorumStrategy) match {
         case FailoverResult(true, 1000) => // good
         case x => fail(x.toString)
       }
@@ -142,7 +142,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
     "knows not to failover when there is sufficient evidence of other leaders heartbeat" in {
       val nack1 = PrepareNack(minPrepare.id, 0, initialData.progress, 0, 998)
       val nack2 = PrepareNack(minPrepare.id, 1, initialData.progress, 0, 999)
-      FollowerHandler.computeFailover(NoopPaxosLogging, 0, initialData, Map(1 -> nack1, 2 -> nack2) ) match {
+      FollowerHandler.computeFailover(NoopPaxosLogging, 0, initialData, Map(1 -> nack1, 2 -> nack2), initialQuorumStrategy) match {
         case FailoverResult(false, 999) => // good
         case x => fail(x.toString)
       }
@@ -150,7 +150,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
     "chooses to failover when there is insufficient evidence of other leaders heartbeat" in {
       val nack1 = PrepareNack(minPrepare.id, 0, initialData.progress, 0, 998)
       val nack2 = PrepareNack(minPrepare.id, 0, initialData.progress, 0, 999)
-      FollowerHandler.computeFailover(NoopPaxosLogging, 0, initialData.copy(leaderHeartbeat = 998, clusterSize = () => 5), Map(1 -> nack1, 2 -> nack2) ) match {
+      FollowerHandler.computeFailover(NoopPaxosLogging, 0, initialData.copy(leaderHeartbeat = 998), Map(1 -> nack1, 2 -> nack2), initialQuorumStrategy5 ) match {
         case FailoverResult(true, 999) => // good
         case x => fail(x.toString)
       }

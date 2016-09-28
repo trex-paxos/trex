@@ -49,7 +49,7 @@ with ClientCommandHandler {
     // update heartbeat and attempt to commit contiguous accept messages
     case PaxosEvent(io, agent@PaxosAgent(_, Follower, _, _), c@Commit(i, heartbeat)) =>
       handleFollowerCommit(io, agent, c)
-    case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, _, _, _, _), _), CheckTimeout) if io.clock >= to =>
+    case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, _, _, _), _), CheckTimeout) if io.clock >= to =>
       handleFollowerTimeout(io, agent)
     case PaxosEvent(io, agent, vote: PrepareResponse) if agent.role == Follower =>
       handelFollowerPrepareResponse(io, agent, vote)

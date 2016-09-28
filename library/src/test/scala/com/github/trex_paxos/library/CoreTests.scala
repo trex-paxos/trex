@@ -37,7 +37,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
 
     import Ordering._
 
-    val nodeData = PaxosData(progress, 0, 0, () => 3, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, String)])
+    val nodeData = PaxosData(progress, 0, 0, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, String)])
     val id = Identifier(0, BallotNumber(1, 2), 3L)
 
     "set prepare responses" in {
@@ -125,7 +125,6 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
         ),
         leaderHeartbeat = 0,
         timeout = 0,
-        clusterSize = () => 3,
         prepareResponses = TreeMap(id -> Map.empty),
         epoch = Some(number),
         acceptResponses = TreeMap(id -> AcceptResponsesAndTimeout(0, accept, Map.empty)),
