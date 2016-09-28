@@ -24,7 +24,7 @@ class ReturnToFollowerTests extends WordSpecLike with Matchers with OptionValues
       val optMsg = new Box[PaxosMessage](None)
       handler.handleReturnToFollowerOnHigherCommit(new TestIO(new UndefinedJournal){
         override def send(msg: PaxosMessage): Unit = optMsg(msg)
-      }, PaxosAgent(0, Recoverer, initialData), Commit(id))
+      }, PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy), Commit(id))
       // then
       optMsg() shouldBe RetransmitRequest(from = 0, to = 2, initialData.progress.highestCommitted.logIndex)
     }
@@ -42,7 +42,7 @@ class ReturnToFollowerTests extends WordSpecLike with Matchers with OptionValues
         override def sendNoLongerLeader(cc: Map[Identifier, (CommandValue, String)]): Unit = {
           clientCommands ++= cc
         }
-      }, PaxosAgent(0, Recoverer, dataWithClient), Commit(id))
+      }, PaxosAgent(0, Recoverer, dataWithClient, initialQuorumStrategy), Commit(id))
       // then the client is sent a NoLongerLeaderException
       clientCommands shouldBe dataWithClient.clientCommands
     }

@@ -49,7 +49,7 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
       // when
       val AcceptsAndData(accepts, data) = handler.computeResendAccepts(new TestIO(new UndefinedJournal) {
         override def randomTimeout: Long = 121L
-      }, PaxosAgent(99, Leader, initialData.copy(acceptResponses = emptyAcceptResponses)), 100L)
+      }, PaxosAgent(99, Leader, initialData.copy(acceptResponses = emptyAcceptResponses), initialQuorumStrategy), 100L)
       // then
       data.timeout shouldBe 121L
       accepts.size shouldBe 2
@@ -65,7 +65,7 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
       val AcceptsAndData(accepts, data) = handler.computeResendAccepts(new TestIO(new UndefinedJournal) {
         override def randomTimeout: Long = 121L
       }
-        , PaxosAgent(100, Leader, initialData.copy(acceptResponses = higherPromise)), 100L)
+        , PaxosAgent(100, Leader, initialData.copy(acceptResponses = higherPromise), initialQuorumStrategy), 100L)
       // then it move to the 1-higher epoch
       data.epoch match {
         case Some(newEpoch) => // success
@@ -95,7 +95,7 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
       // when
       val AcceptsAndData(accepts, data) = handler.computeResendAccepts(new TestIO(new UndefinedJournal) {
         override def randomTimeout: Long = 121L
-      }, PaxosAgent(99, Leader, initialData.copy(acceptResponses = higherPromise)), 100L)
+      }, PaxosAgent(99, Leader, initialData.copy(acceptResponses = higherPromise), initialQuorumStrategy), 100L)
       // then
       data.timeout shouldBe 121L
       accepts.size shouldBe 2
@@ -119,7 +119,7 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
         override def randomTimeout: Long = 121L
 
         override def send(msg: PaxosMessage): Unit = sendTime(System.nanoTime())
-      }, PaxosAgent(99, Leader, initialData.copy(acceptResponses = emptyAcceptResponses)), 100L)
+      }, PaxosAgent(99, Leader, initialData.copy(acceptResponses = emptyAcceptResponses), initialQuorumStrategy), 100L)
       // then we saved, accepted and sent
       assert(saveJournalTime() > 0 && acceptJournalTime() > 0 && sendTime() > 0)
       // in the correct order had we done a full round of paxos which is promise, accept then send last
@@ -127,7 +127,7 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
     }
     "resend prepares and refresh its timeout" in {
       // given
-      val agent = PaxosAgent(0, Follower, selfAckPrepares2)
+      val agent = PaxosAgent(0, Follower, selfAckPrepares2, initialQuorumStrategy)
       val handler = new ResendHandler{}
       val sent = ArrayBuffer[PaxosMessage]()
       val ioWithTimeout = new UndefinedIO with SilentLogging {
@@ -136,7 +136,7 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
         override def send(msg: PaxosMessage): Unit = sent += msg
       }
       // when
-      val PaxosAgent(_, _, data) = handler.handleResendPrepares(ioWithTimeout, agent, selfAckPrepares.timeout + 1)
+      val PaxosAgent(_, _, data, _) = handler.handleResendPrepares(ioWithTimeout, agent, selfAckPrepares.timeout + 1)
       // then
       data.timeout shouldBe 12345L
       sent.size shouldBe 2
@@ -155,7 +155,7 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
       val handler = new TestResendHandler
       val higherPromise = emptyAcceptResponses +
         (a99.id -> AcceptResponsesAndTimeout(timeoutAt50, a99, Map(0 -> AcceptNack(a99.id, 0, progressWith(zeroProgress.highestPromised, BallotNumber(99, 99))))))
-      val agent = PaxosAgent(100, Leader, initialData.copy(acceptResponses = higherPromise))
+      val agent = PaxosAgent(100, Leader, initialData.copy(acceptResponses = higherPromise), initialQuorumStrategy)
 
       // when
       val AcceptsAndData(accepts, data) = handler.computeResendAccepts(undefinedIO, agent, timeNow)
@@ -165,7 +165,6 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
 
     }
   }
-
 }
 
 object ResendAcceptsTests {

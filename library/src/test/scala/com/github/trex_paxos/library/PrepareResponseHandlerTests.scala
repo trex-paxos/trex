@@ -4,7 +4,6 @@ import org.scalatest.{Matchers, OptionValues, WordSpecLike}
 
 import scala.collection.immutable.SortedMap
 import scala.collection.mutable.ArrayBuffer
-
 import Ordering._
 
 case class TimeAndMessage(message: Any, time: Long)
@@ -28,9 +27,9 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       // given
       val handler = new TestPrepareResponseHandlerNoRetransmission
       val vote = PrepareAck(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), 12, 13, None)
-      val PaxosAgent(_, role, state) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
+      val PaxosAgent(_, role, state, _) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
         override def randomTimeout: Long = 1234L
-      }, PaxosAgent(0, Recoverer, initialData), vote)
+      }, PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy), vote)
       // then
       role match {
         case Recoverer => // good
@@ -47,14 +46,14 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       val handler = new TestPrepareResponseHandlerNoRetransmission
       val vote = PrepareNack(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), 12, 13)
       // when
-      val PaxosAgent(_, role, _) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
+      val PaxosAgent(_, role, _, _) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
           val update = TimeAndMessage(msg, System.nanoTime())
           broadcastValues += update
         }
-      }, PaxosAgent(0, Recoverer, selfNackPrepares), vote)
+      }, PaxosAgent(0, Recoverer, selfNackPrepares, initialQuorumStrategy), vote)
       // then we are a follower
       role match {
         case Follower => // good
@@ -70,14 +69,14 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       val otherAcceptedIndex = 2L // recoverHighPrepare.id.logIndex + 1
       val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), otherAcceptedIndex, 13, None)
       // when
-      val PaxosAgent(_, role, data) = handler.handlePrepareResponse(new TestIO(emptyJournal) {
+      val PaxosAgent(_, role, data, _) = handler.handlePrepareResponse(new TestIO(emptyJournal) {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
           val update = TimeAndMessage(msg, System.nanoTime())
           broadcastValues += update
         }
-      }, PaxosAgent(0, Recoverer, selfAckPrepares), vote)
+      }, PaxosAgent(0, Recoverer, selfAckPrepares, initialQuorumStrategy), vote)
       // then we are still a recoverer as not finished with all prepares
       role match {
         case Recoverer => // good
@@ -113,14 +112,14 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), otherAcceptedIndex, 13, None)
       val higherPromise = Progress.highestPromisedLens.set(selfAckPrepares.progress, BallotNumber(Int.MaxValue, Int.MaxValue))
       // when
-      val PaxosAgent(_, role, data) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
+      val PaxosAgent(_, role, data, _) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
           val update = TimeAndMessage(msg, System.nanoTime())
           broadcastValues += update
         }
-      }, PaxosAgent(0, Recoverer, selfAckPrepares.copy(progress = higherPromise)), vote)
+      }, PaxosAgent(0, Recoverer, selfAckPrepares.copy(progress = higherPromise), initialQuorumStrategy), vote)
       // then we are still a recoverer as not finished with all prepares
       role match {
         case Recoverer => // good
@@ -169,7 +168,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
         }
       }
       // when
-      val PaxosAgent(_, role, data) = handler.handlePrepareResponse(io, PaxosAgent(0, Recoverer, selfAckPrepares), vote)
+      val PaxosAgent(_, role, data, _) = handler.handlePrepareResponse(io, PaxosAgent(0, Recoverer, selfAckPrepares, initialQuorumStrategy), vote)
       // then we promote to leader
       role match {
         case Leader => // good
@@ -212,7 +211,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), recoverHighPrepare.id.logIndex, 13, None)
       // when
       val higherPromise = Progress.highestPromisedLens.set(selfAckPrepares.progress, BallotNumber(Int.MaxValue, Int.MaxValue))
-      val PaxosAgent(_, role, data) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
+      val PaxosAgent(_, role, data, _) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
@@ -220,7 +219,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
           broadcastValues += update
         }
 
-      }, PaxosAgent(0, Recoverer, selfAckPrepares.copy(progress = higherPromise)), vote)
+      }, PaxosAgent(0, Recoverer, selfAckPrepares.copy(progress = higherPromise), initialQuorumStrategy), vote)
       // then we promote to leader
       role match {
         case Leader => // good
@@ -254,13 +253,13 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), otherCommittedIndex)), 12L, 13, None)
 
       // when
-      val PaxosAgent(_, role, data) = handler.handlePrepareResponse(new TestIO(emptyJournal) {
+      val PaxosAgent(_, role, data, _) = handler.handlePrepareResponse(new TestIO(emptyJournal) {
         override def randomTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
           sentValues += msg
         }
-      }, PaxosAgent(0, Recoverer, selfAckPrepares), vote)
+      }, PaxosAgent(0, Recoverer, selfAckPrepares, initialQuorumStrategy), vote)
 
       // then
       sentValues.headOption.value shouldBe (RetransmitRequest(0, 5, selfAckPrepares.progress.highestCommitted.logIndex))
@@ -304,7 +303,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       val vote = PrepareAck(recoverHighPrepare.id, 2, initialData.progress, 0, 0, Some(a2))
 
       // and our agent ready to choose the highest accept
-      val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = () => 5, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress))
+      val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = () => 5, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress), initialQuorumStrategy)
 
       // and a capturing IO
       val buffer = ArrayBuffer[PaxosMessage]()
@@ -347,7 +346,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
     val vote = PrepareAck(recoverHighPrepare.id, 2, initialData.progress, 0, 0, None)
 
     // and our agent ready to choose the highest accept
-    val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = () => 5, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress))
+    val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = () => 5, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress), initialQuorumStrategy)
 
     // and a capturing IO
     val buffer = ArrayBuffer[PaxosMessage]()
@@ -388,7 +387,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
     val vote = PrepareNack(recoverHighPrepare.id, 4, initialData.progress, 0, 0)
 
     // and our agent ready to choose back down on a split vote as cluster size is 4
-    val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = () => 4, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress))
+    val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = () => 4, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress), initialQuorumStrategy4)
 
     // and a do nothing IO
     val io = new TestIO(noopJournal) {
@@ -396,7 +395,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
     }
 
     // when we get the majority
-    val PaxosAgent(_, role, newData) = handler.handlePrepareResponse(io, agent, vote)
+    val PaxosAgent(_, role, newData, _) = handler.handlePrepareResponse(io, agent, vote)
 
     // then
     role shouldBe Follower
@@ -427,10 +426,10 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
     val vote = PrepareNack(recoverHighPrepare.id, 2, initialData.progress, 0, 0)
 
     // and our agent ready to choose the highest accept
-    val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = () => 5, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress))
+    val agent = PaxosAgent(0, Recoverer, initialData.copy(clusterSize = () => 5, epoch = Some(recoverHighNumber), prepareResponses = prepareResponses, progress = progress), initialQuorumStrategy)
 
     // when we get the majority
-    val PaxosAgent(_, role, data) = handler.handlePrepareResponse(undefinedSilentIO, agent, vote)
+    val PaxosAgent(_, role, data, _) = handler.handlePrepareResponse(undefinedSilentIO, agent, vote)
 
     // then we have simply recorded the vote
     role shouldBe Recoverer
@@ -449,7 +448,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
     // and an agent ready to choose the highest accept
     val agent: PaxosAgent =
       PaxosAgent(0, Recoverer, initialData.copy(clusterSize = () => 5, epoch = Some(recoverHighNumber),
-        progress = progress))
+        progress = progress), initialQuorumStrategy)
 
     val lenses: PaxosLenses = new TestPrepareResponseHandlerNoRetransmission
 

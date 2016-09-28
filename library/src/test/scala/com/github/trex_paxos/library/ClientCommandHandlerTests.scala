@@ -14,7 +14,7 @@ with PaxosLenses {
   "ClientCommandHandler" should {
     "assign a command to the next slot" in {
       // given
-      val agent = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)))
+      val agent = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)), TestHelpers.initialQuorumStrategy)
       val value = DummyCommandValue(1)
       // when
       val acceptOpt = ClientCommandHandler.acceptFor(agent, value)
@@ -30,7 +30,7 @@ with PaxosLenses {
     }
     "ack if has not made a higher promise" in {
       // given a leader
-      val agent: PaxosAgent = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)))
+      val agent: PaxosAgent = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)), TestHelpers.initialQuorumStrategy)
       // and a fresh timeout
       val ioWithTimeout = new UndefinedIO {
         override def randomTimeout: Long = 12345L
@@ -59,7 +59,7 @@ with PaxosLenses {
     "nacks if has made a higher promise" in {
       // given an Leader agent with a high promise
       val highPromiseData = highestPromisedLens.set(initialData, BallotNumber(Int.MaxValue, Int.MaxValue))
-      val agent: PaxosAgent = PaxosAgent(5, Leader, highPromiseData.copy(epoch = Option(highPromiseData.progress.highestPromised)))
+      val agent: PaxosAgent = PaxosAgent(5, Leader, highPromiseData.copy(epoch = Option(highPromiseData.progress.highestPromised)), TestHelpers.initialQuorumStrategy)
       // and a fresh timeout
       val ioWithTimeout = new UndefinedIO {
         override def randomTimeout: Long = 12345L
@@ -91,7 +91,7 @@ with PaxosLenses {
       // and a Leader agent with a high promise
       val highPromiseData = highestPromisedLens.set(initialData, BallotNumber(Int.MaxValue, Int.MaxValue))
       val agent: PaxosAgent =
-        PaxosAgent(5, Leader, highPromiseData.copy(epoch = Option(BallotNumber(Int.MinValue, Int.MinValue))))
+        PaxosAgent(5, Leader, highPromiseData.copy(epoch = Option(BallotNumber(Int.MinValue, Int.MinValue))), TestHelpers.initialQuorumStrategy)
       // and a fresh timeout
       val ioWithTimeout = new UndefinedIO {
         override def randomTimeout: Long = 12345L
@@ -99,7 +99,7 @@ with PaxosLenses {
         override def send(msg: PaxosMessage): Unit = {}
       }
       // when
-      val PaxosAgent(_, _, data) = handler.handleClientCommand(ioWithTimeout, agent, NoOperationCommandValue, DummyRemoteRef())
+      val PaxosAgent(_, _, data, _) = handler.handleClientCommand(ioWithTimeout, agent, NoOperationCommandValue, DummyRemoteRef())
       // then
       data.acceptResponses.size shouldBe 1
       data.acceptResponses.headOption match {
@@ -116,7 +116,7 @@ with PaxosLenses {
       // given a handler
       val handler = new Object with ClientCommandHandler
       // and a leader
-      val agent: PaxosAgent = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)))
+      val agent: PaxosAgent = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)), TestHelpers.initialQuorumStrategy)
       // and an IO which records when it sent and saved
       val acceptedTs = ArrayBuffer[Long]()
       val sent = ArrayBuffer[Long]()
@@ -131,7 +131,7 @@ with PaxosLenses {
         }
       }
       // when
-      val PaxosAgent(_, _, data) = handler.handleClientCommand(ioWithTimeout, agent, NoOperationCommandValue, DummyRemoteRef())
+      val PaxosAgent(_, _, data, _) = handler.handleClientCommand(ioWithTimeout, agent, NoOperationCommandValue, DummyRemoteRef())
       // then
       assert( acceptedTs.max < sent.min )
     }
@@ -140,7 +140,7 @@ with PaxosLenses {
       // given a handler
       val handler = new Object with ClientCommandHandler
       // and a leader
-      val agent: PaxosAgent = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)))
+      val agent: PaxosAgent = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)), TestHelpers.initialQuorumStrategy)
       // and a minimal IO that captures the sent accept
       val sent = ArrayBuffer[PaxosMessage]()
       val ioWithTimeout = new UndefinedIO {
@@ -158,7 +158,7 @@ with PaxosLenses {
       // and a dummy value
       val value = DummyCommandValue(1)
       // when
-      val PaxosAgent(_, _, data) = handler.handleClientCommand(ioWithTimeout, agent, value, client)
+      val PaxosAgent(_, _, data, _) = handler.handleClientCommand(ioWithTimeout, agent, value, client)
       // then
       assert(data.clientCommands.nonEmpty)
       // and the sent accept is mapped to the client

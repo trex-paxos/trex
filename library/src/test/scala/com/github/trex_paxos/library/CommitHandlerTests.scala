@@ -66,7 +66,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val emptyJournal = stub[Journal]
       (emptyJournal.accepted _) when (*) returns None
       // and an agent
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       // when
       val (newProgress, result) = handler.commit(new UndefinedIO with SilentLogging {
         override def journal: Journal = emptyJournal
@@ -79,7 +79,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       // given a handler
       val handler = new Object with CommitHandler
       // and an agent
-      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareSelfAck, leaderHeartbeat = Long.MinValue))
+      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareSelfAck, leaderHeartbeat = Long.MinValue), initialQuorumStrategy)
       // and an io with a new timeout
       val io = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
@@ -87,7 +87,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       // and a commit with a higher heartbeat
       val commitWithHigherHeartbeat = Commit(initialData.progress.highestCommitted, Long.MaxValue)
       // when
-      val PaxosAgent(_, role, data) = handler.handleFollowerCommit(io, agent, commitWithHigherHeartbeat)
+      val PaxosAgent(_, role, data, _) = handler.handleFollowerCommit(io, agent, commitWithHigherHeartbeat)
       // then
       data.timeout shouldBe Long.MaxValue
       data.prepareResponses.isEmpty shouldBe true
@@ -99,7 +99,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       // some number
       val high = BallotNumber(Int.MaxValue, Int.MaxValue)
       // and an agent
-      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareSelfAck, leaderHeartbeat = Long.MinValue))
+      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareSelfAck, leaderHeartbeat = Long.MinValue), initialQuorumStrategy)
       // and an io with a new timeout
       val io = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
@@ -107,7 +107,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       // and a commit with a higher number
       val commitWithHigherNumber = Commit(initialData.progress.highestCommitted.copy(number = high), Long.MinValue)
       // when
-      val PaxosAgent(_, _, data) =
+      val PaxosAgent(_, _, data, _) =
         handler.handleFollowerCommit(io, agent, commitWithHigherNumber)
       // then
       data.timeout shouldBe Long.MaxValue
@@ -121,10 +121,10 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val emptyJournal = stub[Journal]
       (emptyJournal.accepted _) when (*) returns None
       // and an agent
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       // when
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val PaxosAgent(_, _, data) = handler.handleFollowerCommit(new UndefinedIO with SilentLogging {
+      val PaxosAgent(_, _, data, _) = handler.handleFollowerCommit(new UndefinedIO with SilentLogging {
         override def journal: Journal = emptyJournal
 
         override def randomTimeout: Long = 1234L
@@ -144,10 +144,10 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val stubJournal = stub[Journal]
       (stubJournal.accepted _) when (*) returns Some(accepted)
       // and an agent
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       // when
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
-      val PaxosAgent(_, _, data) = handler.handleFollowerCommit(new UndefinedIO with SilentLogging {
+      val PaxosAgent(_, _, data, _) = handler.handleFollowerCommit(new UndefinedIO with SilentLogging {
         override def journal: Journal = stubJournal
 
         override def randomTimeout: Long = 1234L
@@ -177,7 +177,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val id3 = Identifier(otherNodeId, BallotNumber(lowValue, 99), 3L)
       (stubJournal.accepted _) when (3L) returns Some(Accept(id3, DummyCommandValue(3)))
       // and an agent
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData,initialQuorumStrategy)
       // and an io
       val sentMessages: ArrayBuffer[PaxosMessage] = ArrayBuffer()
       val io = new TestIO(stubJournal) {
@@ -189,7 +189,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
         override def deliver(payload: Payload): Any = {}
       }
       // when
-      val PaxosAgent(_, _, data) = handler.handleFollowerCommit(io, agent, Commit(id3))
+      val PaxosAgent(_, _, data, _) = handler.handleFollowerCommit(io, agent, Commit(id3))
       // then
       data.progress.highestCommitted shouldBe id1
       sentMessages.headOption.value shouldBe RetransmitRequest(0, id3.from, id1.logIndex)
@@ -216,7 +216,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       (stubJournal.accepted _) when (3L) returns Some(Accept(id3, DummyCommandValue(3)))
 
       // and an agent
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       // and an io
       val sentMessages: ArrayBuffer[PaxosMessage] = ArrayBuffer()
       val io = new TestIO(stubJournal) {
@@ -228,7 +228,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
         override def deliver(payload: Payload): Any = {}
       }
       // when we commit up to slot 3
-      val PaxosAgent(_, _, data) = handler.handleFollowerCommit(io, agent, Commit(id3))
+      val PaxosAgent(_, _, data, _) = handler.handleFollowerCommit(io, agent, Commit(id3))
       // then
       data.progress.highestCommitted shouldBe id1
       sentMessages.headOption.value shouldBe RetransmitRequest(0, id3.from, id1.logIndex)
@@ -240,9 +240,9 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val emptyJournal = stub[Journal]
       (emptyJournal.accepted _) when (*) returns None
       // and an agent
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       // when
-      val PaxosAgent(_, _, data) = handler.handleFollowerCommit(new UndefinedIO with SilentLogging,
+      val PaxosAgent(_, _, data, _) = handler.handleFollowerCommit(new UndefinedIO with SilentLogging,
         agent, Commit(initialData.progress.highestCommitted, initialData.leaderHeartbeat))
       // then
       data shouldBe initialData
@@ -258,13 +258,13 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       // and we promised to a12 and have only committed up to a11
       val oldProgress = Progress(a12.id.number, a11.id)
       // and an agent
-      val agent = PaxosAgent(0, Follower, initialData.copy(progress = oldProgress))
+      val agent = PaxosAgent(0, Follower, initialData.copy(progress = oldProgress), initialQuorumStrategy)
       // and a configured IO
       val io = new TestIO(stubJournal) {
         override def deliver(payload: Payload): Any = payload.command.bytes
       }
       // when we commit to a14
-      val PaxosAgent(_, _, data) = handler.handleFollowerCommit(io, agent, Commit(a12.id, initialData.leaderHeartbeat))
+      val PaxosAgent(_, _, data, _) = handler.handleFollowerCommit(io, agent, Commit(a12.id, initialData.leaderHeartbeat))
 
       // then we will have made new progress
       data.progress.highestCommitted shouldBe a12.id
@@ -282,13 +282,13 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       // and we promised to a12 and have only committed up to a11
       val oldProgress = Progress(a12.id.number, a11.id)
       // and an agent
-      val agent = PaxosAgent(0, Follower, initialData.copy(progress = oldProgress))
+      val agent = PaxosAgent(0, Follower, initialData.copy(progress = oldProgress), initialQuorumStrategy)
       // and a configured IO
       val io = new TestIO(stubJournal) {
         override def deliver(payload: Payload): Any = payload.command.bytes
       }
       // when we commit to a14
-      val PaxosAgent(_, _, data) = handler.handleFollowerCommit(io, agent, Commit(a14.id, initialData.leaderHeartbeat))
+      val PaxosAgent(_, _, data, _) = handler.handleFollowerCommit(io, agent, Commit(a14.id, initialData.leaderHeartbeat))
 
       // then we will have made new progress
       data.progress.highestCommitted shouldBe accepts11thru14.lastOption.value.id

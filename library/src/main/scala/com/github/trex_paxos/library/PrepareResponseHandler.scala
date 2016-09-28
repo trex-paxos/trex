@@ -33,7 +33,7 @@ trait PrepareResponseHandler extends PaxosLenses with BackdownAgent {
         // register the vote
         val votes = map + (vote.from -> vote)
 
-        agent.data.quorumStrategy.assessPromises(votes.values) match {
+        agent.quorumStrategy.assessPromises(votes.values) match {
           case Some(QuorumAck) =>
             // issue new prepare messages if others have accepted higher slot indexes
             val expandedPreparesData = expandedPrepareSlotRange(io, this, agent, votes)

@@ -14,7 +14,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val handler = new TestAcceptHandler
       val mockJournal = stub[Journal]
       val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
-      val agent = PaxosAgent(1, Follower, TestHelpers.initialData)
+      val agent = PaxosAgent(1, Follower, TestHelpers.initialData, TestHelpers.initialQuorumStrategy)
       intercept[IllegalArgumentException] {
         handler.handleHighAccept(new TestIO(mockJournal), agent, Accept(id, NoOperationCommandValue))
       }
@@ -31,7 +31,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val journal = new UndefinedJournal {
         override def accept(a: Accept*): Unit = saveTs.set(System.nanoTime)
       }
-      val agent = PaxosAgent(1, Follower, TestHelpers.initialData)
+      val agent = PaxosAgent(1, Follower, TestHelpers.initialData, TestHelpers.initialQuorumStrategy)
       val io = new TestIO(journal)
       handler.handleAccept(io, agent, accept)
       io.sent().headOption.value match {
@@ -51,10 +51,10 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
 
         override def saveProgress(progress: Progress): Unit = saveTs.set(System.nanoTime)
       }
-      val agent = PaxosAgent(1, Follower, TestHelpers.initialData)
+      val agent = PaxosAgent(1, Follower, TestHelpers.initialData, TestHelpers.initialQuorumStrategy)
       val io = new TestIO(journal)
       val handler = new TestAcceptHandler
-      val PaxosAgent(_, Follower, newData) = handler.handleAccept(io, agent, accept)
+      val PaxosAgent(_, Follower, newData, _) = handler.handleAccept(io, agent, accept)
       assert(saveTs != 0L)
       io.sent().headOption.value match {
         case MessageAndTimestamp(ack: AcceptAck, sendTs) if ack.requestId == id && saveTs.longValue() < sendTs => // good
@@ -78,9 +78,9 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       stubJournal.accepted _ when 0L returns Some(accepted)
       // when our node sees this
       val handler = new TestAcceptHandler
-      val agent = PaxosAgent(1, Follower, data)
+      val agent = PaxosAgent(1, Follower, data, TestHelpers.initialQuorumStrategy)
       val io = new TestIO(stubJournal)
-      val PaxosAgent(_, Follower, newData) = handler.handleAccept(io, agent, accepted)
+      val PaxosAgent(_, Follower, newData, _) = handler.handleAccept(io, agent, accepted)
       // it acks
       io.sent().headOption.value match {
         case MessageAndTimestamp(ack: AcceptAck, _) => // good
@@ -101,9 +101,9 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val acceptedAccept = Accept(higherIdentifier, DummyCommandValue(2))
       // when our node sees this
       val handler = new TestAcceptHandler
-      val agent = PaxosAgent(1, Follower, initialData)
+      val agent = PaxosAgent(1, Follower, initialData, TestHelpers.initialQuorumStrategy )
       val io = new TestIO(stubJournal)
-      val PaxosAgent(_, Follower, newData) = handler.handleAccept(io, agent, acceptedAccept)
+      val PaxosAgent(_, Follower, newData, _) = handler.handleAccept(io, agent, acceptedAccept)
       // it nacks
       io.sent().headOption.value match {
         case MessageAndTimestamp(ack: AcceptNack, _) => // good
@@ -118,7 +118,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val accept = Accept(id, NoOperationCommandValue)
       val handler = new TestAcceptHandler
       val journal = new UndefinedJournal
-      val agent = PaxosAgent(1, Follower, TestHelpers.initialData)
+      val agent = PaxosAgent(1, Follower, TestHelpers.initialData, TestHelpers.initialQuorumStrategy)
       val io = new TestIO(journal)
       handler.handleAccept(io, agent, accept)
       io.sent().headOption.value match {

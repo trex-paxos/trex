@@ -12,7 +12,7 @@ import Ordering._
 class TestPrepareHandler extends PrepareHandler
 
 class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
-  val agentPromise10 = PaxosAgent(0, Follower, initialData.copy(progress = initialData.progress.copy(highestPromised = BallotNumber(10, 10))))
+  val agentPromise10 = PaxosAgent(0, Follower, initialData.copy(progress = initialData.progress.copy(highestPromised = BallotNumber(10, 10))), initialQuorumStrategy)
 
   object `A PromiseHandler` {
 
@@ -45,7 +45,7 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
       val io = new TestIO(mockJournal)
       testPromiseHandler.handlePrepare(io, agentPromise10, Prepare(Identifier(0, BallotNumber(11, 11), 10))) match {
-        case PaxosAgent(_, _, data) if data.progress.highestPromised == BallotNumber(11, 11) => // good
+        case PaxosAgent(_, _, data, _) if data.progress.highestPromised == BallotNumber(11, 11) => // good
         case x => fail(x.toString)
       }
     }
@@ -60,7 +60,7 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
       val io = new TestIO(mockJournal)
       testPromiseHandler.handlePrepare(io, agentPromise10.copy(data = recoverLikeData, role = Recoverer), Prepare(Identifier(0, BallotNumber(11, 11), 10))) match {
-        case PaxosAgent(_, _, data) if data.progress.highestPromised == BallotNumber(11, 11) =>
+        case PaxosAgent(_, _, data, _) if data.progress.highestPromised == BallotNumber(11, 11) =>
           data match {
             case p if p.epoch == None && p.acceptResponses.isEmpty && p.prepareResponses.isEmpty && p.clientCommands.isEmpty => // good
             case x =>

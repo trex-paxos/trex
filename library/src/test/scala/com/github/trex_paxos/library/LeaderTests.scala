@@ -12,7 +12,7 @@ import scala.collection.mutable.ArrayBuffer
 class LeaderTests extends AllRolesTests with LeaderLikeTests {
 
   object `The Leader Function` {
-    val initialDataAgent = PaxosAgent(0, Leader, initialData)
+    val initialDataAgent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
     def `should be defined for a leader and RetransmitRequest` {
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, RetransmitRequest(0, 1, 0L))))
     }
@@ -40,14 +40,14 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
     def `should be defined for a leader and an Accept with a higher number for a committed slot` {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = TestHelpers.highestPromisedHighestCommittedLens.set(TestHelpers.initialData, (promise, Identifier(from = 0, number = promise, logIndex = 99L)))
-      val higherCommittedAgent = PaxosAgent(0, Leader, initialData)
+      val higherCommittedAgent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, higherCommittedAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
     def `should be defined for an Accept equal to promise` {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = highestPromisedLens.set(TestHelpers.initialData, promise)
-      val equalPromiseAgent = PaxosAgent(0, Leader, initialData)
+      val equalPromiseAgent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, equalPromiseAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
@@ -55,22 +55,22 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       val higherAcceptId = BallotNumber(Int.MaxValue, Int.MaxValue)
       val lowerPromise = BallotNumber(Int.MaxValue -1 , Int.MaxValue - 1)
       val initialData = highestPromisedLens.set(TestHelpers.initialData, lowerPromise)
-      val higherPromiseAgent = PaxosAgent(0, Leader, initialData)
+      val higherPromiseAgent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, higherPromiseAgent, Accept(Identifier(0, higherAcceptId, 0), NoOperationCommandValue))))
     }
 
     def `should be defined for a Heartbeat` = {
-      val agent = PaxosAgent(0, Leader, initialData)
+      val agent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, agent, HeartBeat)))
     }
 
     def `should be defined for a CheckTimeout when not timed out` = {
-      val agent = PaxosAgent(0, Leader, initialData)
+      val agent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, CheckTimeout)))
     }
 
     def `should be defined for a CheckTimeout when accepts are timed out` {
-      val agent = PaxosAgent(0, Leader, initialData.copy(acceptResponses = emptyAcceptResponses))
+      val agent = PaxosAgent(0, Leader, initialData.copy(acceptResponses = emptyAcceptResponses), initialQuorumStrategy)
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, CheckTimeout)))
     }
 
@@ -87,31 +87,31 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
           agent
         }
       }
-      val agent = PaxosAgent(0, Leader, initialData.copy(prepareResponses = prepareSelfVotes, acceptResponses = emptyAcceptResponses))
+      val agent = PaxosAgent(0, Leader, initialData.copy(prepareResponses = prepareSelfVotes, acceptResponses = emptyAcceptResponses), initialQuorumStrategy)
       paxosAlgorithm.leaderFunction(PaxosEvent(maxClockIO, agent, CheckTimeout))
       assert(handleResendPreparesInvoked() == true && handleResendAcceptsInvoked() == false)
     }
 
     def `should be defined for a commit at a higher log index` {
-      val agent = PaxosAgent(0, Leader, initialData)
+      val agent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, initialData.progress.highestPromised, Int.MaxValue))
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
     def `should be defined for a commit at a same log index with a higher number` {
-      val agent = PaxosAgent(0, Leader, initialData)
+      val agent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, BallotNumber(Int.MaxValue, Int.MaxValue), initialData.progress.highestCommitted.logIndex))
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
     def `should be defined for a low commit` {
-      val agent = PaxosAgent(0, Leader, initialData)
+      val agent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
     def `should be defined for Heatbeat`{
-      val agent = PaxosAgent(0, Leader, initialData)
+      val agent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, HeartBeat)))
     }
 
@@ -128,7 +128,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       epoch = Option(BallotNumber(Int.MaxValue, Int.MaxValue)),
       acceptResponses = acceptSelfAck98,
       clientCommands = initialDataClientCommand
-    ))
+    ), initialQuorumStrategy)
 
     def `Return to follower handler should do nothing for commit not at higher slot ` = {
       val handler = new ReturnToFollowerHandler with CommitHandler {}
@@ -172,7 +172,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
     val dataNewEpoch = epochLens.set(initialData, Some(epoch))
     val freshAcceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering)
     val initialLeaderData = leaderLens.set(dataNewEpoch, (SortedMap.empty[Identifier, Map[Int, PrepareResponse]], freshAcceptResponses, Map.empty))
-    val agentInitialLeaderData = new PaxosAgent(0, Leader, initialLeaderData)
+    val agentInitialLeaderData = new PaxosAgent(0, Leader, initialLeaderData, initialQuorumStrategy)
     val expectedString2 = "Paxos"
     val expectedBytes2 = expectedString2.getBytes
 
@@ -268,7 +268,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       val responses = acceptResponsesLens.set(initialData, votes)
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
       val data = responses.copy(progress = committed)
-      val agent = PaxosAgent(0, Leader, data)
+      val agent = PaxosAgent(0, Leader, data, initialQuorumStrategy)
       val accept = Accept(id99, DummyCommandValue(99))
       inMemoryJournal.a.put(99L, (0L -> accept))
       // when it gets an ack giving it a majority
@@ -330,7 +330,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       val responses = acceptResponsesLens.set(initialData, votes)
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
       val data = responses.copy(progress = committed)
-      val agent = PaxosAgent(0, Leader, data)
+      val agent = PaxosAgent(0, Leader, data, initialQuorumStrategy)
       val accept99 = Accept(id99, DummyCommandValue(99))
       inMemoryJournal.a.put(99L, (0L -> accept99))
       val accept100 = Accept(id100, DummyCommandValue(100))
@@ -429,7 +429,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
       val clientCommands: Map[Identifier, (CommandValue, String)] = Map(id99 -> (DummyCommandValue(99), "1"))
       val data = responses.copy(progress = committed, clientCommands = clientCommands)
-      val agent = PaxosAgent(0, Leader, data)
+      val agent = PaxosAgent(0, Leader, data, initialQuorumStrategy)
       val accept = Accept(id99, DummyCommandValue(99))
       inMemoryJournal.a.put(99L, (0L -> accept))
       // when it gets the messages

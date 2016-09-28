@@ -139,7 +139,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
         override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = sentNoLongerLeader(true)
       }
       // when we backdown
-      val PaxosAgent(nuid, role, followerData) = handler.backdownAgent(io, PaxosAgent(0, Leader, leaderData))
+      val PaxosAgent(nuid, role, followerData, _) = handler.backdownAgent(io, PaxosAgent(0, Leader, leaderData, TestHelpers.initialQuorumStrategy))
       role shouldBe Follower
       nuid shouldBe 0
       // then it has a new timeout and the leader data is gone

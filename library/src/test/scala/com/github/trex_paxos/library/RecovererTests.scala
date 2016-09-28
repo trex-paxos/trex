@@ -2,8 +2,7 @@ package com.github.trex_paxos.library
 
 import com.github.trex_paxos.library.TestHelpers._
 
-import scala.collection.immutable.{SortedMap}
-
+import scala.collection.immutable.SortedMap
 import Ordering._
 
 import scala.collection.mutable.ArrayBuffer
@@ -11,7 +10,7 @@ import scala.compat.Platform
 
 class RecovererTests extends AllRolesTests with LeaderLikeTests {
 
-  val initialDataAgent = PaxosAgent(0, Recoverer, initialData)
+  val initialDataAgent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
 
   object `The Recoverer Function` {
     def `should be defined for a recoverer and a client command message` {
@@ -45,14 +44,14 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
     def `should be defined for a recoverer and an Accept with a higher number for a committed slot` {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = TestHelpers.highestPromisedHighestCommittedLens.set(TestHelpers.initialData, (promise, Identifier(from = 0, number = promise, logIndex = 99L)))
-      val higherCommittedAgent = PaxosAgent(0, Recoverer, initialData)
+      val higherCommittedAgent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, higherCommittedAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
     def `should be defined for an Accept equal to promise` {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = highestPromisedLens.set(TestHelpers.initialData, promise)
-      val equalPromiseAgent = PaxosAgent(0, Recoverer, initialData)
+      val equalPromiseAgent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, equalPromiseAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
@@ -60,32 +59,32 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val higherAcceptId = BallotNumber(Int.MaxValue, Int.MaxValue)
       val lowerPromise = BallotNumber(Int.MaxValue - 1, Int.MaxValue - 1)
       val initialData = highestPromisedLens.set(TestHelpers.initialData, lowerPromise)
-      val higherPromiseAgent = PaxosAgent(0, Recoverer, initialData)
+      val higherPromiseAgent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, higherPromiseAgent, Accept(Identifier(0, higherAcceptId, 0), NoOperationCommandValue))))
     }
 
     def `should be defined for a Heartbeat` = {
-      val agent = PaxosAgent(0, Recoverer, initialData)
+      val agent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, agent, HeartBeat)))
     }
 
     def `should be defined for a CheckTimeout when not timed out` = {
-      val agent = PaxosAgent(0, Recoverer, initialData)
+      val agent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, CheckTimeout)))
     }
 
     def `should be defined for a PrepareResponse` {
-      val agent = PaxosAgent(0, Recoverer, initialData)
+      val agent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, new UndefinedPrepareResponse)))
     }
 
     def `should be defined for a CheckTimeout when prepares are timed out` {
-      val agent = PaxosAgent(0, Recoverer, initialData.copy(prepareResponses = prepareSelfVotes))
+      val agent = PaxosAgent(0, Recoverer, initialData.copy(prepareResponses = prepareSelfVotes), initialQuorumStrategy)
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, CheckTimeout)))
     }
 
     def `should be defined for a CheckTimeout when accepts are timed out` {
-      val agent = PaxosAgent(0, Recoverer, initialData.copy(acceptResponses = emptyAcceptResponses))
+      val agent = PaxosAgent(0, Recoverer, initialData.copy(acceptResponses = emptyAcceptResponses), initialQuorumStrategy)
       assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, CheckTimeout)))
     }
 
@@ -102,26 +101,26 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
           agent
         }
       }
-      val agent = PaxosAgent(0, Recoverer, initialData.copy(prepareResponses = prepareSelfVotes, acceptResponses = emptyAcceptResponses))
+      val agent = PaxosAgent(0, Recoverer, initialData.copy(prepareResponses = prepareSelfVotes, acceptResponses = emptyAcceptResponses), initialQuorumStrategy)
       paxosAlgorithm.recovererFunction(PaxosEvent(maxClockIO, agent, CheckTimeout))
 
       assert(handleResendPreparesInvoked() == true && handleResendAcceptsInvoked() == false)
     }
 
     def `should be defined for a commit at a higher log index` {
-      val agent = PaxosAgent(0, Recoverer, initialData)
+      val agent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, initialData.progress.highestPromised, Int.MaxValue))
       assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
     def `should be defined for a commit at a same log index with a higher number` {
-      val agent = PaxosAgent(0, Recoverer, initialData)
+      val agent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, BallotNumber(Int.MaxValue, Int.MaxValue), initialData.progress.highestCommitted.logIndex))
       assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
     def `should be defined for a low commit` {
-      val agent = PaxosAgent(0, Recoverer, initialData)
+      val agent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
       assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
@@ -157,12 +156,12 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
     def `should be defined for an Accept with a higher number for a committed slot` {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = TestHelpers.highestPromisedHighestCommittedLens.set(TestHelpers.initialData, (promise, Identifier(from = 0, number = promise, logIndex = 99L)))
-      val higherCommittedAgent = PaxosAgent(0, Recoverer, initialData)
+      val higherCommittedAgent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, higherCommittedAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
     def `should be defined for a CheckTimeout when not timedout` {
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, CheckTimeout)))
     }
   }
@@ -174,7 +173,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
     val data = initialData.copy(clusterSize = () => numberOfNodes, epoch = Some(recoverHighPrepare.id.number),
       prepareResponses = prepareSelfVotes, acceptResponses = SortedMap.empty)
 
-    val agent = PaxosAgent(0, Recoverer, data)
+    val agent = PaxosAgent(0, Recoverer, data, new DefaultQuorumStrategy(() => numberOfNodes))
 
     (agent, recoverHighPrepare.id)
   }
@@ -231,7 +230,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val otherHigherPrepare = Prepare(Identifier(2, BallotNumber(lowValue + 1, 2), 1L))
       val event = new PaxosEvent(io, agent, otherHigherPrepare)
       // when we process the event
-      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      val PaxosAgent(_, newRole, newData, _) = paxosAlgorithm(event)
       // then
       sent.headOption.value match {
         case a: PrepareAck => // good
@@ -259,7 +258,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         }
       }
       val agentNack1 = paxosAlgorithm(new PaxosEvent(io, agent, PrepareNack(prepareId, 1, initialData.progress, 0, 0)))
-      val PaxosAgent(_, role, data) =  paxosAlgorithm(new PaxosEvent(io, agentNack1, PrepareNack(prepareId, 2, initialData.progress, 0, 0)))
+      val PaxosAgent(_, role, data, _) =  paxosAlgorithm(new PaxosEvent(io, agentNack1, PrepareNack(prepareId, 2, initialData.progress, 0, 0)))
       // then
       role shouldBe Follower
       data.prepareResponses.isEmpty shouldBe true
@@ -351,7 +350,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       }
       // when a majority prepare response with an ack from node1 which shows it has missed values
       val ack1 = PrepareAck(prepareId, 1, initialData.progress, 3, 0, None)
-      val PaxosAgent(_, role, data) = paxosAlgorithm(new PaxosEvent(io, agent, ack1))
+      val PaxosAgent(_, role, data, _) = paxosAlgorithm(new PaxosEvent(io, agent, ack1))
       // then it sends three messages
       sent.size shouldBe 3
       // recover prepare for slot 2
@@ -410,7 +409,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
 
       // when a majority prepare response with an ack from node1
       val ack1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
-      val PaxosAgent(_, role, data) = paxosAlgorithm(new PaxosEvent(io, agent, ack1))
+      val PaxosAgent(_, role, data, _) = paxosAlgorithm(new PaxosEvent(io, agent, ack1))
 
       // then it boardcasts a no-op
       val accept = Accept(prepareId, NoOperationCommandValue)
@@ -468,7 +467,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       }
       // when a majority prepare response with an ack from node1
       val prepareAck = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
-      val leader@PaxosAgent(_, role, _ )= paxosAlgorithm(new PaxosEvent(io, agent, prepareAck))
+      val leader@PaxosAgent(_, role, _, _)= paxosAlgorithm(new PaxosEvent(io, agent, prepareAck))
       // then it boardcasts a no-op
       val accept = Accept(prepareId, NoOperationCommandValue)
       sent.headOption.value match {
@@ -480,7 +479,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       // when it gets a majority accept response with an ack from node1
       sent.clear()
       val acceptAck = AcceptAck(prepareId, 1, initialData.progress)
-      val PaxosAgent(_, _, data) = paxosAlgorithm(new PaxosEvent(io, leader, acceptAck))
+      val PaxosAgent(_, _, data, _) = paxosAlgorithm(new PaxosEvent(io, leader, acceptAck))
       // it commits the no-op
       sent.headOption.value match {
         case Commit(prepareId, _) => // good
@@ -525,7 +524,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       // and some value returned in the promise from node1 with some lower number
       val lowerId = prepareId.copy(number = prepareId.number.copy(counter = prepareId.number.counter - 1))
       val prepareAck = PrepareAck(prepareId, 1, initialData.progress, 0, 0, Some(Accept(lowerId, DummyCommandValue(0))))
-      val leader@PaxosAgent(_, role, _ )= paxosAlgorithm(new PaxosEvent(io, agent, prepareAck))
+      val leader@PaxosAgent(_, role, _, _)= paxosAlgorithm(new PaxosEvent(io, agent, prepareAck))
       // then it boardcasts the payload from the promise under its higher epoch number
       val accept = Accept(prepareId, DummyCommandValue(0))
       sent.headOption.value match {
@@ -537,7 +536,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       // when it gets a majority accept response with an ack from node1
       sent.clear()
       val acceptAck = AcceptAck(prepareId, 1, initialData.progress)
-      val PaxosAgent(_, _, data) = paxosAlgorithm(new PaxosEvent(io, leader, acceptAck))
+      val PaxosAgent(_, _, data, _) = paxosAlgorithm(new PaxosEvent(io, leader, acceptAck))
       // it delivers the value
       Option(lastDelivered()) match {
         case Some(DummyCommandValue(0)) => // good
@@ -581,10 +580,10 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       }
       // when a majority prepare response with an ack from node1 and node2
       val ack1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
-      val ack1Agent@PaxosAgent(_, roleAck1, _) = paxosAlgorithm(new PaxosEvent(io, agent, ack1))
+      val ack1Agent@PaxosAgent(_, roleAck1, _, _) = paxosAlgorithm(new PaxosEvent(io, agent, ack1))
       roleAck1 shouldBe Recoverer
       val ack2 = PrepareAck(prepareId, 2, initialData.progress, 0, 0, None)
-      val leader@PaxosAgent(_, role, _) = paxosAlgorithm(new PaxosEvent(io, ack1Agent, ack2))
+      val leader@PaxosAgent(_, role, _, _) = paxosAlgorithm(new PaxosEvent(io, ack1Agent, ack2))
       // then
       role shouldBe Leader
       // then it boardcasts a no-op
@@ -596,10 +595,10 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       // when it gets a majority accept response with an ack from node1
       sent.clear()
       val acceptAck1 = AcceptAck(prepareId, 1, initialData.progress)
-      val leader2@PaxosAgent(_, _, _) = paxosAlgorithm(new PaxosEvent(io, leader, acceptAck1))
+      val leader2 = paxosAlgorithm(new PaxosEvent(io, leader, acceptAck1))
       sent.isEmpty shouldBe true
       val acceptAck2 = AcceptAck(prepareId, 2, initialData.progress)
-      val PaxosAgent(_, _, data) = paxosAlgorithm(new PaxosEvent(io, leader2, acceptAck2))
+      val PaxosAgent(_, _, data, _) = paxosAlgorithm(new PaxosEvent(io, leader2, acceptAck2))
       // it commits the no-op
       sent.headOption.value match {
         case Commit(prepareId, _) => // good
@@ -646,7 +645,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val prepareAck1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, Some(Accept(lowerId, DummyCommandValue(0))))
       val ack1 = paxosAlgorithm(new PaxosEvent(io, agent, prepareAck1))
       val prepareAck2 = PrepareAck(prepareId, 2, initialData.progress, 0, 0, Some(Accept(lowerId, DummyCommandValue(0))))
-      val leader@PaxosAgent(_, roleLeader, _) = paxosAlgorithm(new PaxosEvent(io, ack1, prepareAck2))
+      val leader@PaxosAgent(_, roleLeader, _, _) = paxosAlgorithm(new PaxosEvent(io, ack1, prepareAck2))
 
       // then it boardcasts the payload from the promise under its higher epoch number
       val accept = Accept(prepareId, DummyCommandValue(0))
@@ -661,7 +660,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val acceptAck1 = AcceptAck(prepareId, 1, initialData.progress)
       val acceptAck1agent = paxosAlgorithm(new PaxosEvent(io, leader, acceptAck1))
       val acceptAck2 = AcceptAck(prepareId, 2, initialData.progress)
-      val PaxosAgent(_, _, data) = paxosAlgorithm(new PaxosEvent(io, acceptAck1agent, acceptAck2))
+      val PaxosAgent(_, _, data, _) = paxosAlgorithm(new PaxosEvent(io, acceptAck1agent, acceptAck2))
       // it delivers the value
       Option(lastDelivered()) match {
         case Some(DummyCommandValue(0)) => // good

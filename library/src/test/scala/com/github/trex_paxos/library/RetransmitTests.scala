@@ -67,7 +67,7 @@ with OptionValues {
 
         override def journal: Journal = stubJournal
       }
-      handler.handleRetransmitRequest(testIO, PaxosAgent(99, Leader, initialDataCommittedSlotOne), RetransmitRequest(2, 0, 0L))
+      handler.handleRetransmitRequest(testIO, PaxosAgent(99, Leader, initialDataCommittedSlotOne, initialQuorumStrategy), RetransmitRequest(2, 0, 0L))
       // then
       val expected = RetransmitResponse(99, 2, Seq(a98), Seq(a99))
       testIO.sent().headOption.value match {
@@ -106,7 +106,7 @@ with OptionValues {
         }
 
         override def journal: Journal = stubJournal
-      }, PaxosAgent(99, Follower, initialData), RetransmitResponse(1, 0, accepts98thru100, Seq.empty))
+      }, PaxosAgent(99, Follower, initialData, initialQuorumStrategy), RetransmitResponse(1, 0, accepts98thru100, Seq.empty))
       // then we deliver before we save
       deliveredWithTs.headOption.getOrElse(fail("empty delivered list")) match {
         case (ts, _) =>
@@ -161,7 +161,7 @@ with OptionValues {
       val committed = Seq(a98, a99)
       val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
       val handler = new RetransmitHandler {}
-      val agent = PaxosAgent(99, Follower, initialData98)
+      val agent = PaxosAgent(99, Follower, initialData98, initialQuorumStrategy)
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
@@ -176,7 +176,7 @@ with OptionValues {
       val committed = Seq(a98, a99)
       val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
       val handler = new RetransmitHandler {}
-      val agent = PaxosAgent(99, Follower, initialData96)
+      val agent = PaxosAgent(99, Follower, initialData96, initialQuorumStrategy)
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
@@ -189,7 +189,7 @@ with OptionValues {
       val committed = Seq(a98, a100)
       val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
       val handler = new RetransmitHandler {}
-      val agent = PaxosAgent(99, Follower, initialData97)
+      val agent = PaxosAgent(99, Follower, initialData97, initialQuorumStrategy)
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
@@ -202,7 +202,7 @@ with OptionValues {
       val committed = Seq(a98, a100)
       val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
       val handler = new RetransmitHandler {}
-      val agent = PaxosAgent(99, Follower, initialData97)
+      val agent = PaxosAgent(99, Follower, initialData97, initialQuorumStrategy)
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
@@ -214,7 +214,7 @@ with OptionValues {
       val uncommitted = Seq(a98, a100)
       val retransmitResponse = RetransmitResponse(0, 0, Seq(), uncommitted)
       val handler = new RetransmitHandler {}
-      val agent = PaxosAgent(99, Follower, initialData97)
+      val agent = PaxosAgent(99, Follower, initialData97, initialQuorumStrategy)
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
@@ -227,7 +227,7 @@ with OptionValues {
       val committed = Seq(a98, a100)
       val retransmitResponse = RetransmitResponse(0, 0, committed, Seq())
       val handler = new RetransmitHandler {}
-      val agent = PaxosAgent(99, Follower, initialData97)
+      val agent = PaxosAgent(99, Follower, initialData97, initialQuorumStrategy)
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
@@ -241,7 +241,7 @@ with OptionValues {
       val retransmitResponse = RetransmitResponse(0, 0, Seq(), uncommitted)
       val handler = new RetransmitHandler {}
       val highPromise = BallotNumber(Int.MaxValue -1 , Int.MaxValue - 1)
-      val agent = PaxosAgent(99, Follower, highestPromisedLens.set(initialData97, highPromise))
+      val agent = PaxosAgent(99, Follower, highestPromisedLens.set(initialData97, highPromise), initialQuorumStrategy)
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then

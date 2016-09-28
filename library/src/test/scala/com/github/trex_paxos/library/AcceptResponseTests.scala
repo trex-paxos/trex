@@ -14,10 +14,10 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
     "ignores a response it is not awaiting" in {
       // given
       val handler = new Object with AcceptResponseHandler
-      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98))
+      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98), TestHelpers.initialQuorumStrategy)
 
       // when
-      val PaxosAgent(_, role, data) = handler.handleAcceptResponse(undefinedSilentIO, agent, a99ack1)
+      val PaxosAgent(_, role, data, _) = handler.handleAcceptResponse(undefinedSilentIO, agent, a99ack1)
 
       // then
       role shouldBe agent.role
@@ -34,10 +34,10 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
     "ignores a repeated response it is not awaiting" in {
       // given
       val handler = new Object with AcceptResponseHandler
-      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98))
+      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98), TestHelpers.initialQuorumStrategy)
 
       // when
-      val PaxosAgent(_, role, data) = handler.handleAcceptResponse(undefinedSilentIO, agent, a98ack0)
+      val PaxosAgent(_, role, data, _) = handler.handleAcceptResponse(undefinedSilentIO, agent, a98ack0)
 
       // then
       role shouldBe agent.role
@@ -54,13 +54,13 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
     "records a vote it is looking for when not got a majority ack or nack" in {
       // given
       val handler = new Object with AcceptResponseHandler
-      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98))
+      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98), TestHelpers.initialQuorumStrategy)
       val randomTimeoutIO = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
       }
 
       // when
-      val PaxosAgent(_, role, data) = handler.handleAcceptResponse(randomTimeoutIO, agent, a98nack1)
+      val PaxosAgent(_, role, data, _) = handler.handleAcceptResponse(randomTimeoutIO, agent, a98nack1)
 
       // then
       role shouldBe agent.role
@@ -78,13 +78,13 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
     "backdown if sees higher log index in a commit message" in {
       // given
       val handler = new Object with AcceptResponseHandler
-      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98))
+      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98), TestHelpers.initialQuorumStrategy)
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
       }
 
       // when
-      val PaxosAgent(_, role, data) = handler.handleAcceptResponse(ioRandomTimeout, agent, a98ackProgress98)
+      val PaxosAgent(_, role, data, _) = handler.handleAcceptResponse(ioRandomTimeout, agent, a98ackProgress98)
 
       // then
       role shouldBe Follower
@@ -95,13 +95,13 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
     "backdown if sees a majority nack" in {
       // given
       val handler = new Object with AcceptResponseHandler
-      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSplitAckAndNack))
+      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSplitAckAndNack), TestHelpers.initialQuorumStrategy)
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
       }
 
       // when
-      val PaxosAgent(_, role, data) = handler.handleAcceptResponse(ioRandomTimeout, agent, a98nack2)
+      val PaxosAgent(_, role, data, _) = handler.handleAcceptResponse(ioRandomTimeout, agent, a98nack2)
 
       // then
       role shouldBe Follower
@@ -112,13 +112,13 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
     "records the vote if it got a majority ack out of sequence" in {
       // given
       val handler = new Object with AcceptResponseHandler
-      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98and99))
+      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98and99), TestHelpers.initialQuorumStrategy)
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
       }
 
       // when
-      val PaxosAgent(_, role, data) = handler.handleAcceptResponse(ioRandomTimeout, agent, a99ack1)
+      val PaxosAgent(_, role, data, _) = handler.handleAcceptResponse(ioRandomTimeout, agent, a99ack1)
 
       // then
       role shouldBe agent.role
@@ -140,13 +140,13 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
     "backdown if it sees a majority ack but committable slows are not contiguous with highest committed" in {
       // given
       val handler = new Object with AcceptResponseHandler
-      val agent = PaxosAgent(0, Leader, initialData96.copy(acceptResponses = acceptSelfAck98))
+      val agent = PaxosAgent(0, Leader, initialData96.copy(acceptResponses = acceptSelfAck98), TestHelpers.initialQuorumStrategy)
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
       }
 
       // when
-      val PaxosAgent(_, role, data) = handler.handleAcceptResponse(ioRandomTimeout, agent, a98ack1)
+      val PaxosAgent(_, role, data, _) = handler.handleAcceptResponse(ioRandomTimeout, agent, a98ack1)
 
       // then
       role shouldBe Follower
@@ -156,7 +156,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
     "commit multiple contiguous slots on a majority ack" in {
       // given
       val handler = new Object with AcceptResponseHandler
-      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptAck98and99empty))
+      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptAck98and99empty), TestHelpers.initialQuorumStrategy)
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
       val mockJournal = stub[Journal]
       mockJournal.accepted _ when (98L) returns Some(a98)
@@ -170,7 +170,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       }
 
       // when
-      val PaxosAgent(_, role, data) = handler.handleAcceptResponse(ioRandomTimeout, agent, a98ack1)
+      val PaxosAgent(_, role, data, _) = handler.handleAcceptResponse(ioRandomTimeout, agent, a98ack1)
 
       // then
       role shouldBe Leader
@@ -205,9 +205,9 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       val testJournal = new UndefinedJournal {
         override def saveProgress(progress: Progress): Unit = saveTime(System.nanoTime())
       }
-      val PaxosAgent(_, _, _) = handler.handleAcceptResponse(new TestIO(testJournal) {
+      val PaxosAgent(_, _, _, _) = handler.handleAcceptResponse(new TestIO(testJournal) {
         override def send(msg: PaxosMessage): Unit = sendTime(System.nanoTime())
-      }, PaxosAgent(0, Recoverer, data), vote)
+      }, PaxosAgent(0, Recoverer, data, TestHelpers.initialQuorumStrategy), vote)
       // then we saved before we sent
       assert(saveTime() > 0)
       assert(sendTime() > 0)
@@ -223,7 +223,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
         (a101.id ->(NoOperationCommandValue, DummyRemoteRef(101))),
         (a99.id ->(NoOperationCommandValue, DummyRemoteRef(99)))
       )
-      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptAck98and99empty, clientCommands = clientCommands))
+      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptAck98and99empty, clientCommands = clientCommands), TestHelpers.initialQuorumStrategy)
       val mockJournal = stub[Journal]
       mockJournal.accepted _ when (98L) returns Some(a98)
       mockJournal.accepted _ when (99L) returns Some(a99)
@@ -239,7 +239,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       }
 
       // when
-      val PaxosAgent(_, role, data) = handler.handleAcceptResponse(ioRandomTimeout, agent, a98ack1)
+      val PaxosAgent(_, role, data, _) = handler.handleAcceptResponse(ioRandomTimeout, agent, a98ack1)
 
       // then
       role shouldBe Leader
@@ -253,13 +253,13 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
     "deals with a split vote in even number sized cluster" in {
       // given
       val handler = new Object with AcceptResponseHandler
-      val agent = PaxosAgent(0, Leader, initialData97.copy(clusterSize = () => 4, acceptResponses = acceptkAndTwoNack98))
+      val agent = PaxosAgent(0, Leader, initialData97.copy(clusterSize = () => 4, acceptResponses = acceptkAndTwoNack98), TestHelpers.initialQuorumStrategy4)
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
       }
 
       // when
-      val PaxosAgent(_, role, data) = handler.handleAcceptResponse(ioRandomTimeout, agent, a98ack3)
+      val PaxosAgent(_, role, data, _) = handler.handleAcceptResponse(ioRandomTimeout, agent, a98ack3)
 
       // then
       role shouldBe Follower
@@ -272,7 +272,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       val handler = new Object with AcceptResponseHandler
       // an agent committed up to slot 96 awaiting responses only on slot 98 so got illegal gap at slot 97
       val (id, AcceptResponsesAndTimeout(_, accept, responses)) = acceptkAndTwoNack98.headOption.value
-      val agent = PaxosAgent(0, Leader, initialData96.copy(clusterSize = () => 3, acceptResponses = acceptkAndTwoNack98))
+      val agent = PaxosAgent(0, Leader, initialData96.copy(clusterSize = () => 3, acceptResponses = acceptkAndTwoNack98), TestHelpers.initialQuorumStrategy)
       val errorLog = ArrayBuffer[String]()
       val ioRandomTimeout = new UndefinedIO {
         override def randomTimeout: Long = Long.MaxValue
@@ -283,7 +283,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       }
       val latestVotes = responses + (a98ack3.from -> a98ack3)
       // when
-      val PaxosAgent(_, role, data) = handler.handleFreshResponse(ioRandomTimeout, agent, latestVotes, accept, a98ack3)
+      val PaxosAgent(_, role, data, _) = handler.handleFreshResponse(ioRandomTimeout, agent, latestVotes, accept, a98ack3)
 
       // then
       role shouldBe Follower

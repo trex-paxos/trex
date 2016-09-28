@@ -14,7 +14,7 @@ class FollowerTests extends AllRolesTests {
     override def clock: Long = time
   }
 
-  val initialDataAgent = PaxosAgent(0, Follower, initialData)
+  val initialDataAgent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
 
   object `The FollowingFunction` {
 
@@ -147,14 +147,14 @@ class FollowerTests extends AllRolesTests {
     def `should be defined for an Accept with a higher number for a committed slot` {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = TestHelpers.highestPromisedHighestCommittedLens.set(TestHelpers.initialData, (promise, Identifier(from = 0, number = promise, logIndex = 99L)))
-      val higherCommittedAgent = PaxosAgent(0, Follower, initialData)
+      val higherCommittedAgent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, higherCommittedAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
     def `should be defined for an Accept equal to promise` {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = highestPromisedLens.set(TestHelpers.initialData, promise)
-      val equalPromiseAgent = PaxosAgent(0, Follower, initialData)
+      val equalPromiseAgent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, equalPromiseAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
@@ -162,17 +162,17 @@ class FollowerTests extends AllRolesTests {
       val higherAcceptId = BallotNumber(Int.MaxValue, Int.MaxValue)
       val lowerPromise = BallotNumber(Int.MaxValue -1 , Int.MaxValue - 1)
       val initialData = highestPromisedLens.set(TestHelpers.initialData, lowerPromise)
-      val higherPromiseAgent = PaxosAgent(0, Follower, initialData)
+      val higherPromiseAgent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, higherPromiseAgent, Accept(Identifier(0, higherAcceptId, 0), NoOperationCommandValue))))
     }
 
     def `should be defined for a Heartbeat` = {
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, agent, HeartBeat)))
     }
 
     def `should be defined for a CheckTimeout when not timedout` {
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, CheckTimeout)))
     }
   }
@@ -185,7 +185,7 @@ class FollowerTests extends AllRolesTests {
     def `should use follower commit handler` {
       import CommitHandlerTests.a14
       // given
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       val event = new PaxosEvent(new UndefinedIO, agent, Commit(a14.id, initialData.leaderHeartbeat))
       val invoked = new AtomicBoolean(false)
       val paxosAlgorithm = new PaxosAlgorithm {
@@ -195,14 +195,14 @@ class FollowerTests extends AllRolesTests {
         }
       }
       // when
-      val PaxosAgent(_, _, data) = paxosAlgorithm(event)
+      val PaxosAgent(_, _, data, _) = paxosAlgorithm(event)
       // then
       invoked.get() shouldBe true
     }
     def `should not change state if not timed out` {
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       val notTimedOutEvent = PaxosEvent(negativeClockIO, agent, CheckTimeout)
-      val PaxosAgent(_, role, data) = paxosAlgorithm(notTimedOutEvent)
+      val PaxosAgent(_, role, data, _) = paxosAlgorithm(notTimedOutEvent)
       assert( role == agent.role && data == agent.data)
     }
     def `should update its timeout and observed heartbeat when it sees a commit` {
@@ -214,15 +214,15 @@ class FollowerTests extends AllRolesTests {
         override def randomTimeout: Long = timeout
       }
 
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       val event = PaxosEvent(timeoutIO, agent, Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0L), heartbeat))
-      val PaxosAgent(_, role, data) = paxosAlgorithm(event)
+      val PaxosAgent(_, role, data, _) = paxosAlgorithm(event)
       assert( role == Follower && data == agent.data.copy(timeout = timeout, leaderHeartbeat = heartbeat))
     }
     def `should ignore a lower commit` {
-      val agent = PaxosAgent(0, Follower, initialDataCommittedSlotOne)
+      val agent = PaxosAgent(0, Follower, initialDataCommittedSlotOne, initialQuorumStrategy)
       val event = PaxosEvent(undefinedSilentIO, agent, Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0L), Long.MinValue))
-      val PaxosAgent(_, role, data) = paxosAlgorithm(event)
+      val PaxosAgent(_, role, data, _) = paxosAlgorithm(event)
       role shouldBe Follower
       data shouldBe agent.data
     }
@@ -231,19 +231,19 @@ class FollowerTests extends AllRolesTests {
     }
     def `should ignore an accept response`  {
       // given
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       val message = AcceptAck(initialData.progress.highestCommitted, 0, initialData.progress)
       val event = new PaxosEvent(new UndefinedIO, agent, message)
       val paxosAlgorithm = new PaxosAlgorithm
       // when
-      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      val PaxosAgent(_, newRole, newData, _) = paxosAlgorithm(event)
       // then
       newRole shouldBe Follower
       newData shouldBe initialData
     }
     def `should update timeout and hearbeat up repeated commit` {
       // given
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       val message = Commit(initialData.progress.highestCommitted, Long.MaxValue)
       val io = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = 12345L
@@ -251,7 +251,7 @@ class FollowerTests extends AllRolesTests {
       val event = new PaxosEvent(io, agent, message)
       val paxosAlgorithm = new PaxosAlgorithm
       // when
-      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      val PaxosAgent(_, newRole, newData, _) = paxosAlgorithm(event)
       // then
       newRole shouldBe Follower
       newData shouldBe initialData.copy(timeout = 12345L, leaderHeartbeat = Long.MaxValue)
@@ -277,10 +277,10 @@ class FollowerTests extends AllRolesTests {
       }
       // and a check timeout event
       val message = CheckTimeout
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       val event = new PaxosEvent(io, agent, message)
       // when we process the event
-      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      val PaxosAgent(_, newRole, newData, _) = paxosAlgorithm(event)
       // then
       messages.headOption.value match {
         case p: Prepare if p == minPrepare => // good
@@ -298,7 +298,7 @@ class FollowerTests extends AllRolesTests {
       // given a follower that has issued a min prepare
       val selfAck = PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None)
       val prepareResponses = initialData.prepareResponses + (minPrepare.id -> Map(0 -> selfAck))
-      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareResponses))
+      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareResponses), initialQuorumStrategy)
       // and an io that captures messages
       val messages: ArrayBuffer[PaxosMessage] = ArrayBuffer.empty
       val io = new UndefinedIO with SilentLogging{
@@ -310,7 +310,7 @@ class FollowerTests extends AllRolesTests {
       val message = PrepareNack(minPrepare.id, 2, Progress.highestCommittedLens.set(initialData.progress, initialData.progress.highestCommitted.copy(logIndex = Long.MaxValue)), 0, Long.MinValue)
       val event = new PaxosEvent(io, agent, message)
       // when
-      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      val PaxosAgent(_, newRole, newData, _) = paxosAlgorithm(event)
       // then
       newRole shouldBe Follower
       newData.prepareResponses.isEmpty shouldBe true
@@ -321,7 +321,7 @@ class FollowerTests extends AllRolesTests {
       // given a follower in a cluster sized 3 that has issued a min prepare
       val selfAck = PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None)
       val prepareResponses = initialData.prepareResponses + (minPrepare.id -> Map(0 -> selfAck))
-      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareResponses))
+      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareResponses), initialQuorumStrategy)
       // and an io that captures messages
       val messages: ArrayBuffer[PaxosMessage] = ArrayBuffer.empty
       val io = new UndefinedIO with SilentLogging{
@@ -333,7 +333,7 @@ class FollowerTests extends AllRolesTests {
       val message = PrepareNack(minPrepare.id, 2, initialData.progress, 0, Long.MaxValue)
       val event = new PaxosEvent(io, agent, message)
       // when
-      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      val PaxosAgent(_, newRole, newData, _) = paxosAlgorithm(event)
       // then
       newRole shouldBe Follower
       newData.prepareResponses.isEmpty shouldBe true
@@ -345,7 +345,7 @@ class FollowerTests extends AllRolesTests {
       // given a follower in a cluster sized 3 that has issued a min prepare
       val selfAck = PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None)
       val prepareResponses = initialData.prepareResponses + (minPrepare.id -> Map(0 -> selfAck))
-      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareResponses))
+      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareResponses), initialQuorumStrategy)
       // and an io that captures messages
       val messages: ArrayBuffer[PaxosMessage] = ArrayBuffer.empty
       val io = new UndefinedIO with SilentLogging{
@@ -357,7 +357,7 @@ class FollowerTests extends AllRolesTests {
       val message = Commit(Identifier(1, BallotNumber(lowValue + 1, lowValue), 0), 0)
       val event = new PaxosEvent(io, agent, message)
       // when
-      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      val PaxosAgent(_, newRole, newData, _) = paxosAlgorithm(event)
       // then
       newRole shouldBe Follower
       newData.prepareResponses.isEmpty shouldBe true
@@ -368,7 +368,7 @@ class FollowerTests extends AllRolesTests {
       // given a follower in a cluster sized 3 that has issued a min prepare
       val selfAck = PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None)
       val prepareResponses = initialData.prepareResponses + (minPrepare.id -> Map(0 -> selfAck))
-      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareResponses))
+      val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareResponses), initialQuorumStrategy)
       // and an io that captures messages
       val messages: ArrayBuffer[PaxosMessage] = ArrayBuffer.empty
       val io = new UndefinedIO with SilentLogging{
@@ -380,7 +380,7 @@ class FollowerTests extends AllRolesTests {
       val message = Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0), Long.MaxValue)
       val event = new PaxosEvent(io, agent, message)
       // when
-      val PaxosAgent(_, newRole, newData) = paxosAlgorithm(event)
+      val PaxosAgent(_, newRole, newData, _) = paxosAlgorithm(event)
       // then
       newRole shouldBe Follower
       newData.prepareResponses.isEmpty shouldBe true
@@ -421,9 +421,9 @@ class FollowerTests extends AllRolesTests {
       }
 
       // and an empty node
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       // when the retransmission is received
-      val PaxosAgent(_, role, data) = paxosAlgorithm(new PaxosEvent(io, agent, retransmission))
+      val PaxosAgent(_, role, data, _) = paxosAlgorithm(new PaxosEvent(io, agent, retransmission))
 
       // then it sends no messages
       messages.isEmpty shouldBe true
@@ -499,7 +499,7 @@ class FollowerTests extends AllRolesTests {
       }
 
       // and an empty node
-      val agent = PaxosAgent(0, Follower, initialData)
+      val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       // when at timeout is received
       val follower = paxosAlgorithm(new PaxosEvent(io, agent, CheckTimeout))
       // then it sends out a single low prepare
@@ -552,5 +552,4 @@ class FollowerTests extends AllRolesTests {
       assert(true == prapareIds.toSet.contains(id3))
     }
   }
-
 }

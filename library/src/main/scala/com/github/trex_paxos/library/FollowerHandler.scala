@@ -30,7 +30,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
     val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
       Map(io.minPrepare.id -> Map(agent.nodeUniqueId -> PrepareNack(io.minPrepare.id, agent.nodeUniqueId, agent.data.progress, highestAcceptedIndex(io), agent.data.leaderHeartbeat)))
     io.send(io.minPrepare)
-    PaxosAgent(agent.nodeUniqueId, Follower, timeoutPrepareResponsesLens.set(agent.data, (io.randomTimeout, prepareSelfVotes)))
+    PaxosAgent(agent.nodeUniqueId, Follower, timeoutPrepareResponsesLens.set(agent.data, (io.randomTimeout, prepareSelfVotes)), agent.quorumStrategy)
   }
 
   def handelFollowerPrepareResponse(io: PaxosIO, agent: PaxosAgent, vote: PrepareResponse): PaxosAgent = {
@@ -112,7 +112,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
         io.logger.debug(s"Node {} {} sees evidence of a leader is not failing over. ", agent.nodeUniqueId, agent.role)
         // other nodes are showing a leader behind a partial network partition so we backdown.
         // we update the local known heartbeat in case that leader dies causing a new scenario were only this node can form a majority.
-        val a@PaxosAgent(_, _, data) = backdownAgent(io, agent)
+        val a@PaxosAgent(_, _, data, _) = backdownAgent(io, agent)
         a.copy(data = data.copy(leaderHeartbeat = maxHeartbeat))
       case x => throw new AssertionError(s"unreachable code $x")
     }

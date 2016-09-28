@@ -74,7 +74,7 @@ class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValue
 
   def respondsIsNotLeader(role: PaxosRole) {
     require(role != Leader)
-    val agent = PaxosAgent(0, role, initialData)
+    val agent = PaxosAgent(0, role, initialData, initialQuorumStrategy)
     val sent = ArrayBuffer[PaxosMessage]()
     val io = new UndefinedIO {
       override def send(msg: PaxosMessage): Unit = sent += msg
@@ -84,7 +84,7 @@ class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValue
     val event = new PaxosEvent(io, agent, DummyCommandValue(1))
     val paxosAlgorithm = new PaxosAlgorithm
     // when
-    val PaxosAgent(_,newRole, newData) = paxosAlgorithm(event)
+    val PaxosAgent(_,newRole, newData, _) = paxosAlgorithm(event)
     // then
     assert(newData == initialData)
     assert(newRole == role)
@@ -96,13 +96,13 @@ class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValue
 
   def shouldIngoreLatePrepareResponse(role: PaxosRole) {
     val paxosAlgorithm = new PaxosAlgorithm
-    val agent1 = PaxosAgent(0, role, initialDataCommittedSlotOne)
+    val agent1 = PaxosAgent(0, role, initialDataCommittedSlotOne, initialQuorumStrategy)
     val event1 = PaxosEvent(undefinedIO, agent1, PrepareNack(minPrepare.id, 2, initialData.progress, initialData.progress.highestCommitted.logIndex, Long.MaxValue))
-    val PaxosAgent(_, newRole, data) = paxosAlgorithm(event1)
+    val PaxosAgent(_, newRole, data, _) = paxosAlgorithm(event1)
     newRole shouldBe role
     data shouldBe agent1.data
     val event2 = PaxosEvent(undefinedIO, agent1, PrepareAck(minPrepare.id, 2, initialData.progress, initialData.progress.highestCommitted.logIndex, Long.MaxValue, None))
-    val PaxosAgent(_, newRole2, data2) = paxosAlgorithm(event2)
+    val PaxosAgent(_, newRole2, data2, _) = paxosAlgorithm(event2)
     newRole2 shouldBe role
     data2 shouldBe agent1.data
 

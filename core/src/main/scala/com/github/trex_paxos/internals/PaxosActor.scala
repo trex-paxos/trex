@@ -93,7 +93,7 @@ with AkkaLoggingAdapter {
   def highestAcceptedIndex = journal.bounds.max
 
   def event(io: PaxosIO, stateName: PaxosRole, data: PaxosData, msg: PaxosMessage): PaxosEvent =
-    PaxosEvent(io, PaxosAgent(nodeUniqueId, stateName, data), msg)
+    PaxosEvent(io, PaxosAgent(nodeUniqueId, stateName, data, new DefaultQuorumStrategy(data.clusterSize)), msg)
 
   def randomInterval: Long = {
     config.leaderTimeoutMin + ((config.leaderTimeoutMax - config.leaderTimeoutMin) * random.nextDouble()).toLong
@@ -243,7 +243,7 @@ object PaxosActor {
     new PaxosAgent(nodeUniqueId, Follower, PaxosData(progress, 0, 0, clusterSize,
     SortedMap.empty[Identifier, Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering), None,
     SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering),
-    Map.empty[Identifier, (CommandValue, String)]))
+    Map.empty[Identifier, (CommandValue, String)]), new DefaultQuorumStrategy(clusterSize))
 
 
 }

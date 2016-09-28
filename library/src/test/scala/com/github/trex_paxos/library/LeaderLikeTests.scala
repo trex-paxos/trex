@@ -16,9 +16,9 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
 
   def shouldIngoreLowerCommit(role: PaxosRole) {
     require(role == Leader || role == Recoverer)
-    val agent = PaxosAgent(0, role, initialDataCommittedSlotOne)
+    val agent = PaxosAgent(0, role, initialDataCommittedSlotOne, initialQuorumStrategy)
     val event = PaxosEvent(undefinedIO, agent, Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0L), Long.MinValue))
-    val PaxosAgent(_, newRole, data) = paxosAlgorithm(event)
+    val PaxosAgent(_, newRole, data, _) = paxosAlgorithm(event)
     newRole shouldBe role
     data shouldBe agent.data
   }
@@ -26,12 +26,12 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     require(role == Leader || role == Recoverer)
     val node2slot1Identifier = Identifier(2, BallotNumber(lowValue + 1, 2), 1L)
     val agent = PaxosAgent(0, role, initialData.copy(epoch = Some(node2slot1Identifier.number),
-      progress = initialData.progress.copy(highestCommitted = node2slot1Identifier)))
+      progress = initialData.progress.copy(highestCommitted = node2slot1Identifier)), initialQuorumStrategy)
     // when node2 it gets commit for same slot but lower nodeIdentifier
     val node0slot1Identifier = Identifier(0, BallotNumber(lowValue + 1, 0), 1L)
     val commit = Commit(node0slot1Identifier)
     val event = PaxosEvent(undefinedIO, agent, commit)
-    val PaxosAgent(_, newRole, data) = paxosAlgorithm(event)
+    val PaxosAgent(_, newRole, data, _) = paxosAlgorithm(event)
     newRole shouldBe role
     data shouldBe agent.data
   }
@@ -40,14 +40,14 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     val node2slot1Identifier = Identifier(2, BallotNumber(lowValue + 1, 2), 1L)
     val node3slot1Identifier = Identifier(0, BallotNumber(lowValue + 1, 3), 1L)
     val agent = PaxosAgent(0, role, initialData.copy(epoch = Some(node2slot1Identifier.number),
-      progress = initialData.progress.copy(highestCommitted = node2slot1Identifier)))
+      progress = initialData.progress.copy(highestCommitted = node2slot1Identifier)), initialQuorumStrategy)
     // when node2 it gets commit for same slot but lower nodeIdentifier
     val commit = Commit(node3slot1Identifier)
     val io = new UndefinedIO with SilentLogging {
       override def randomTimeout: Long = 12345L
     }
     val event = PaxosEvent(io, agent, commit)
-    val PaxosAgent(_, newRole, data) = paxosAlgorithm(event)
+    val PaxosAgent(_, newRole, data, _) = paxosAlgorithm(event)
     newRole shouldBe Follower
     data.timeout shouldBe 12345L
     data.leaderHeartbeat should not be(initialData.leaderHeartbeat)
@@ -57,7 +57,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     val identifier = Identifier(1, BallotNumber(lowValue + 1, 0), 1L)
     val greaterThan = Identifier(1, BallotNumber(lowValue + 2, 2), 2L)
     val agent = PaxosAgent(0, role, initialData.copy(epoch = Some(identifier.number),
-      progress = initialData.progress.copy(highestCommitted = identifier)))
+      progress = initialData.progress.copy(highestCommitted = identifier)), initialQuorumStrategy)
     // empty journal
     val stubJournal: Journal = stub[Journal]
     (stubJournal.accepted _) when(*) returns (None)
@@ -73,7 +73,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     // and commit
     val commit = Commit(greaterThan)
     val event = PaxosEvent(io, agent, commit)
-    val PaxosAgent(_, newRole, data) = paxosAlgorithm(event)
+    val PaxosAgent(_, newRole, data, _) = paxosAlgorithm(event)
     newRole shouldBe Follower
     data.timeout shouldBe 12345L
     data.leaderHeartbeat should not be(initialData.leaderHeartbeat)
@@ -91,7 +91,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     val stubJournal: Journal = stub[Journal]
     (stubJournal.accepted _) when(*) returns (Some(accepted))
 
-    val agent = PaxosAgent(0, role, initialData.copy(epoch = Some(initialData.progress.highestPromised)))
+    val agent = PaxosAgent(0, role, initialData.copy(epoch = Some(initialData.progress.highestPromised)), initialQuorumStrategy)
     // recording of sends
     val delivered: ArrayBuffer[CommandValue] = ArrayBuffer()
     val io = new UndefinedIO with SilentLogging {
@@ -104,7 +104,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     // and commit
     val commit = Commit(identifier)
     val event = PaxosEvent(io, agent, commit)
-    val PaxosAgent(_, newRole, data) = paxosAlgorithm(event)
+    val PaxosAgent(_, newRole, data, _) = paxosAlgorithm(event)
     newRole shouldBe Follower
     data.timeout shouldBe 12345L
     data.leaderHeartbeat should not be(initialData.leaderHeartbeat)
@@ -123,7 +123,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     val responses = acceptResponsesLens.set(initialData, votes)
     val oldProgress = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
     val timeNow = 999L
-    val agent = PaxosAgent(0, role, responses.copy(epoch = Some(BallotNumber(1, 0)), progress = oldProgress))
+    val agent = PaxosAgent(0, role, responses.copy(epoch = Some(BallotNumber(1, 0)), progress = oldProgress), initialQuorumStrategy)
     // recording of sends
     val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
     val io = new UndefinedIO with SilentLogging {
@@ -136,7 +136,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     }
     // when
     val event = PaxosEvent(io, agent, CheckTimeout)
-    val PaxosAgent(_, newRole, data) = paxosAlgorithm(event)
+    val PaxosAgent(_, newRole, data, _) = paxosAlgorithm(event)
     // then
     newRole shouldBe role
     sent.headOption.value shouldBe a99
@@ -155,7 +155,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     )))
     val responses = acceptResponsesLens.set(initialData, votes)
     val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
-    val agent = PaxosAgent(0, role, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))))
+    val agent = PaxosAgent(0, role, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))), initialQuorumStrategy)
     // recording of sends
     val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
     val sentTime = new AtomicLong()
@@ -173,7 +173,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     }
     // when
     val event = PaxosEvent(io, agent, CheckTimeout)
-    val PaxosAgent(_, newRole, data) = paxosAlgorithm(event)
+    val PaxosAgent(_, newRole, data, _) = paxosAlgorithm(event)
     // then
     newRole shouldBe role
     // and it should have +1 the high promise it learnt about
@@ -206,7 +206,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     val responses = acceptResponsesLens.set(initialData, votes)
     val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (BallotNumber(22, 2), lastCommitted))
     val timeNow = 999L
-    val agent = PaxosAgent(0, role, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))))
+    val agent = PaxosAgent(0, role, responses.copy(progress = committed, epoch = Some(BallotNumber(1, 0))), initialQuorumStrategy)
     // recording of sends
     val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
     val sentTime = new AtomicLong()
@@ -225,7 +225,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     }
     // when
     val event = PaxosEvent(io, agent, CheckTimeout)
-    val PaxosAgent(_, newRole, data) = paxosAlgorithm(event)
+    val PaxosAgent(_, newRole, data, _) = paxosAlgorithm(event)
     // then
     newRole shouldBe role
     // it broadcasts higher accept

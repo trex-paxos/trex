@@ -1,6 +1,6 @@
 package com.github.trex_paxos.library
 
-case class PaxosAgent(nodeUniqueId: Int, role: PaxosRole, data: PaxosData)
+case class PaxosAgent(nodeUniqueId: Int, role: PaxosRole, data: PaxosData, quorumStrategy: QuorumStrategy)
 
 case class PaxosEvent(io: PaxosIO, agent: PaxosAgent, message: PaxosMessage)
 
@@ -47,14 +47,14 @@ with ClientCommandHandler {
 
   val followingFunction: PaxosFunction = {
     // update heartbeat and attempt to commit contiguous accept messages
-    case PaxosEvent(io, agent@PaxosAgent(_, Follower, _), c@Commit(i, heartbeat)) =>
+    case PaxosEvent(io, agent@PaxosAgent(_, Follower, _, _), c@Commit(i, heartbeat)) =>
       handleFollowerCommit(io, agent, c)
-    case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, _, _, _, _)), CheckTimeout) if io.clock >= to =>
+    case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, _, _, _, _), _), CheckTimeout) if io.clock >= to =>
       handleFollowerTimeout(io, agent)
     case PaxosEvent(io, agent, vote: PrepareResponse) if agent.role == Follower =>
       handelFollowerPrepareResponse(io, agent, vote)
     // ignore an accept response which may be seen after we backdown to follower
-    case PaxosEvent(_, agent@PaxosAgent(_, Follower, _), vote: AcceptResponse) =>
+    case PaxosEvent(_, agent@PaxosAgent(_, Follower, _, _), vote: AcceptResponse) =>
       agent
   }
 

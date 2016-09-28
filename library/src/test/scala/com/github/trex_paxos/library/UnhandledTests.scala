@@ -19,7 +19,7 @@ class UnhandledTests extends WordSpecLike {
 
       val unknown = "~unknown message~"
 
-      handler.handleUnhandled(new TestIO(new UndefinedJournal), PaxosAgent(99, Leader, initialData), unknown)
+      handler.handleUnhandled(new TestIO(new UndefinedJournal), PaxosAgent(99, Leader, initialData, initialQuorumStrategy), unknown)
 
       assert(loggedError().contains("99") && loggedError().contains("Leader") && loggedError().contains(unknown))
     }

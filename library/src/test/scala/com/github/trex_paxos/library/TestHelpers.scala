@@ -138,6 +138,10 @@ object TestHelpers extends PaxosLenses{
     timeout = 0,
     clusterSize = () => 3, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, String)])
 
+  val initialQuorumStrategy = new DefaultQuorumStrategy(initialData.clusterSize)
+
+  val initialQuorumStrategy4 = new DefaultQuorumStrategy(() => 4)
+
   val undefinedPrepareResponse = new UndefinedPrepareResponse
 
   val undefinedAcceptResponse = new UndefinedAcceptResponse

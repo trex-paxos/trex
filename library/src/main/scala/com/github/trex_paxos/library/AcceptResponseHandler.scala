@@ -43,7 +43,7 @@ with CommitHandler {
 
   def handleFreshResponse(io: PaxosIO, agent: PaxosAgent, votes: Map[Int, AcceptResponse], accept: Accept, vote: AcceptResponse) = {
 
-    agent.data.quorumStrategy.assessAccepts(votes.values) match {
+    agent.quorumStrategy.assessAccepts(votes.values) match {
       case Some(QuorumNack) =>
         io.logger.info("Node {} {} received a majority accept nack so has lost leadership becoming a follower.", agent.nodeUniqueId, agent.role)
         backdownAgent(io, agent)

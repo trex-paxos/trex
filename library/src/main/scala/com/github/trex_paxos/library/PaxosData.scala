@@ -23,7 +23,6 @@ case class PaxosData(progress: Progress,
                      epoch: Option[BallotNumber] = None,
                      acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = PaxosData.emptyAccepts,
                      clientCommands: Map[Identifier, (CommandValue, String)] = Map.empty) {
-  lazy val quorumStrategy: QuorumStrategy = new DefaultQuorumStrategy(clusterSize)
 }
 
 object PaxosData {
