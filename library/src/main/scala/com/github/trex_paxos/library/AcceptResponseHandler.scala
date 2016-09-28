@@ -13,7 +13,6 @@ with BackdownAgent
 with CommitHandler {
 
   import AcceptResponseHandler._
-  import Vote._
 
   def handleAcceptResponse(io: PaxosIO, agent: PaxosAgent, vote: AcceptResponse): PaxosAgent = {
     io.logger.debug("{} sees response {}", agent.nodeUniqueId, vote)
@@ -42,19 +41,14 @@ with CommitHandler {
     }
   }
 
-  val acceptVoteDiscriminator: (AcceptResponse => Boolean) = {
-    case v: AcceptAck => true
-    case _ => false
-  }
-
   def handleFreshResponse(io: PaxosIO, agent: PaxosAgent, votes: Map[Int, AcceptResponse], accept: Accept, vote: AcceptResponse) = {
 
-    count(agent.data.clusterSize(), votes.values, acceptVoteDiscriminator) match {
-      case Some(MajorityNack) =>
+    agent.data.quorumStrategy.assessAccepts(votes.values) match {
+      case Some(QuorumNack) =>
         io.logger.info("Node {} {} received a majority accept nack so has lost leadership becoming a follower.", agent.nodeUniqueId, agent.role)
         backdownAgent(io, agent)
 
-      case Some(MajorityAck) =>
+      case Some(QuorumAck) =>
         // this slot is fixed record that we are not awaiting any more votes
         val updated = agent.data.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(Long.MaxValue, accept, Map.empty))
 

@@ -3,7 +3,6 @@ package com.github.trex_paxos.library
 import Ordering._
 
 import scala.collection.immutable.SortedMap
-import Vote._
 
 trait PrepareResponseHandler extends PaxosLenses with BackdownAgent {
 
@@ -16,11 +15,6 @@ trait PrepareResponseHandler extends PaxosLenses with BackdownAgent {
       io.logger.info("Node {} Recoverer requesting retransmission to target {} with highestCommittedIndex {}", agent.nodeUniqueId, from, highestCommittedIndex)
       io.send(RetransmitRequest(agent.nodeUniqueId, from, highestCommittedIndex))
     }
-  }
-
-  val prepareVoteDiscriminator: (PrepareResponse => Boolean) = {
-    case v: PrepareAck => true
-    case _ => false
   }
 
   def handlePrepareResponse(io: PaxosIO, agent: PaxosAgent, vote: PrepareResponse): PaxosAgent = {
@@ -39,8 +33,8 @@ trait PrepareResponseHandler extends PaxosLenses with BackdownAgent {
         // register the vote
         val votes = map + (vote.from -> vote)
 
-        count(agent.data.clusterSize(), votes.values, prepareVoteDiscriminator) match {
-          case Some(MajorityAck) =>
+        agent.data.quorumStrategy.assessPromises(votes.values) match {
+          case Some(QuorumAck) =>
             // issue new prepare messages if others have accepted higher slot indexes
             val expandedPreparesData = expandedPrepareSlotRange(io, this, agent, votes)
             // choose the value to set as the highest returned from a majority response else a noop
@@ -64,7 +58,7 @@ trait PrepareResponseHandler extends PaxosLenses with BackdownAgent {
               agent.copy(data = newData)
             }
 
-          case Some(MajorityNack) =>
+          case Some(QuorumNack) =>
             io.logger.info("Node {} {} received majority prepare nacks returning to follower", agent.nodeUniqueId, agent.role)
             backdownAgent(io, agent)
 
