@@ -267,8 +267,6 @@ class FollowerTests extends AllRolesTests {
       val io = new UndefinedIO with SilentLogging {
         override def clock: Long = Long.MaxValue
 
-        override def minPrepare: Prepare = TestHelpers.minPrepare
-
         override def send(msg: PaxosMessage): Unit = messages += msg
 
         override def randomTimeout: Long = 987654L
@@ -487,8 +485,6 @@ class FollowerTests extends AllRolesTests {
         override def randomTimeout: Long = 987654L
 
         override def clock: Long = Int.MaxValue
-
-        override def minPrepare: Prepare = Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
 
         override def deliver(payload: Payload): Any = payload match {
           case Payload(_, c: DummyCommandValue) => delivered += c

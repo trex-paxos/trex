@@ -1,29 +1,68 @@
 package com.github.trex_paxos.library
 
-case class PaxosAgent(nodeUniqueId: Int, role: PaxosRole, data: PaxosData, quorumStrategy: QuorumStrategy)
+/**
+  * A node in a paxos cluster
+  * @param nodeUniqueId The node unique ID used in the ballot numbers. Assumed to never be recycled.
+  * @param role The current role such as Follower or Leader
+  * @param data The current state of the node holding the paxos algorithm bookwork
+  * @param quorumStrategy The current quorum strategy (which could be any FPaxos flexible paxos strategy)
+  */
+case class PaxosAgent(nodeUniqueId: Int, role: PaxosRole, data: PaxosData, quorumStrategy: QuorumStrategy) {
+  def minPrepare: Prepare = Prepare(Identifier(nodeUniqueId, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
+}
 
+/**
+  * The latest event is an IO to read and write data (side effects), the paxos node, and a paxos message.
+  * @param io
+  * @param agent
+  * @param message
+  */
 case class PaxosEvent(io: PaxosIO, agent: PaxosAgent, message: PaxosMessage)
 
+/**
+  * Paxos has side effects (writes to the network and read+write to disk) which are isolated into this class to simplify testing.
+  */
 trait PaxosIO {
+  /** The durable story to hold the state on disk.
+   */
   def journal: Journal
 
+  /**
+    * A logging adaptor.
+    */
   def logger: PaxosLogging
 
+  /**
+    * Randomised timeouts.
+   */
   def randomTimeout: Long
 
+  /**
+    * The current time (so that we can test timeout permutations and behaviours).
+    */
   def clock: Long
 
+  /**
+    * The callback to the host application which can side effect.
+    */
   def deliver(payload: Payload): Any
 
+  /**
+    * Send a paxos algorithm message within the cluster. May be deferred.
+    */
   def send(msg: PaxosMessage)
-
-  def minPrepare: Prepare
 
   // actor version side-effects by adding id to a weak map
   def senderId(): String
 
+  /**
+    * Send a host application response back to a client.
+    */
   def respond(client: String, data: Any)
 
+  /**
+    * Inform a client that we are no longer accepted commands.
+    */
   def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit
 }
 

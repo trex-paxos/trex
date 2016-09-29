@@ -19,8 +19,6 @@ class UndefinedIO extends PaxosIO{
 
   override def logger: PaxosLogging = throw new AssertionError("deliberately not implemented")
 
-  override def minPrepare: Prepare = throw new AssertionError("deliberately not implemented")
-
   override def randomTimeout: Long = throw new AssertionError("deliberately not implemented")
 
   override def clock: Long = throw new AssertionError("deliberately not implemented")

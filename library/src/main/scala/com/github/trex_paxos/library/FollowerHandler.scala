@@ -11,7 +11,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
 
   def handleFollowerResendLowPrepares(io: PaxosIO, agent: PaxosAgent): PaxosAgent = {
     io.logger.debug("Node {} {} timed-out having already issued a low. rebroadcasting", agent.nodeUniqueId, agent.role)
-    io.send(io.minPrepare)
+    io.send(agent.minPrepare)
     agent.copy(data = timeoutLens.set(agent.data, io.randomTimeout))
   }
 
@@ -28,8 +28,8 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
     io.logger.info("Node {} {} timed-out progress: {}", agent.nodeUniqueId, agent.role, agent.data.progress)
     // nack our own prepare
     val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
-      Map(io.minPrepare.id -> Map(agent.nodeUniqueId -> PrepareNack(io.minPrepare.id, agent.nodeUniqueId, agent.data.progress, highestAcceptedIndex(io), agent.data.leaderHeartbeat)))
-    io.send(io.minPrepare)
+      Map(agent.minPrepare.id -> Map(agent.nodeUniqueId -> PrepareNack(agent.minPrepare.id, agent.nodeUniqueId, agent.data.progress, highestAcceptedIndex(io), agent.data.leaderHeartbeat)))
+    io.send(agent.minPrepare)
     PaxosAgent(agent.nodeUniqueId, Follower, timeoutPrepareResponsesLens.set(agent.data, (io.randomTimeout, prepareSelfVotes)), agent.quorumStrategy)
   }
 
@@ -65,7 +65,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
 
           } else {
             // need to wait until we hear from a majority
-            agent.copy(role = Follower, data = agent.data.copy(prepareResponses = TreeMap(Map(io.minPrepare.id -> votes).toArray: _*))) // TODO lens
+            agent.copy(role = Follower, data = agent.data.copy(prepareResponses = TreeMap(Map(agent.minPrepare.id -> votes).toArray: _*))) // TODO lens
           }
         case x =>
           io.logger.debug("Node {} {} is no longer awaiting responses to {} so ignoring {}", agent.nodeUniqueId, agent.role, vote.requestId, x)

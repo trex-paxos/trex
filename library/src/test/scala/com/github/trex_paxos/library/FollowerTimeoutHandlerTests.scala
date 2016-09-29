@@ -38,7 +38,6 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       handler.sendLowPrepares(new TestIO(new UndefinedJournal){
         override def send(msg: PaxosMessage): Unit = sentMsg(msg)
         override def randomTimeout: Long = 12345L
-        override def minPrepare: Prepare = TestFollowerHandler.minPrepare
       }, agent) match {
         case PaxosAgent(99, Follower, data: PaxosData, _) =>
           // it should set a fresh timeout
@@ -60,7 +59,6 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       handler.handleFollowerResendLowPrepares(new TestIO(new UndefinedJournal){
         override def send(msg: PaxosMessage): Unit = sentMsg(msg)
         override def randomTimeout: Long = 12345L
-        override def minPrepare: Prepare = TestFollowerHandler.minPrepare
       }, PaxosAgent(99, Follower, initialData, initialQuorumStrategy)) match {
         case PaxosAgent(_, _, data, _) =>
           // it should set a fresh timeout
@@ -121,7 +119,6 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       val vote = PrepareNack(minPrepare.id, otherNodeUniqueId, initialDataWithTimeoutAndPrepareResponses.progress, 0, initialDataWithTimeoutAndPrepareResponses.leaderHeartbeat)
       // when it sees that response and does not have a majority as cluster size is 5
       handler.handleLowPrepareResponse(new TestIO(new UndefinedJournal){
-        override def minPrepare: Prepare = TestFollowerHandler.minPrepare
       }, PaxosAgent(0, Follower, initialDataWithTimeoutAndPrepareResponses, initialQuorumStrategy5), vote) match {
         case PaxosAgent(_, Follower, data, _) => // it stays as follower
           data.prepareResponses.getOrElse(minPrepare.id, Map.empty).get(otherNodeUniqueId) match {

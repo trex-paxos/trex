@@ -31,9 +31,9 @@ sbt coverageReport
 - [x] breakup monolithic actor and increase unit test coverage
 - [x] java demo
 
-0.2 - flexible paxos FPaxos support in the library
+0.2 - Flexible paxos (FPaxos) hooks
 
-- [x] flexible paxos
+- [x] pluggable quorum strategy
 
 0.6 - practical
 - [ ] dynamic cluster membership
