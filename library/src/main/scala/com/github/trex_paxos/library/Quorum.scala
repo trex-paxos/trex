@@ -15,28 +15,41 @@ trait QuorumStrategy {
 }
 
 class DefaultQuorumStrategy(clusterSize: () => Int) extends QuorumStrategy{
-  def assessPromises(promises: Iterable[PrepareResponse]): Option[Outcome] = DefaultQuorumStrategy.assessPromises(clusterSize(), promises)
+  def assessPromises(promises: Iterable[PrepareResponse]): Option[Outcome] =
+    SimpleMajorityQuorumStrategy.assessPromises(clusterSize(), promises)
 
-  def assessAccepts(accepts: Iterable[AcceptResponse]): Option[Outcome] = DefaultQuorumStrategy.assessAccepts(clusterSize(), accepts)
+  def assessAccepts(accepts: Iterable[AcceptResponse]): Option[Outcome] =
+    SimpleMajorityQuorumStrategy.assessAccepts(clusterSize(), accepts)
 
   override def promiseQuorumSize: Int = clusterSize() / 2
+
 }
 
 object DefaultQuorumStrategy {
+  def apply(clusterSize: () => Int) = new DefaultQuorumStrategy(clusterSize)
+}
+
+object SimpleMajorityQuorumStrategy {
+
+  def simpleMajority(clusterSize: Int, postivies: Int, negatives: Int) = {
+    (postivies, negatives) match {
+    case (p, _) if p > clusterSize / 2 =>
+      Option(QuorumAck)
+    case (_, n) if n > clusterSize / 2 =>
+      Option(QuorumNack)
+    case (p, n) if p + n == clusterSize =>
+      Option(SplitVote)
+    case (_, _) =>
+      None
+    }
+  }
 
   def assessPromises[ResponseType](clusterSize: Int, votes: Iterable[ResponseType]): Option[Outcome] = {
     votes.toList.partition({
       case v: PrepareAck => true
       case _ => false
     }) match {
-      case (positives, negatives) if positives.size > clusterSize / 2 =>
-        Option(QuorumAck)
-      case (positives, negatives) if negatives.size > clusterSize / 2 =>
-        Option(QuorumNack)
-      case (positives, negatives) if votes.size == clusterSize =>
-        Option(SplitVote)
-      case (positives, negatives) =>
-        None
+      case (positives, negatives) => simpleMajority(clusterSize, positives.size, negatives.size)
     }
   }
 
@@ -45,14 +58,7 @@ object DefaultQuorumStrategy {
       case v: AcceptAck => true
       case _ => false
     }) match {
-      case (positives, negatives) if positives.size > clusterSize / 2 =>
-        Option(QuorumAck)
-      case (positives, negatives) if negatives.size > clusterSize / 2 =>
-        Option(QuorumNack)
-      case (positives, negatives) if votes.size == clusterSize =>
-        Option(SplitVote)
-      case (positives, negatives) =>
-        None
+      case (positives, negatives) => simpleMajority(clusterSize, positives.size, negatives.size)
     }
   }
 

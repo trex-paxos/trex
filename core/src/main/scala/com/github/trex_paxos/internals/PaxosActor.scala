@@ -240,7 +240,7 @@ object PaxosActor {
     new PaxosAgent(nodeUniqueId, Follower, PaxosData(progress, 0, 0,
     SortedMap.empty[Identifier, Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering), None,
     SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering),
-    Map.empty[Identifier, (CommandValue, String)]), new DefaultQuorumStrategy(clusterSize))
+    Map.empty[Identifier, (CommandValue, String)]), DefaultQuorumStrategy(clusterSize))
 
 
 }

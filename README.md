@@ -31,8 +31,11 @@ sbt coverageReport
 - [x] breakup monolithic actor and increase unit test coverage
 - [x] java demo
 
-0.6 - practical
+0.2 - flexible paxos FPaxos support in the library
 
+- [x] flexible paxos
+
+0.6 - practical
 - [ ] dynamic cluster membership
 - [ ] forced reconfigurations
 - [ ] learners / scale-out multicast
