@@ -8,7 +8,7 @@ val logbackVersion = "1.1.7"
 lazy val commonSettings = Seq(
   scalaVersion := "2.11.8",
   organization := "com.github.trex-paxos",
-  version := "0.6",
+  version := "0.2",
   scalacOptions := Seq("-feature", "-deprecation", "-Xfatal-warnings")
 )
 
