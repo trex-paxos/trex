@@ -140,6 +140,8 @@ object TestHelpers extends PaxosLenses{
 
   val initialQuorumStrategy4 = new DefaultQuorumStrategy(() => 4)
 
+  val initialQuorumSimpleStrategy4 = new SimplyMajorityQuorumStrategy(() => 4)
+
   val initialQuorumStrategy5 = new DefaultQuorumStrategy(() => 5)
 
   val undefinedPrepareResponse = new UndefinedPrepareResponse
@@ -224,13 +226,17 @@ object TestHelpers extends PaxosLenses{
   val recoverHighPrepare = Prepare(Identifier(0, BallotNumber(lowValue + 1, 0), 1L))
   val recoverHighPrepare2 = Prepare(Identifier(0, BallotNumber(lowValue + 1, 0), 2L))
 
+  val pNack = PrepareNack(recoverHighPrepare.id, 0, initialData.progress, 0, 0)
+
   val highPrepareEpoch = Some(recoverHighPrepare.id.number)
   val prepareSelfNack = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
-    Seq((recoverHighPrepare.id -> Map(0 -> PrepareNack(recoverHighPrepare.id, 0, initialData.progress, 0, 0))))
+    Seq((recoverHighPrepare.id -> Map(0 -> pNack)))
   val selfNackPrepares = initialData.copy(epoch = highPrepareEpoch, prepareResponses = prepareSelfNack, acceptResponses = SortedMap.empty)
 
+  val pAck = PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None)
+
   val prepareSelfAck = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
-    Seq((recoverHighPrepare.id -> Map(0 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None))))
+    Seq((recoverHighPrepare.id -> Map(0 -> pAck)))
   val selfAckPrepares = initialData.copy(epoch = highPrepareEpoch, prepareResponses = prepareSelfAck, acceptResponses = SortedMap.empty)
 
   val prepareSelfAck2 = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
@@ -257,11 +263,14 @@ object TestHelpers extends PaxosLenses{
   val a98ack1 = AcceptAck(a98.id, 1, initialData97.progress)
   val a98ack3 = AcceptAck(a98.id, 3, initialData97.progress)
 
+  val a98nack0 = AcceptNack(a98.id, 0, initialData97.progress)
   val a98nack1 = AcceptNack(a98.id, 1, initialData97.progress)
   val a98nack2 = AcceptNack(a98.id, 2, initialData97.progress)
 
-  val a99ack1 = AcceptAck(a99.id, 1, initialData97.progress)
   val a99ack0 = AcceptAck(a99.id, 0, initialData97.progress)
+  val a99ack1 = AcceptAck(a99.id, 1, initialData97.progress)
+  val a99ack2 = AcceptAck(a99.id, 1, initialData97.progress)
+  val a99nack1 = AcceptNack(a99.id, 1, initialData97.progress)
 
   val a98ackProgress98 = AcceptAck(a98.id, 1, progress98)
 

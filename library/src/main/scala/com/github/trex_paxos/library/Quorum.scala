@@ -14,14 +14,36 @@ trait QuorumStrategy {
   def promiseQuorumSize: Int
 }
 
-class DefaultQuorumStrategy(clusterSize: () => Int) extends QuorumStrategy{
+class SimplyMajorityQuorumStrategy(clusterSize: () => Int) extends QuorumStrategy {
   def assessPromises(promises: Iterable[PrepareResponse]): Option[Outcome] =
     SimpleMajorityQuorumStrategy.assessPromises(clusterSize(), promises)
 
   def assessAccepts(accepts: Iterable[AcceptResponse]): Option[Outcome] =
-    SimpleMajorityQuorumStrategy.assessAccepts(clusterSize(), accepts)
+        SimpleMajorityQuorumStrategy.assessAccepts(clusterSize(), accepts)
 
-  override def promiseQuorumSize: Int = clusterSize() / 2
+  override def promiseQuorumSize: Int = clusterSize() / 2 + 1
+
+}
+
+class DefaultQuorumStrategy(clusterSize: () => Int) extends QuorumStrategy {
+  def assessPromises(promises: Iterable[PrepareResponse]): Option[Outcome] = {
+    SimpleMajorityQuorumStrategy.assessPromises(clusterSize(), promises)
+  }
+
+  /**
+    * Here we apply the FPaxos even nodes optimisation.
+    */
+  def assessAccepts(accepts: Iterable[AcceptResponse]): Option[Outcome] = {
+    val size = clusterSize()
+    size % 2 match {
+      case 0 =>
+        SimpleMajorityQuorumStrategy.assessAccepts(size - 1, accepts)
+      case _ =>
+        SimpleMajorityQuorumStrategy.assessAccepts(size, accepts)
+    }
+  }
+
+  override def promiseQuorumSize: Int = clusterSize() / 2 + 1
 
 }
 
@@ -31,8 +53,8 @@ object DefaultQuorumStrategy {
 
 object SimpleMajorityQuorumStrategy {
 
-  def simpleMajority(clusterSize: Int, postivies: Int, negatives: Int) = {
-    (postivies, negatives) match {
+  def simpleMajority(clusterSize: Int, positives: Int, negatives: Int) = {
+    (positives, negatives) match {
     case (p, _) if p > clusterSize / 2 =>
       Option(QuorumAck)
     case (_, n) if n > clusterSize / 2 =>

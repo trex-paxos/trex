@@ -250,10 +250,10 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       responds.contains(DummyRemoteRef(99)) shouldBe true
     }
 
-    "deals with a split vote in even number sized cluster" in {
+    "deals with a split vote in even number sized cluster using simple majority strategy" in {
       // given
       val handler = new Object with AcceptResponseHandler
-      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptkAndTwoNack98), TestHelpers.initialQuorumStrategy4)
+      val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptkAndTwoNack98), TestHelpers.initialQuorumSimpleStrategy4)
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = Long.MaxValue
       }
