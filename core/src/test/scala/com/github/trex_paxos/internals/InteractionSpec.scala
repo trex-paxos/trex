@@ -2,8 +2,7 @@ package com.github.trex_paxos.internals
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import com.github.trex_paxos.library._
-import com.typesafe.config.ConfigFactory
+import _root_.com.github.trex_paxos.library._
 import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
 
 import scala.collection.immutable.SortedMap
@@ -12,7 +11,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 object InteractionSpec {
-  val config = ConfigFactory.parseString("trex.leader-timeout-min=1\ntrex.leader-timeout-max=10\nakka.loglevel = \"DEBUG\"")
+  val config = _root_.com.typesafe.config.ConfigFactory.parseString("trex.leader-timeout-min=1\ntrex.leader-timeout-max=10\nakka.loglevel = \"DEBUG\"")
 }
 
 class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
@@ -127,7 +126,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case f => fail(f.toString)
       }
       // then send it some data
-      val hw = ClientRequestCommandValue(0, Array[Byte](1))
+      val hw = ClientCommandValue("0", Array[Byte](1))
       actor0 ! hw
       // it will send out an accept
       val accept2 = expectMsgPF(50 millisecond) {
@@ -135,7 +134,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case f => fail(f.toString)
       }
       accept2.id.logIndex should be(2)
-      accept2.value.asInstanceOf[ClientRequestCommandValue].bytes.length should be(1)
+      accept2.value.asInstanceOf[ClientCommandValue].bytes.length should be(1)
       accept2.id.number should be(phigh.id.number)
       // when we send that to node one
       actor1 ! accept2
@@ -176,13 +175,13 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       performConsensus(actor0, actor1, new TestProbe(system), 33)
 
       def performConsensus(leader: ActorRef, follower: ActorRef, client: TestProbe, msg: Byte): Unit = {
-        client.send(leader, ClientRequestCommandValue(0, Array[Byte](msg)))
+        client.send(leader, ClientCommandValue("0", Array[Byte](msg)))
         // it will send out an accept
         val accept: Accept = expectMsgPF(50 millisecond) {
           case a: Accept => a
           case f => fail(f.toString)
         }
-        accept.value.asInstanceOf[ClientRequestCommandValue].bytes.length should be(1)
+        accept.value.asInstanceOf[ClientCommandValue].bytes.length should be(1)
         // when we send that to node one
         follower ! accept
         // it will ack
@@ -230,7 +229,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
 
       // when a client sends to actor0
       val client = new TestProbe(system)
-      client.send(actor0, ClientRequestCommandValue(99, Array[Byte](11)))
+      client.send(actor0, ClientCommandValue("99", Array[Byte](11)))
 
       // it will broadcast out an accept
       val accept: Accept = expectMsgPF(100 millisecond) {
@@ -270,7 +269,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
 
       // and it told the client it had lost leadership
       client.expectMsgPF(100 millis) {
-        case nlle: LostLeadershipException if nlle.msgId == 99 => // good
+        case nlle: LostLeadershipException if nlle.msgId == "99" => // good
         case x => fail(s"unexpected msg $x")
       }
     }
@@ -282,13 +281,13 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       val actor0 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 0, self, journal0, ArrayBuffer.empty, None))
       // and node one with a three accepted values but no committed
       val journal1 = new TestJournal
-      val v1 = ClientRequestCommandValue(11, Array[Byte] {
+      val v1 = ClientCommandValue("11", Array[Byte] {
         0
       })
-      val v2 = ClientRequestCommandValue(22, Array[Byte] {
+      val v2 = ClientCommandValue("22", Array[Byte] {
         1
       })
-      val v3 = ClientRequestCommandValue(22, Array[Byte] {
+      val v3 = ClientCommandValue("22", Array[Byte] {
         3
       })
       val a1 = Accept(Identifier(0, BallotNumber(Int.MinValue + 1, Int.MinValue + 1), 1L), v1)

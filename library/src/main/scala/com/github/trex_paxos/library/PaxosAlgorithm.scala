@@ -44,6 +44,8 @@ trait PaxosIO {
 
   /**
     * The callback to the host application which can side effect.
+    * @param payload The payload response to the client command value.
+    * @return
     */
   def deliver(payload: Payload): Any
 

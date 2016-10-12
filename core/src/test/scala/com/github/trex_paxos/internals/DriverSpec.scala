@@ -1,18 +1,20 @@
 package com.github.trex_paxos.internals
 
+import _root_.com.github.trex_paxos._
+import _root_.com.github.trex_paxos.library._
+
 import java.util.concurrent.TimeoutException
+
 import akka.actor._
-import akka.testkit.{TestProbe, TestActorRef, ImplicitSender, TestKit}
-import com.github.trex_paxos.BaseDriver
-import com.github.trex_paxos.library._
-import org.scalatest.{Matchers, BeforeAndAfterAll, SpecLike}
-import com.typesafe.config.ConfigFactory
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import akka.util.Timeout
+import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
+
 import scala.compat.Platform
 import scala.concurrent.duration._
-import akka.util.Timeout
 
 object DriverSpec {
-  val conf = ConfigFactory.parseString("akka.loglevel = \"DEBUG\"\nakka.log-dead-letters-during-shutdown=false")
+  val conf = _root_.com.typesafe.config.ConfigFactory.parseString("akka.loglevel = \"DEBUG\"\nakka.log-dead-letters-during-shutdown=false")
 }
 
 class DriverSpec extends TestKit(ActorSystem("DriverSpec",
@@ -70,10 +72,10 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
       implicit val ref = bd
       clientProbe.send(ref, "hello")
       testProbe1.expectMsgPF(1 seconds) {
-        case ClientRequestCommandValue(1, bytes) if fromBinary(bytes) == "hello" => // good
+        case ClientCommandValue("1", bytes) if fromBinary(bytes) == "hello" => // good
         case x => fail(x.toString)
       }
-      testProbe1.send(ref, ServerResponse(1, Some("world")))
+      testProbe1.send(ref, ServerResponse(1, "1", Some("world")))
       clientProbe.expectMsgPF(1 seconds) {
         case "world" => // success
         case x => fail(x.toString)
@@ -85,12 +87,12 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
       implicit val ref = bd
       clientProbe.send(ref, "hello")
       testProbe1.expectMsgPF(1 seconds) {
-        case ClientRequestCommandValue(1, bytes) if fromBinary(bytes) == "hello" => // good
+        case ClientCommandValue("1", bytes) if fromBinary(bytes) == "hello" => // good
         case x => fail(x.toString)
       }
-      testProbe1.send(ref, new LostLeadershipException(2,1))
+      testProbe1.send(ref, new LostLeadershipException(2,"1"))
       clientProbe.expectMsgPF(1 seconds) {
-        case nlle: LostLeadershipException if nlle.msgId == 1 && nlle.nodeId == 2=> // success
+        case nlle: LostLeadershipException if nlle.msgId == "1" && nlle.nodeId == 2=> // success
         case x => fail(x.toString)
       }
     }
@@ -104,10 +106,10 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
       ref ! CheckTimeout
 
       testProbe3.expectMsgPF(1 seconds) {
-        case ClientRequestCommandValue(1, bytes) if fromBinary(bytes) == "hello" =>
+        case ClientCommandValue("1", bytes) if fromBinary(bytes) == "hello" =>
         case x => fail(x.toString)
       }
-      testProbe3.send(ref, ServerResponse(1, Some("world")))
+      testProbe3.send(ref, ServerResponse(1, "1", Some("world")))
       clientProbe.expectMsgPF(1 seconds) {
         case "world" => // success
         case x => fail(x.toString)
@@ -120,16 +122,16 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
 
       clientProbe.send(ref, "hello")
       testProbe1.expectMsgPF(1 seconds) {
-        case ClientRequestCommandValue(1, bytes) if fromBinary(bytes) == "hello" =>
+        case ClientCommandValue("1", bytes) if fromBinary(bytes) == "hello" =>
         case x => fail(x.toString)
       }
       ref ! CheckTimeout
 
       testProbe2.expectMsgPF(1 seconds) {
-        case ClientRequestCommandValue(1, bytes) if fromBinary(bytes) == "hello" =>
+        case ClientCommandValue("1", bytes) if fromBinary(bytes) == "hello" =>
         case x => fail(x.toString)
       }
-      testProbe2.send(ref, ServerResponse(1, Some("world")))
+      testProbe2.send(ref, ServerResponse(1, "1", Some("world")))
       clientProbe.expectMsgPF(1 seconds) {
         case "world" => // success
         case x => fail(x.toString)
@@ -137,10 +139,10 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
 
       clientProbe.send(ref, "hello again")
       testProbe2.expectMsgPF(1 seconds) {
-        case ClientRequestCommandValue(2, bytes) if fromBinary(bytes) == "hello again" =>
+        case ClientCommandValue("2", bytes) if fromBinary(bytes) == "hello again" =>
         case x => fail(x.toString)
       }
-      testProbe2.send(ref, ServerResponse(2, Some("world again")))
+      testProbe2.send(ref, ServerResponse(2, "2", Some("world again")))
       clientProbe.expectMsgPF(1 seconds) {
         case "world again" => // success
         case x => fail(x.toString)
@@ -158,16 +160,16 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
       clientProbe.send(ref, "hello")
 
       testProbe1.expectMsgPF(1 seconds) {
-        case ClientRequestCommandValue(1, bytes) if fromBinary(bytes) == "hello" =>
+        case ClientCommandValue("1", bytes) if fromBinary(bytes) == "hello" =>
         case x => fail(x.toString)
       }
-      testProbe1.send(ref, NotLeader(0, 1))
+      testProbe1.send(ref, NotLeader(0, "1"))
       testProbe2.expectMsgPF(1 seconds) {
-        case ClientRequestCommandValue(1, bytes) if fromBinary(bytes) == "hello" =>
+        case ClientCommandValue("1", bytes) if fromBinary(bytes) == "hello" =>
         case other => fail(s"got $other not bytes")
       }
 
-      testProbe2.send(ref, ServerResponse(1, Some("world")))
+      testProbe2.send(ref, ServerResponse(1, "1", Some("world")))
       clientProbe.expectMsgPF(1 seconds) {
         case "world" => // success
         case x => fail(x.toString)
@@ -175,10 +177,10 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
 
       clientProbe.send(ref, "hello again")
       testProbe2.expectMsgPF(1 seconds) {
-        case ClientRequestCommandValue(2, bytes) if fromBinary(bytes) == "hello again" =>
+        case ClientCommandValue("2", bytes) if fromBinary(bytes) == "hello again" =>
         case x => fail(x.toString)
       }
-      testProbe2.send(ref, ServerResponse(2, Some("world again")))
+      testProbe2.send(ref, ServerResponse(2, "2", Some("world again")))
       clientProbe.expectMsgPF(1 seconds) {
         case "world again" => // success
         case x => fail(x.toString)
@@ -215,7 +217,7 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
       }
 
       Seq(testProbe1, testProbe2, testProbe3).foreach(_.receiveN(2).map({
-        case ClientRequestCommandValue(_, bytes) => fromBinary(bytes)
+        case ClientCommandValue(_, bytes) => fromBinary(bytes)
         case f => fail(f.toString)
       }) should be(Seq("hello world", "hello world")))
     }

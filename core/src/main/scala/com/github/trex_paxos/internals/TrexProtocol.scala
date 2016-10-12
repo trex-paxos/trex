@@ -1,11 +1,7 @@
 package com.github.trex_paxos.internals
 
 import com.github.trex_paxos.library.CommandValue
-
-/**
-  * Client request command has an id to correlate to the server response.
-  */
-private[trex_paxos] case class ClientRequestCommandValue(msgId: Long, val bytes: Array[Byte]) extends CommandValue
+import com.github.trex_paxos.util.Pickle
 
 /**
   * Placeholder currently not implemented.
@@ -24,7 +20,8 @@ sealed trait OptimizableReadOnlyWork {
   *
   * A `Strong` read is a read of committed work which is always strongly ordered with respect to writes. This requires
   * the leader to assign an order to reads and writes upon arrive, then only run the reads when it learns that all
-  * preceeding writes have been chosen. It then must return the results in the same order.
+  * preceeding writes have been chosen. It then must return the results in the same order. The read or write could be
+  * run on a node other than the leader if configuration allows for this.
   *
   * @param raw The actual raw client command which is opaque to Trex.
   */
@@ -59,26 +56,25 @@ case class TimelineReadWork(val raw: AnyRef) extends OptimizableReadOnlyWork
   */
 case class OutdatableReadWork(val raw: AnyRef) extends OptimizableReadOnlyWork
 
-/**
-  *
-  * @param msgId
-  * @param membership
-  */
-case class MembershipCommandValue(msgId: Long, membership: Membership) extends CommandValue {
-  override def bytes: Array[Byte] = Pickle.pickleMembership(membership).toArray
-}
-
-/**
-  * Used to poll for membership change. If the membership has changed since the
-  * @param slot
-  */
-case class MembershipQuery(slot: Long)
+///**
+//  *
+//  * @param msgId
+//  * @param membership
+//  */
+//case class MembershipCommandValue(msgId: String, membership: Membership) extends CommandValue {
+//  override def bytes: Array[Byte] = ??? ///Pickle.pickleMembership(membership).toArray
+//}
+//
+///**
+//  * Used to poll for membership change. If the membership has changed since the
+//  * @param slot
+//  */
+//case class MembershipQuery(slot: Long)
 
 object MemberStatus {
   def resolve(id: Int) = id match {
     case 0 => Learning
     case 1 => Accepting
-    case 2 => Departed
   }
 }
 
@@ -86,16 +82,20 @@ sealed trait MemberStatus {
   def id: Int
 }
 
+/**
+  * The node is not a part of any quorums so does not respond to prepare or accept messages from a leader.
+  * It isn't eligible to become a leader.
+  */
 case object Learning extends MemberStatus {
   val id: Int = 0
 }
 
+/**
+  * The node is part of any quorums and so responds to prepare or accept messages from a leader.
+  * The node is eligible to become a leader.
+  */
 case object Accepting extends MemberStatus {
   val id: Int = 1
-}
-
-case object Departed extends MemberStatus {
-  val id: Int = 2
 }
 
 object Member {
@@ -103,7 +103,7 @@ object Member {
 }
 
 /**
-  * Details of a member of the current paxos cluster. Note that the actual transports and discovery at abstract to
+  * Details of a member of the current paxos cluster. Note that the actual transports and discovery are abstract to
   * this class it uses strings so that concrete implementations can use different protocols.
   * @param nodeUniqueId The unique paxos number for this membership
   * @param location     The location for server-to-server typically given as "host:port" but could be a url
@@ -147,7 +147,7 @@ sealed trait ReadOnlyCommand extends CommandValue
   * by optimistic locking or compare-and-swap). This is the most scalable read type which may be suitable for high read
   * load with low update contention that is safe to stale reads.
   */
-private[trex_paxos] case class OutdatedRead(msgId: Long, val bytes: Array[Byte]) extends ReadOnlyCommand
+private[trex_paxos] case class OutdatedRead(msgId: String, val bytes: Array[Byte]) extends ReadOnlyCommand
 
 /**
   * Placeholder currently not implemented.
@@ -159,7 +159,7 @@ private[trex_paxos] case class OutdatedRead(msgId: Long, val bytes: Array[Byte])
   * be stale this is suitable for high read loads with high update contention such as taking application leases using
   * compare-and-swap semantics.
   */
-private[trex_paxos] case class SingleRead(msgId: Long, val bytes: Array[Byte]) extends ReadOnlyCommand
+private[trex_paxos] case class SingleRead(msgId: String, val bytes: Array[Byte]) extends ReadOnlyCommand
 
 /**
   * Placeholder currently not implemented.
@@ -167,4 +167,4 @@ private[trex_paxos] case class SingleRead(msgId: Long, val bytes: Array[Byte]) e
   * A strong read is strictly ordered with respect to writes under all failure scenarios. Depending on cluster
   * configurations this may be by either arranged by either the use of a leader lease else by using a majority read.
   */
-private[trex_paxos] case class StrongRead(msgId: Long, val bytes: Array[Byte]) extends ReadOnlyCommand
+private[trex_paxos] case class StrongRead(msgId: String, val bytes: Array[Byte]) extends ReadOnlyCommand

@@ -8,7 +8,7 @@ val logbackVersion = "1.1.7"
 lazy val commonSettings = Seq(
   scalaVersion := "2.11.8",
   organization := "com.github.trex-paxos",
-  version := "0.6",
+  version := "0.3",
   scalacOptions := Seq("-feature", "-deprecation", "-Xfatal-warnings")
 )
 
@@ -32,10 +32,10 @@ lazy val core = project.dependsOn(library).
   settings(name := "trex-core").
   settings(
 		libraryDependencies ++= Seq(
+      "com.typesafe" % "config" % "1.2.1",
 		  "com.typesafe.akka" %% "akka-actor" % akkaVersion,
 		  "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
 		  "org.mapdb" % "mapdb" % mapdbVersion,
-      "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
       "org.scalatest" % "scalatest_2.11" % scalatestVersion % "test,it",
 		  "org.scalamock" %% "scalamock-scalatest-support" % scalmockVersion % "test,it",
       "com.typesafe.akka" %% "akka-remote" % akkaVersion

@@ -3,7 +3,6 @@ package com.github.trex_paxos
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import akka.util.Timeout
-import com.github.trex_paxos.internals.ClientRequestCommandValue
 import com.github.trex_paxos.library._
 import org.scalatest._
 
@@ -39,7 +38,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
 
     def send: Unit = {
       // when we sent it the application value of 1.toByte
-      system.scheduler.scheduleOnce(200 millis, clusterHarness(), ClientRequestCommandValue(0, Array[Byte](data())))
+      system.scheduler.scheduleOnce(200 millis, clusterHarness(), ClientCommandValue("0", Array[Byte](data())))
 
       // it commits and sends by the response of -1.toByte
       expectMsgPF(2 second) {
@@ -83,7 +82,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
 
     val count = (0 until cluster.size).foldLeft(0){ (count, i) =>
       val found = delivered(i) map {
-        case Payload(_, c: ClientRequestCommandValue) => 1
+        case Payload(_, c: ClientCommandValue) => 1
         case _ => 0
       }
       count + found.sum

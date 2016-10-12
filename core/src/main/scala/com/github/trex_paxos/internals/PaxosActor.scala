@@ -113,7 +113,6 @@ with AkkaLoggingAdapter {
 
   /**
    * The deliver method is called when a command is committed after having been selected by consensus.
- *
    * @param payload The selected value and a delivery id that can be used to deduplicate deliveries during crash recovery.
    * @return The response to the value command that has been delivered. May be an empty array.
    */
@@ -124,7 +123,7 @@ with AkkaLoggingAdapter {
    */
   val filteredDeliverClient: PartialFunction[Payload, Any] = {
     case Payload(_, NoOperationCommandValue) => NoOperationCommandValue.bytes
-    case p@Payload(_, c: ClientRequestCommandValue) => deliverClient(p)
+    case p@Payload(_, c: ClientCommandValue) => deliverClient(p)
   }
 
   /**
@@ -132,8 +131,8 @@ with AkkaLoggingAdapter {
    * only for the next message for which we generate an accept message.
    */
   val deliverMembership: PartialFunction[Payload, Any] = {
-    case Payload(_, m@MembershipCommandValue(_, members)) =>
-      throw new AssertionError("not yet implemented")
+    case Payload(_, _) =>
+      throw new AssertionError("not yet implemented") // FIXME
   }
 
   /**

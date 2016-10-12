@@ -271,9 +271,9 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
 
       // and some recognisable accepts to choose from
 
-      val v1 = DummyCommandValue(1)
-      val v2 = DummyCommandValue(2)
-      val v3 = DummyCommandValue(3)
+      val v1 = DummyCommandValue("1")
+      val v2 = DummyCommandValue("2")
+      val v3 = DummyCommandValue("3")
 
       val id1 = Identifier(1, BallotNumber(1, 1), 1L)
       val id2 = Identifier(2, BallotNumber(2, 2), 1L)

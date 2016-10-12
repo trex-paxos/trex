@@ -5,12 +5,10 @@ import java.util.concurrent.TimeoutException
 import akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, ActorSelection}
 import akka.serialization.{SerializationExtension, Serializer}
 import akka.util.Timeout
-import com.github.trex_paxos.BaseDriver.SelectionUrlFactory
-import com.github.trex_paxos.internals._
-import com.github.trex_paxos.library.{LostLeadershipException, _}
+import _root_.com.github.trex_paxos.internals._
+import _root_.com.github.trex_paxos.library.{LostLeadershipException, _}
 
 import scala.collection.SortedMap
-import scala.collection.immutable.IndexedSeq
 import scala.compat.Platform
 import scala.concurrent.duration._
 
@@ -66,7 +64,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
 
   def incrementAndGetRequestId() = {
     requestId = requestId + 1
-    requestId
+    requestId.toString
   }
 
   case class Request(timeoutTime: Long, client: ActorRef, command: CommandValue, attempt: Int)
@@ -74,13 +72,13 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
   /**
     * lookup a request by its identifier
     */
-  private[this] var requestById: SortedMap[Long, Request] = SortedMap.empty
+  private[this] var requestById: SortedMap[String, Request] = SortedMap.empty
 
   /**
     * look up requests by the timeout then by identifier
     * due to clock resolution we can have multiple requests timeout in the same millisecond
     */
-  private[this] var requestByTimeoutById: SortedMap[Long, Map[Long, Request]] = SortedMap.empty
+  private[this] var requestByTimeoutById: SortedMap[Long, Map[String, Request]] = SortedMap.empty
 
   def hold(request: Request): Unit = {
     requestById = requestById + (request.command.msgId -> request)
@@ -128,13 +126,13 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
     /**
       * If we got back a response from the cluster send it back up the stack to the client actor.
       */
-    case ServerResponse(id, responseOption) =>
-      if (log.isDebugEnabled) log.debug("{} found is {} is in map {}", id, requestById.contains(id), requestById)
-      requestById.get(id) foreach {
+    case ServerResponse(slot, cid, responseOption) =>
+      if (log.isDebugEnabled) log.debug("slot {} with {} found is {} is in map {}", slot, cid, requestById.contains(cid), requestById)
+      requestById.get(cid) foreach {
         case request@Request(_, client, _, _) =>
           responseOption foreach { response =>
             client ! response
-            log.debug("response {} for {} is {}", id, client, response)
+            log.debug("response {} for {} is {}", cid, client, response)
           }
           drop(request)
       }
@@ -199,7 +197,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
 
     case work: AnyRef =>
       val bytes = getSerializer(work.getClass).toBinary(work)
-      val commandValue = ClientRequestCommandValue(incrementAndGetRequestId(), bytes)
+      val commandValue = ClientCommandValue(incrementAndGetRequestId(), bytes)
       val request = Request(Platform.currentTime + timeoutMillis, sender(), commandValue, 1)
       transmit(leaderCounter, request)
 
@@ -281,10 +279,11 @@ class DynamicClusterDriver(timeout: Timeout, maxAttempts: Int) extends BaseDrive
           }
       }*/
     case work: Membership =>
-      log.info("received membership change request {}", work)
-      val commandValue = MembershipCommandValue(incrementAndGetRequestId(), work)
-      val request = Request(Platform.currentTime + timeoutMillis, sender(), commandValue, 1)
-      transmit(leaderCounter, request)
+      // FIXME
+//      log.info("received membership change request {}", work)
+//      val commandValue = MembershipCommandValue(incrementAndGetRequestId(), work)
+//      val request = Request(Platform.currentTime + timeoutMillis, sender(), commandValue, 1)
+//      transmit(leaderCounter, request)
     case m: CommittedMembership =>
       // update our knowledge of the commitment membership of the cluster
       membership = Option(m)

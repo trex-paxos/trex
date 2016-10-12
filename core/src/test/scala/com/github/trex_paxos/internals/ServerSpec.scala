@@ -2,16 +2,15 @@ package com.github.trex_paxos.internals
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import com.github.trex_paxos.TrexRouting
-import com.github.trex_paxos.library.{RetransmitRequest, RetransmitResponse, _}
-import com.typesafe.config.ConfigFactory
+import _root_.com.github.trex_paxos.TrexRouting
+import _root_.com.github.trex_paxos.library.{RetransmitRequest, RetransmitResponse, _}
 import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
 object ServerSpec {
-  val config = ConfigFactory.parseString("trex.leader-timeout-min=1\ntrex.leader-timeout-max=10\nakka.loglevel = \"DEBUG\"")
+  val config = _root_.com.typesafe.config.ConfigFactory.parseString("trex.leader-timeout-min=1\ntrex.leader-timeout-max=10\nakka.loglevel = \"DEBUG\"")
 }
 
 class ServerSpec extends TestKit(ActorSystem("ServerSpec", ServerSpec.config))

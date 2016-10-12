@@ -5,7 +5,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 import akka.actor._
 import com.github.trex_paxos.internals.PaxosActor.TraceData
-import com.github.trex_paxos.internals.{ClientRequestCommandValue, PaxosActor, PaxosProperties}
+import com.github.trex_paxos.internals.{PaxosActor, PaxosProperties}
 import com.github.trex_paxos.library._
 import com.typesafe.config.Config
 
@@ -42,14 +42,14 @@ class TestPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniqu
 
   // does nothing but makes this class concrete for testing
   val deliverClient: PartialFunction[Payload, AnyRef] = {
-    case Payload(_, ClientRequestCommandValue(_, bytes)) => bytes
+    case Payload(_, ClientCommandValue(_, bytes)) => bytes
     case x => throw new IllegalArgumentException(x.toString)
   }
 
   override def deliver(payload: Payload): Array[Byte] = {
     delivered.append(payload)
     payload.command match {
-      case ClientRequestCommandValue(_, bytes) =>
+      case ClientCommandValue(_, bytes) =>
         if (bytes.length > 0) Array[Byte]((-bytes(0)).toByte) else bytes
       case noop@NoOperationCommandValue => noop.bytes
     }
@@ -127,13 +127,13 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
     }
   }
 
-  val valueByMsgId = Box(Map[Long, ClientRequestCommandValue]())
+  val valueByMsgId = Box(Map[String, ClientCommandValue]())
 
   def receive: Receive = {
     /**
       * Spray a client request at any node in the cluster
      */
-    case r@ClientRequestCommandValue(msgId, bytes) =>
+    case r@ClientCommandValue(msgId, bytes) =>
       r.bytes(0) match {
         case b if b > 0 => // value greater than zero is client request send to leader
           valueByMsgId(valueByMsgId() + (r.msgId -> r))
@@ -164,7 +164,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       */
     case NotLeader(from, msgId) =>
       val guessedLeader = next()
-      val v@ClientRequestCommandValue(_, bytes) = valueByMsgId()(msgId)
+      val v@ClientCommandValue(_, bytes) = valueByMsgId()(msgId)
       log.info("NotLeader {} trying {} to {}", from, bytes(0), invertedChildren(guessedLeader))
       context.system.scheduler.scheduleOnce(10 millis, guessedLeader, v)
 

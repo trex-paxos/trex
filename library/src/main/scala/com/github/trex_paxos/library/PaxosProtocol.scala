@@ -10,15 +10,44 @@ trait CommandValue extends PaxosMessage {
 
   def bytes: Array[Byte]
 
-  def msgId: Long
+  def msgId: String
 }
 
 /**
+  * Client request command has an id to correlate to the server response.
+  * @param msgId The client message id used to correlate sent commands back to server responses.
+  * @param bytes The serialized client command read to log to a journal or transit on the wire.
+  */
+private[trex_paxos] case class ClientCommandValue(msgId: String, val bytes: Array[Byte]) extends CommandValue
+
+/**
+  * Client request command has an id to correlate to the server response. Does not need to be made durable and can be lost during crashes.
+  * @param msgId The client message id used to correlate sent commands back to server responses.
+  * @param bytes The serialized client command read to log to a journal or transit on the wire.
+  */
+private[trex_paxos] case class ReadOnlyClientCommandValue(msgId: String, val bytes: Array[Byte]) extends CommandValue
+
+/**
+  * Cluster administration command which has an id to correlate to the server response. Does not need to be made durable and can be lost during crashes.
+  * @param msgId The message id used to correlate sent commands back to server responses.
+  * @param bytes The serialized client command read to log to a journal or transit on the wire.
+  */
+private[trex_paxos] case class ClusterCommandValue(msgId: String, val bytes: Array[Byte]) extends CommandValue
+
+
+case object NoOperationCommandValue extends CommandValue {
+  def bytes = emptyArray
+
+  val msgId = ""
+}
+
+
+/**
   * Once consensus has been reached we deliver CommandValues in consensus order with the possibility of repeats during crash recovery.
-  * @param deduplicationId An id number which can be use dto deduplicate repeated deliveries that may happen during crash recovery.
+  * @param logIndex The Paxos slow under which the command value is committed. My be used to deduplicate repeated deliveries due to crashes.
   * @param command The value which has been chosen by the consensus protocol.
   */
-case class Payload(deduplicationId: Long, command: CommandValue)
+case class Payload(logIndex: Long, command: CommandValue)
 
 /**
  * The logical number used to discriminate messages as either higher or lower. Numbers must be unique to _both_ the node in the cluster *and* paxos prepare.  Physically it is 64bits with high 32bits an epoch number and low 32bits a node unique identifier. The number will be fixed for a stable leader so it also represents a leaders term.
@@ -256,7 +285,7 @@ case object HeartBeat extends PaxosMessage
  * @param nodeId The node replying that it is not the leader.
  * @param msgId The client message identifier which the node is responding to.
  */
-case class NotLeader(val nodeId: Int, val msgId: Long) extends PaxosMessage
+case class NotLeader(val nodeId: Int, val msgId: String) extends PaxosMessage
 
 /**
   * Response to a client when the nodes is not currently a follower. As the leader is write bottleneck applications that
@@ -266,7 +295,7 @@ case class NotLeader(val nodeId: Int, val msgId: Long) extends PaxosMessage
   * @param nodeId The node replying that it is has become the leader.
   * @param msgId The client message which the node is responding to.
   */
-case class NotFollower(val nodeId: Int, val msgId: Long) extends PaxosMessage
+case class NotFollower(val nodeId: Int, val msgId: String) extends PaxosMessage
 
 /**
  * Response to a client when the nodes has lost its leadership whilst servicing a request during a fail-over due to
@@ -282,22 +311,17 @@ case class NotFollower(val nodeId: Int, val msgId: Long) extends PaxosMessage
  * @param nodeId The node replying that it is has lost the leader.
  * @param msgId The client message which the node is responding to.
  */
-case class LostLeadershipException(val nodeId: Int, val msgId: Long) extends RuntimeException with PaxosMessage {
+case class LostLeadershipException(val nodeId: Int, val msgId: String) extends RuntimeException with PaxosMessage {
   override def toString() = s"NoLongerLeaderException($nodeId,$msgId)"
 }
 
 /**
- *
- * @param id The id of the ClientRequestCommandValue being responded to.
- * @param response The
- */
-case class ServerResponse(id: Long, val response: Option[AnyRef])
-
-case object NoOperationCommandValue extends CommandValue {
-  def bytes = emptyArray
-
-  val msgId = -1L
-}
+  *
+  * @param logIndex The paxos slot at which the command was chosen.
+  * @param clientMsgId The id of the ClientCommandValue being responded to.
+  * @param response The result of running the comand value.
+  */
+case class ServerResponse(logIndex: Long, clientMsgId: String, val response: Option[AnyRef])
 
 /** Paxos process roles */
 sealed trait PaxosRole

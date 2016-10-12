@@ -117,7 +117,7 @@ class FollowerTests extends AllRolesTests {
   object `The Follower Function` {
     val paxosAlgorithm = new PaxosAlgorithm
     def `should be defined for a client command message` {
-      assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue(0))))
+      assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue("0"))))
     }
 
     def `should be defined for RetransmitRequest` {
@@ -391,9 +391,9 @@ class FollowerTests extends AllRolesTests {
       val tempJournal = new InMemoryJournal()
 
       // given some retransmitted committed values
-      val v1 = DummyCommandValue(1)
-      val v2 = DummyCommandValue(2)
-      val v3 = DummyCommandValue(3)
+      val v1 = DummyCommandValue("1")
+      val v2 = DummyCommandValue("2")
+      val v3 = DummyCommandValue("3")
       val a1 =
         Accept(Identifier(1, BallotNumber(1, 1), 1L), v1)
       val a2 =
@@ -463,13 +463,13 @@ class FollowerTests extends AllRolesTests {
       // given three uncommitted values in the journal
 
       val id1 = Identifier(0, BallotNumber(lowValue + 1, 0), 1)
-      val a1 = Accept(id1, DummyCommandValue(1))
+      val a1 = Accept(id1, DummyCommandValue("1"))
 
       val id2 = Identifier(0, BallotNumber(lowValue + 1, 0), 2)
-      val a2 = Accept(id2, DummyCommandValue(2))
+      val a2 = Accept(id2, DummyCommandValue("2"))
 
       val id3 = Identifier(0, BallotNumber(lowValue + 1, 0), 3)
-      val a3 = Accept(id3, DummyCommandValue(3))
+      val a3 = Accept(id3, DummyCommandValue("3"))
 
       val tempJournal = new InMemoryJournal()
       tempJournal.a.put(1L , (0L, a1))

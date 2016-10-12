@@ -4,10 +4,10 @@ import Ordering._
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 
-case class DummyCommandValue(id: Long) extends CommandValue {
+case class DummyCommandValue(id: String) extends CommandValue {
   override def bytes: Array[Byte] = Array()
 
-  override def msgId: Long = id
+  override def msgId: String = id
 }
 
 object DummyRemoteRef {
@@ -165,7 +165,7 @@ object TestHelpers extends PaxosLenses{
   val identifier100: Identifier = Identifier(3, BallotNumber(3, 3), 100L)
   val a99 = Accept(identifier99, NoOperationCommandValue)
 
-  val a100 = Accept(identifier100, DummyCommandValue(100))
+  val a100 = Accept(identifier100, DummyCommandValue("100"))
 
   val emptyAcceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(
     a98.id -> AcceptResponsesAndTimeout(100L, a98, Map.empty),
@@ -203,7 +203,7 @@ object TestHelpers extends PaxosLenses{
       BallotNumber(lowValue, lowValue), Identifier(0, BallotNumber(lowValue, lowValue), 1)
     ), 0, 0, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, String)])
 
-  val a101 = Accept(identifier101, DummyCommandValue(101))
+  val a101 = Accept(identifier101, DummyCommandValue("101"))
 
   val misorderedAccepts = Seq(a98, a99, a101, a100)
 

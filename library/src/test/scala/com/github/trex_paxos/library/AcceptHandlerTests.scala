@@ -74,7 +74,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val data = highestPromisedLens.set(TestHelpers.initialData, promised)
       val identifier = Identifier(0, promised, 1)
       // and some already journaled accept
-      val accepted = Accept(identifier, DummyCommandValue(1))
+      val accepted = Accept(identifier, DummyCommandValue("1"))
       stubJournal.accepted _ when 0L returns Some(accepted)
       // when our node sees this
       val handler = new TestAcceptHandler
@@ -98,7 +98,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       val initialData = TestHelpers.initialData.copy( progress = Progress(promised, Identifier(0, promised, committedLogIndex)))
       // and some higher identifier but for a slot already committed
       val higherIdentifier = Identifier(0, BallotNumber(6, 0), committedLogIndex)
-      val acceptedAccept = Accept(higherIdentifier, DummyCommandValue(2))
+      val acceptedAccept = Accept(higherIdentifier, DummyCommandValue("2"))
       // when our node sees this
       val handler = new TestAcceptHandler
       val agent = PaxosAgent(1, Follower, initialData, TestHelpers.initialQuorumStrategy )

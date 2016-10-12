@@ -2,8 +2,7 @@ package com.github.trex_paxos
 
 import akka.actor._
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
-import com.github.trex_paxos.internals.ClientRequestCommandValue
-import com.github.trex_paxos.library.{Payload, LostLeadershipException, CommandValue}
+import com.github.trex_paxos.library.{ClientCommandValue, CommandValue, LostLeadershipException, Payload}
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.{BeforeAndAfterAll, _}
 
@@ -32,7 +31,7 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
 
     val count = (0 until cluster.size).foldLeft(0){ (count, i) =>
       val found = delivered(i) map {
-        case Payload(_, c: ClientRequestCommandValue) =>
+        case Payload(_, c: ClientCommandValue) =>
           c.bytes(0) match {
             case 1 => 1
             case _ => 0
@@ -51,8 +50,8 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
     val ref = TestActorRef(new ClusterHarness(clusterSize, cfg),name)
 
     // when we sent it the application value of 1.toByte after 0.4s for the cluster to stabilize
-    val expectedMsgId = 123456789L
-    system.scheduler.scheduleOnce(200 millis, ref, ClientRequestCommandValue(expectedMsgId, Array[Byte](1)))
+    val expectedMsgId = 123456789L.toString
+    system.scheduler.scheduleOnce(200 millis, ref, ClientCommandValue(expectedMsgId, Array[Byte](1)))
 
     // it commits and sends by the response of -1.toByte else replies that it has lost the leadership
     expectMsgPF(12 second) {

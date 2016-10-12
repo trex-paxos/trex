@@ -14,7 +14,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
 
   object `The Recoverer Function` {
     def `should be defined for a recoverer and a client command message` {
-      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue(99))))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue("99"))))
     }
 
     def `should be defined for a recoverer and RetransmitRequest` {
@@ -126,7 +126,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
     }
 
     def `should be defined for a client command message` {
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue(1))))
+      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue("1"))))
     }
 
     def `should be defined for a RetransmitRequest` {
@@ -523,10 +523,10 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       // when a majority prepare response with an ack from node1
       // and some value returned in the promise from node1 with some lower number
       val lowerId = prepareId.copy(number = prepareId.number.copy(counter = prepareId.number.counter - 1))
-      val prepareAck = PrepareAck(prepareId, 1, initialData.progress, 0, 0, Some(Accept(lowerId, DummyCommandValue(0))))
+      val prepareAck = PrepareAck(prepareId, 1, initialData.progress, 0, 0, Some(Accept(lowerId, DummyCommandValue("0"))))
       val leader@PaxosAgent(_, role, _, _)= paxosAlgorithm(new PaxosEvent(io, agent, prepareAck))
       // then it boardcasts the payload from the promise under its higher epoch number
-      val accept = Accept(prepareId, DummyCommandValue(0))
+      val accept = Accept(prepareId, DummyCommandValue("0"))
       sent.headOption.value match {
         case `accept` => // good
         case f => fail(f.toString)
@@ -539,7 +539,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val PaxosAgent(_, _, data, _) = paxosAlgorithm(new PaxosEvent(io, leader, acceptAck))
       // it delivers the value
       Option(lastDelivered()) match {
-        case Some(DummyCommandValue(0)) => // good
+        case Some(DummyCommandValue("0")) => // good
         case f => fail(f.toString)
       }
       // and sends the commit
@@ -642,13 +642,13 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       // when a majority prepare response with an ack from node1
       // and some value returned in the promise from node1 with some lower number
       val lowerId = prepareId.copy(number = prepareId.number.copy(counter = prepareId.number.counter - 1))
-      val prepareAck1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, Some(Accept(lowerId, DummyCommandValue(0))))
+      val prepareAck1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, Some(Accept(lowerId, DummyCommandValue("0"))))
       val ack1 = paxosAlgorithm(new PaxosEvent(io, agent, prepareAck1))
-      val prepareAck2 = PrepareAck(prepareId, 2, initialData.progress, 0, 0, Some(Accept(lowerId, DummyCommandValue(0))))
+      val prepareAck2 = PrepareAck(prepareId, 2, initialData.progress, 0, 0, Some(Accept(lowerId, DummyCommandValue("0"))))
       val leader@PaxosAgent(_, roleLeader, _, _) = paxosAlgorithm(new PaxosEvent(io, ack1, prepareAck2))
 
       // then it boardcasts the payload from the promise under its higher epoch number
-      val accept = Accept(prepareId, DummyCommandValue(0))
+      val accept = Accept(prepareId, DummyCommandValue("0"))
       sent.headOption.value match {
         case `accept` => // good
         case f => fail(f.toString)
@@ -663,7 +663,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val PaxosAgent(_, _, data, _) = paxosAlgorithm(new PaxosEvent(io, acceptAck1agent, acceptAck2))
       // it delivers the value
       Option(lastDelivered()) match {
-        case Some(DummyCommandValue(0)) => // good
+        case Some(DummyCommandValue("0")) => // good
         case f => fail(f.toString)
       }
       // and sends the commit

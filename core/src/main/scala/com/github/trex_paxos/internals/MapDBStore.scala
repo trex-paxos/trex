@@ -3,12 +3,12 @@ package com.github.trex_paxos.internals
 
 import java.io.{Closeable, File}
 
-import akka.util.ByteString
-import com.github.trex_paxos.TrexMembership
-import com.github.trex_paxos.library.{Accept, Identifier, Journal, JournalBounds, Progress}
 import org.mapdb.{DB, DBMaker}
 
 import scala.collection.JavaConversions
+import com.github.trex_paxos.TrexMembership
+import com.github.trex_paxos.library._
+import com.github.trex_paxos.util.{ByteChain, Pickle}
 
 /**
   * A MapDB storage engine. Note that you must call close on the file for a clean shutdown.
@@ -53,7 +53,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
 
   def loadProgress(): Progress = {
     val bytes = bookworkMap.get("FileJournal")
-    Pickle.unpickleProgress(ByteString(bytes))
+    Pickle.unpickleProgress(ByteChain(bytes))
   }
 
   def accept(a: Accept*): Unit = {
@@ -71,7 +71,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
       case None =>
         None
       case Some(bytes) =>
-        Some(Pickle.unpickleAccept(ByteString(bytes)))
+        Some(Pickle.unpickleAccept(ByteChain(bytes)))
     }
   }
 
@@ -93,22 +93,25 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
   val memberMap: java.util.concurrent.ConcurrentNavigableMap[Long, Array[Byte]] =
     db.getTreeMap("MEMBERS")
 
-  override def loadMembership(): Option[CommittedMembership] = {
+  override def loadMembership(): Option[CommittedMembership] =
+  {
     import scala.collection.JavaConverters._
     val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
     lastSlotOption map { (s: Long) =>
-      CommittedMembership(s, Pickle.unpickleMembership(ByteString(memberMap.get(s))))
+     // CommittedMembership(s, MemberPickle.unpickleMembership(ByteChain(memberMap.get(s))))
     }
+    None
   }
 
-  override def saveMembership(cm: CommittedMembership): Unit = {
+  override def saveMembership(cm: CommittedMembership): Unit =
+  {
     import scala.collection.JavaConverters._
     val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
     lastSlotOption foreach {
       case last if last < cm.slot => // good
       case last => throw new IllegalArgumentException(s"slot ${cm.slot} is not higher than last ${last}")
     }
-    memberMap.put(cm.slot, Pickle.pickleMembership(cm.membership).toArray)
+  //  memberMap.put(cm.slot, MemberPickle.pickleMembership(cm.membership).toArray)
     db.commit()
     // TODO consider gc of old values
   }

@@ -31,17 +31,17 @@ class TypedActorPaxosEndpoint(
   }
 
   override val deliverClient: PartialFunction[Payload, AnyRef] = {
-    case Payload(logIndex, c: ClientRequestCommandValue) =>
+    case Payload(logIndex, c: ClientCommandValue) =>
       val mc@TypedActor.MethodCall(method, parameters) = deserialize(c.bytes)
       log.debug("delivering slot {} value {}", logIndex, mc)
       val result = Try {
         val response = Option(method.invoke(target, parameters: _*))
         log.debug(s"invoked ${method.getName} returned $response")
-        ServerResponse(c.msgId, response)
+        ServerResponse(logIndex, c.msgId, response)
       } recover {
         case ex =>
           log.error(ex, s"call to $method with $parameters got exception $ex")
-          ServerResponse(c.msgId, Option(ex))
+          ServerResponse(logIndex, c.msgId, Option(ex))
       }
       result.get
   }
@@ -66,22 +66,23 @@ class TypedActorPaxosEndpoint(
   log.info(s"cluster members are ${others}")
 
   override val deliverMembership: PartialFunction[Payload, AnyRef] = {
-    case Payload(logIndex, MembershipCommandValue(msgId, membership)) =>
-      val result = Try {
-        committedMembership = CommittedMembership(logIndex, membership)
-        membershipStore.saveMembership(committedMembership)
-        others.values foreach {
-          _ ! PoisonPill
-        }
-        others = senders(committedMembership.membership.members)
-        log.info(s"membership at logIndex ${logIndex} is $membership")
-        ServerResponse(msgId, None)
-      } recover {
-        case ex =>
-          log.error(ex, s"call save membership at logIndex ${logIndex} with membership ${membership} got exception $ex")
-          ServerResponse(msgId, Option(ex))
-      }
-      result.get
+    case p@Payload(logIndex, _) =>
+//      val result = Try {
+//        committedMembership = CommittedMembership(logIndex, membership)
+//        membershipStore.saveMembership(committedMembership)
+//        others.values foreach {
+//          _ ! PoisonPill
+//        }
+//        others = senders(committedMembership.membership.members)
+//        log.info(s"membership at logIndex ${logIndex} is $membership")
+//        ServerResponse(logIndex, msgId, None)
+//      } recover {
+//        case ex =>
+//          log.error(ex, s"call save membership at logIndex ${logIndex} with membership ${membership} got exception $ex")
+//          ServerResponse(logIndex, msgId, Option(ex))
+//      }
+//      result.get
+    p // FIXME
   }
 
   override def clusterSize: Int = others.size + 1
