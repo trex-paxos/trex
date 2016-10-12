@@ -37,9 +37,14 @@ sbt coverageReport
 
 - [x] pluggable quorum strategy in the library
 
-0.6 - practical
+0.3 - practical
+
+- [ ] Remove Akka dependence from core (keep in tests)
 - [ ] dynamic cluster membership
-- [ ] forced reconfigurations
+- [ ] message integrity 
+
+0.6 - enhanced 
+
 - [ ] learners / scale-out multicast
 - [ ] timeline reads
 - [ ] noop heartbeats (less duels and partitioned leader detection)
@@ -74,4 +79,3 @@ M1
 ## Attribution
 
 The TRex icon is Tyrannosaurus Rex by Raf Verbraeken from the Noun Project licensed under [CC3.0](http://creativecommons.org/licenses/by/3.0/us/)
-
