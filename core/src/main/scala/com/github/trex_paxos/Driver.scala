@@ -2,9 +2,9 @@ package com.github.trex_paxos
 
 import java.util.concurrent.TimeoutException
 
-import akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, ActorSelection}
-import akka.serialization.{SerializationExtension, Serializer}
-import akka.util.Timeout
+import _root_.akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, ActorSelection}
+import _root_.akka.serialization.{SerializationExtension, Serializer}
+import _root_.akka.util.Timeout
 import _root_.com.github.trex_paxos.internals._
 import _root_.com.github.trex_paxos.library.{LostLeadershipException, _}
 

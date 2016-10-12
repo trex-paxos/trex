@@ -2,8 +2,8 @@ package com.github.trex_paxos
 
 import java.net.InetSocketAddress
 
-import akka.actor._
-import akka.event.Logging
+import _root_.akka.actor._
+import _root_.akka.event.Logging
 import com.github.trex_paxos.internals._
 import com.github.trex_paxos.library._
 

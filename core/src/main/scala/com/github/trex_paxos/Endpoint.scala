@@ -2,9 +2,9 @@ package com.github.trex_paxos
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, PoisonPill, Props, TypedActor}
-import akka.actor.TypedActor.MethodCall
-import akka.serialization.SerializationExtension
+import _root_.akka.actor.{ActorRef, PoisonPill, Props, TypedActor}
+import _root_.akka.actor.TypedActor.MethodCall
+import _root_.akka.serialization.SerializationExtension
 import com.github.trex_paxos.internals._
 import com.github.trex_paxos.library._
 

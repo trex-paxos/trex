@@ -2,10 +2,10 @@ package com.github.trex_paxos
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorLogging, ActorRef}
-import akka.io.Udp.CommandFailed
-import akka.io.{IO, Udp}
-import akka.util.ByteString
+import _root_.akka.actor.{Actor, ActorLogging, ActorRef}
+import _root_.akka.io.Udp.CommandFailed
+import _root_.akka.io.{IO, Udp}
+import _root_.akka.util.ByteString
 import com.github.trex_paxos.util.Pickle
 
 // TODO do we really need a UdpSender wrapper seems like its many actors possibly talking to one "IO(Udp)" else many to
