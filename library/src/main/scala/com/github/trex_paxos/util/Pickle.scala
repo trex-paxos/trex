@@ -1,4 +1,4 @@
-package com.github.trex_paxos.util
+package com.github.trex_paxosL.util
 
 import java.util.NoSuchElementException
 
@@ -256,11 +256,16 @@ object Pickle {
   def picklePrepareNack(p: PrepareNack): ByteChain = pickleIdentifier(p.requestId) ++ pickleInt(p.from) ++ pickleProgress(p.progress) ++ pickleLong(p.highestAcceptedIndex) ++ pickleLong(p.leaderHeartbeat)
 
   def unpicklePrepareNack(b: Iterable[Byte]): PrepareNack = {
+    val (requestId: Iterable[Byte], from: Iterable[Byte], progress: Iterable[Byte], r3: Iterable[Byte]) = extractPrepare(b)
+    val (highestAcceptedIndex, leaderHeartbeat) = r3.splitAt(lengthOfLong)
+    PrepareNack(unpickleIdentifier(requestId), unpickleInt(from), unpickleProgress(progress), unpickleLong(highestAcceptedIndex), unpickleLong(leaderHeartbeat))
+  }
+
+  def extractPrepare(b: Iterable[Byte]): (Iterable[Byte], Iterable[Byte], Iterable[Byte], Iterable[Byte]) = {
     val (requestId, r1) = b.splitAt(sizeOfIdentifier)
     val (from, r2) = r1.splitAt(lengthOfInt)
     val (progress, r3) = r2.splitAt(sizeOfProgress)
-    val (highestAcceptedIndex, leaderHeartbeat) = r3.splitAt(lengthOfLong)
-    PrepareNack(unpickleIdentifier(requestId), unpickleInt(from), unpickleProgress(progress), unpickleLong(highestAcceptedIndex), unpickleLong(leaderHeartbeat))
+    (requestId, from, progress, r3)
   }
 
   def picklePrepareAck(p: PrepareAck): ByteChain = {
@@ -269,9 +274,8 @@ object Pickle {
   }
 
   def unpicklePrepareAck(b: Iterable[Byte]): PrepareAck = {
-    val (requestId, r1) = b.splitAt(sizeOfIdentifier)
-    val (from, r2) = r1.splitAt(lengthOfInt)
-    val (progress, r3) = r2.splitAt(sizeOfProgress)
+    val (requestId: Iterable[Byte], from: Iterable[Byte], progress: Iterable[Byte], r3: Iterable[Byte]) = extractPrepare(b)
+
     val (highestAcceptedIndex, r4) = r3.splitAt(lengthOfLong)
     val (leaderHeartbeat, r5) = r4.splitAt(lengthOfLong)
     val (bool, accept) = r5.splitAt(lengthOfBool)

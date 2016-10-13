@@ -1,7 +1,6 @@
 package com.github.trex_paxos.internals
 
 import com.github.trex_paxos.library.CommandValue
-import com.github.trex_paxos.util.Pickle
 
 /**
   * Placeholder currently not implemented.

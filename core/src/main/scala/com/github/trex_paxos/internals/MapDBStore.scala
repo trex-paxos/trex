@@ -8,7 +8,7 @@ import org.mapdb.{DB, DBMaker}
 import scala.collection.JavaConversions
 import com.github.trex_paxos.TrexMembership
 import com.github.trex_paxos.library._
-import com.github.trex_paxos.util.{ByteChain, Pickle}
+
 
 /**
   * A MapDB storage engine. Note that you must call close on the file for a clean shutdown.
@@ -17,6 +17,8 @@ import com.github.trex_paxos.util.{ByteChain, Pickle}
   * @param retained    Minimum number of committed slots to retain for retransmission
   */
 class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMembership with Closeable {
+
+  import com.github.trex_paxosL.util.{Pickle,ByteChain}
 
   // whether store needs initializing
   val emptyStoreFile = journalFile.length == 0
