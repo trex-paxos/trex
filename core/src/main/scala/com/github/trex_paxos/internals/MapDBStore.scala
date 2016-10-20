@@ -18,7 +18,7 @@ import com.github.trex_paxos.library._
   */
 class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMembership with Closeable {
 
-  import com.github.trex_paxosL.util.{Pickle,ByteChain}
+  import com.github.trex_paxos.util.{Pickle,ByteChain}
 
   // whether store needs initializing
   val emptyStoreFile = journalFile.length == 0

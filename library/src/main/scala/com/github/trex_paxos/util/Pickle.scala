@@ -1,4 +1,4 @@
-package com.github.trex_paxosL.util
+package com.github.trex_paxos.util
 
 import java.util.NoSuchElementException
 
