@@ -36,6 +36,7 @@ lazy val core = project.dependsOn(library).
 		  "com.typesafe.akka" %% "akka-actor" % akkaVersion,
 		  "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
 		  "org.mapdb" % "mapdb" % mapdbVersion,
+      "org.scala-lang.modules" % "scala-parser-combinators_2.11" % "1.0.4",
       "org.scalatest" % "scalatest_2.11" % scalatestVersion % "test,it",
 		  "org.scalamock" %% "scalamock-scalatest-support" % scalmockVersion % "test,it",
       "com.typesafe.akka" %% "akka-remote" % akkaVersion

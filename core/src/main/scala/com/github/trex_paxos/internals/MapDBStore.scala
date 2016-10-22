@@ -95,14 +95,16 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
   val memberMap: java.util.concurrent.ConcurrentNavigableMap[Long, Array[Byte]] =
     db.getTreeMap("MEMBERS")
 
+  val UTF8 = "UTF8"
+
   override def loadMembership(): Option[CommittedMembership] =
   {
     import scala.collection.JavaConverters._
     val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
     lastSlotOption map { (s: Long) =>
-     // CommittedMembership(s, MemberPickle.unpickleMembership(ByteChain(memberMap.get(s))))
+      val jsonBytesUtf8 = memberMap.get(s)
+      MemberPickle.fromJson(new String(jsonBytesUtf8, UTF8))
     }
-    None
   }
 
   override def saveMembership(cm: CommittedMembership): Unit =
@@ -113,7 +115,8 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
       case last if last < cm.slot => // good
       case last => throw new IllegalArgumentException(s"slot ${cm.slot} is not higher than last ${last}")
     }
-  //  memberMap.put(cm.slot, MemberPickle.pickleMembership(cm.membership).toArray)
+    val json = MemberPickle.toJson(cm)
+    memberMap.put(cm.slot, json.getBytes(UTF8))
     db.commit()
     // TODO consider gc of old values
   }

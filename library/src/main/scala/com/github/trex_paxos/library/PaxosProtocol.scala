@@ -28,7 +28,7 @@ case class ClientCommandValue(msgId: String, val bytes: Array[Byte]) extends Com
 case class ReadOnlyClientCommandValue(msgId: String, val bytes: Array[Byte]) extends CommandValue
 
 /**
-  * Cluster administration command which has an id to correlate to the server response. Does not need to be made durable and can be lost during crashes.
+  * Cluster administration command which has an id to correlate to the server response.
   * @param msgId The message id used to correlate sent commands back to server responses.
   * @param bytes The serialized client command read to log to a journal or transit on the wire.
   */
@@ -321,7 +321,7 @@ case class LostLeadershipException(val nodeId: Int, val msgId: String) extends R
   * @param clientMsgId The id of the ClientCommandValue being responded to.
   * @param response The result of running the comand value.
   */
-case class ServerResponse(logIndex: Long, clientMsgId: String, val response: Option[AnyRef])
+case class ServerResponse(logIndex: Long, clientMsgId: String, val response: Option[Array[Byte]])
 
 /** Paxos process roles */
 sealed trait PaxosRole

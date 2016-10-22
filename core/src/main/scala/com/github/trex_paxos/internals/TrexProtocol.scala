@@ -107,9 +107,9 @@ object Member {
   * @param nodeUniqueId The unique paxos number for this membership
   * @param location     The location for server-to-server typically given as "host:port" but could be a url
   * @param clientLocation The location for client-to-server typically given as "host:port" but could be a url
-  * @param active       The status of the member.
+  * @param status       The status of the member.
   */
-private[trex_paxos] case class Member(nodeUniqueId: Int, location: String, clientLocation: String, active: MemberStatus)
+private[trex_paxos] case class Member(nodeUniqueId: Int, location: String, clientLocation: String, status: MemberStatus)
 
 /**
   * A complete Paxos cluster.

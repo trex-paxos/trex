@@ -46,7 +46,7 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
     Map(0 -> system.actorSelection("/user/a0-" + now), 1 -> system.actorSelection("/user/a1-" + now), 2 -> system.actorSelection("/user/a2-" + now))
   }
 
-  def fromBinary(bytes: Array[Byte])(implicit probe: TestActorRef[BaseDriver]) = probe.underlyingActor.getSerializer(classOf[String]).fromBinary(bytes)
+  def fromBinary(bytes: Array[Byte])(implicit probe: TestActorRef[BaseDriver]) = probe.underlyingActor.serializerClient.fromBinary(bytes)
 
   object `client driver` {
 
@@ -75,9 +75,10 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
         case ClientCommandValue("1", bytes) if fromBinary(bytes) == "hello" => // good
         case x => fail(x.toString)
       }
-      testProbe1.send(ref, ServerResponse(1, "1", Some("world")))
+      val worldBytes = bd.underlyingActor.serializerClient.toBinary("world")
+      testProbe1.send(ref, ServerResponse(1, "1", Some(worldBytes)))
       clientProbe.expectMsgPF(1 seconds) {
-        case "world" => // success
+        case "world"  => // success
         case x => fail(x.toString)
       }
     }
@@ -109,9 +110,10 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
         case ClientCommandValue("1", bytes) if fromBinary(bytes) == "hello" =>
         case x => fail(x.toString)
       }
-      testProbe3.send(ref, ServerResponse(1, "1", Some("world")))
+      val worldBytes = bd.underlyingActor.serializerClient.toBinary("world")
+      testProbe3.send(ref, ServerResponse(1, "1", Some(worldBytes)))
       clientProbe.expectMsgPF(1 seconds) {
-        case "world" => // success
+        case "world"  => // success
         case x => fail(x.toString)
       }
     }
@@ -131,9 +133,10 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
         case ClientCommandValue("1", bytes) if fromBinary(bytes) == "hello" =>
         case x => fail(x.toString)
       }
-      testProbe2.send(ref, ServerResponse(1, "1", Some("world")))
+      val worldBytes = bd.underlyingActor.serializerClient.toBinary("world")
+      testProbe2.send(ref, ServerResponse(1, "1", Some(worldBytes)))
       clientProbe.expectMsgPF(1 seconds) {
-        case "world" => // success
+        case "world"  => // success
         case x => fail(x.toString)
       }
 
@@ -142,9 +145,10 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
         case ClientCommandValue("2", bytes) if fromBinary(bytes) == "hello again" =>
         case x => fail(x.toString)
       }
-      testProbe2.send(ref, ServerResponse(2, "2", Some("world again")))
+      val worldAgainBytes = bd.underlyingActor.serializerClient.toBinary("world again")
+      testProbe2.send(ref, ServerResponse(2, "2", Some(worldAgainBytes)))
       clientProbe.expectMsgPF(1 seconds) {
-        case "world again" => // success
+        case "world again"  => // success
         case x => fail(x.toString)
       }
 
@@ -169,9 +173,11 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
         case other => fail(s"got $other not bytes")
       }
 
-      testProbe2.send(ref, ServerResponse(1, "1", Some("world")))
+      val worldBytes = bd.underlyingActor.serializerClient.toBinary("world")
+
+      testProbe2.send(ref, ServerResponse(1, "1", Some(worldBytes)))
       clientProbe.expectMsgPF(1 seconds) {
-        case "world" => // success
+        case "world"  => // success
         case x => fail(x.toString)
       }
 
@@ -180,9 +186,12 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
         case ClientCommandValue("2", bytes) if fromBinary(bytes) == "hello again" =>
         case x => fail(x.toString)
       }
-      testProbe2.send(ref, ServerResponse(2, "2", Some("world again")))
+
+      val worldAgainBytes = bd.underlyingActor.serializerClient.toBinary("world again")
+
+      testProbe2.send(ref, ServerResponse(2, "2", Some(worldAgainBytes)))
       clientProbe.expectMsgPF(1 seconds) {
-        case "world again" => // success
+        case "world again"  => // success
         case x => fail(x.toString)
       }
 

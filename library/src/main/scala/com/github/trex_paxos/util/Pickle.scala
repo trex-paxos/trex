@@ -85,7 +85,8 @@ object Pickle {
     0xb.toByte -> (NoOperationCommandValue.getClass -> unpickleNoOpValue _),
     0xc.toByte -> (classOf[ClientCommandValue] -> unpickleClientValue _),
     0xd.toByte -> (classOf[ReadOnlyClientCommandValue] -> unpickleReadOnlyClientValue _),
-    0xe.toByte -> (classOf[ClusterCommandValue] -> unpickleClusterValue _)
+    0xe.toByte -> (classOf[ClusterCommandValue] -> unpickleClusterValue _),
+    0xf.toByte -> (classOf[ServerResponse] -> unpickleServerResponse _)
   )
   val toMap: Map[Class[_], Byte] = (config.map {
     case (b, (c, f)) => c -> b
@@ -170,14 +171,14 @@ object Pickle {
 
   def pickleValue(v: CommandValue) = v match {
     case n@NoOperationCommandValue => pickleNoOpValue
-    case c: CommandValue => picklePayloadedValue(c)
+    case c: CommandValue => pickleCommandValue(c)
   }
 
   def pickleNoOpValue = ByteChain.empty
 
   def unpickleNoOpValue(b: Iterable[Byte]): CommandValue = NoOperationCommandValue
 
-  def picklePayloadedValue(c: CommandValue): ByteChain = pickleStringUtf8(c.msgId) ++ pickleInt(c.bytes.length) ++ ByteChain(c.bytes)
+  def pickleCommandValue(c: CommandValue): ByteChain = pickleStringUtf8(c.msgId) ++ pickleInt(c.bytes.length) ++ ByteChain(c.bytes)
 
   def unpickleClientValue(b: Iterable[Byte]): ClientCommandValue = {
     val (id: String, r2: Iterable[Byte], lv: Int) = unpackValue(b)
@@ -212,6 +213,36 @@ object Pickle {
     val lid = unpickleInt(l0)
     val msgId = new String(r1.take(lid).toArray, "UTF8")
     NotLeader(unpickleInt(nodeId), msgId)
+  }
+
+  def pickleServerResponse(r: ServerResponse): ByteChain = pickleLong(r.logIndex) ++
+    pickleStringUtf8(r.clientMsgId) ++ (r.response match {
+    case None =>
+      ByteChain(Array(0.toByte))
+    case Some(b) =>
+      ByteChain(Array(1.toByte)) ++ pickleInt(b.length) ++ ByteChain(b)
+    })
+
+  val zeroByte = 0x0.toByte
+
+  def unpickleServerResponse(b: Iterable[Byte]): ServerResponse = {
+    val (slot, r0 ) = b.splitAt(lengthOfLong)
+    val logIndex = unpickleLong(slot)
+    val (l, r1) = r0.splitAt(lengthOfInt)
+    val lid = unpickleInt(l)
+    val (s, r2) = r1.splitAt(lid)
+    val msgId = new String(s.take(lid).toArray, "UTF8")
+    val (optArray, r3) = r2.splitAt(1)
+    val bb: Byte = optArray.iterator.next()
+    val opt = bb match {
+      case b if b == zeroByte =>
+        None
+      case _ =>
+        val (l, r4) = r3.splitAt(lengthOfInt)
+        val length = unpickleInt(l)
+        Some(r4.take(length).toArray)
+    }
+    ServerResponse(logIndex, msgId, opt)
   }
 
   def picklePrepare(p: Prepare): ByteChain = pickleIdentifier(p.id)
@@ -352,6 +383,8 @@ object Pickle {
     case r: RetransmitRequest => pickleRetransmitRequest(r)
     case r: RetransmitResponse => pickleRetransmitResponse(r)
     case p: Progress => pickleProgress(p)
+    case NoOperationCommandValue => pickleNoOpValue
+    case s: ServerResponse => pickleServerResponse(s)
     case x =>
       System.err.println(s"don't know how to pickle $x so returning empty ByteChain")
       ByteChain.empty

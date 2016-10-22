@@ -231,6 +231,29 @@ class PickleTests extends WordSpecLike with Matchers {
         case f => fail(f.toString)
       }
     }
+    "roundtrip None ServerResponse" in {
+      val s1 = ServerResponse(0, "one", None)
+      Pickle.unpack(Pickle.pack(s1).toBytes) match {
+        case `s1` => // good
+        case f => fail(f.toString)
+      }
+    }
+    "roundtrip empty ServerResponse" in {
+      val s1 = ServerResponse(0, "one", Some(Array[Byte]()))
+      Pickle.unpack(Pickle.pack(s1).toBytes) match {
+        case ServerResponse(n,m,Some(a)) if n == 0L && m == "one" && a.length == 0 =>  // good
+        case f => fail(f.toString)
+      }
+    }
+    "roundtrip some ServerResponse" in {
+      val s1 = ServerResponse(0, "one", Some(bytes1))
+      Pickle.unpack(Pickle.pack(s1).toBytes) match {
+        case ServerResponse(n,m,Some(bout)) if n == 0L && m == "one" =>
+          assert(bequals(Array[Byte](5, 6), bout))
+        case f => fail(f.toString)
+      }
+    }
+
   }
 }
 

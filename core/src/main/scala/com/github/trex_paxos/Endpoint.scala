@@ -23,11 +23,20 @@ class TypedActorPaxosEndpoint(
   val listenerRef = context.system.actorOf(Props(classOf[UdpListener],
     new InetSocketAddress(selfNode.host, selfNode.nodePort), self), s"UdpListener${selfNode.nodeUniqueId}")
 
-  val serialization = SerializationExtension(context.system)
-  val serializer = serialization.serializerFor(classOf[MethodCall])
+  /**
+    * Akka lets you configure differ serializers per class and defaults to the built in java serializer.
+    * Here we abuse that slightly by letting you configure a serializer for ClientCommandValue and
+    * that serializer will be used to configure all application request/response type into bytes. The
+    * actual ClientCommandValue wrapper will be pickled with the built in pickler. Note that if you host
+    * can send back exceptions and you configure a custom serializer you need to ensure that it can roundtrip
+    * your application exceptions.
+    */
+  val serializerClient = SerializationExtension(context.system).serializerFor(new ClientCommandValue("", Array.empty[Byte]).getClass)
+
+  val serializerMethodCall = SerializationExtension(context.system).serializerFor(classOf[MethodCall])
 
   def deserialize(bytes: Array[Byte]): MethodCall = {
-    serializer.fromBinary(bytes, manifest = None).asInstanceOf[MethodCall]
+    serializerMethodCall.fromBinary(bytes, manifest = None).asInstanceOf[MethodCall]
   }
 
   override val deliverClient: PartialFunction[Payload, AnyRef] = {
@@ -37,11 +46,18 @@ class TypedActorPaxosEndpoint(
       val result = Try {
         val response = Option(method.invoke(target, parameters: _*))
         log.debug(s"invoked ${method.getName} returned $response")
-        ServerResponse(logIndex, c.msgId, response)
+        response match {
+          case Some(result) =>
+            val bytes = serializerClient.toBinary(result)
+            ServerResponse(logIndex, c.msgId, Some(bytes))
+          case None =>
+            ServerResponse(logIndex, c.msgId, None)
+        }
       } recover {
         case ex =>
           log.error(ex, s"call to $method with $parameters got exception $ex")
-          ServerResponse(logIndex, c.msgId, Option(ex))
+          val bytes = serializerClient.toBinary(ex)
+          ServerResponse(logIndex, c.msgId, Option(bytes))
       }
       result.get
   }
@@ -66,23 +82,7 @@ class TypedActorPaxosEndpoint(
   log.info(s"cluster members are ${others}")
 
   override val deliverMembership: PartialFunction[Payload, AnyRef] = {
-    case p@Payload(logIndex, _) =>
-//      val result = Try {
-//        committedMembership = CommittedMembership(logIndex, membership)
-//        membershipStore.saveMembership(committedMembership)
-//        others.values foreach {
-//          _ ! PoisonPill
-//        }
-//        others = senders(committedMembership.membership.members)
-//        log.info(s"membership at logIndex ${logIndex} is $membership")
-//        ServerResponse(logIndex, msgId, None)
-//      } recover {
-//        case ex =>
-//          log.error(ex, s"call save membership at logIndex ${logIndex} with membership ${membership} got exception $ex")
-//          ServerResponse(logIndex, msgId, Option(ex))
-//      }
-//      result.get
-    p // FIXME
+    case _ => None
   }
 
   override def clusterSize: Int = others.size + 1

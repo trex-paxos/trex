@@ -18,7 +18,7 @@ public class StackClusterNode {
 
     static void usage(int returned) {
         System.out.println("usage:   StackClusterNode config nodeId");
-        System.out.println("example: StackClusterNode cluster3.conf 2552");
+        System.out.println("example: StackClusterNode server3.conf 2552");
         System.exit(returned);
     }
 

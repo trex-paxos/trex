@@ -103,19 +103,15 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
     hold(in)
   }
 
-  // TODO is this cache necessary surely akka caches itself?
-  private[this] var serializers: Map[Class[_], Serializer] = Map.empty
-
-  def getSerializer(clazz: Class[_]) = {
-    val serializer = serializers.get(clazz)
-    serializer match {
-      case Some(s) => s
-      case None =>
-        val s = SerializationExtension(context.system).serializerFor(clazz)
-        serializers = serializers + (clazz -> s)
-        s
-    }
-  }
+  /**
+    * Akka lets you configure differ serializers per class and defaults to the built in java serializer.
+    * Here we abuse that slightly by letting you configure a serializer for ClientCommandValue and
+    * that serializer will be used to configure all application request/response type into bytes. The
+    * actual ClientCommandValue wrapper will be pickled with the built in pickler. Note that if you host
+    * can send back exceptions and you configure a custom serializer you need to ensure that it can roundtrip
+    * your application exceptions.
+    */
+  val serializerClient = SerializationExtension(context.system).serializerFor(new ClientCommandValue("", Array.empty[Byte]).getClass)
 
   /**
     * override for tests
@@ -131,7 +127,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
       requestById.get(cid) foreach {
         case request@Request(_, client, _, _) =>
           responseOption foreach { response =>
-            client ! response
+            client ! serializerClient.fromBinary(response)
             log.debug("response {} for {} is {}", cid, client, response)
           }
           drop(request)
@@ -196,11 +192,10 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
       }
 
     case work: AnyRef =>
-      val bytes = getSerializer(work.getClass).toBinary(work)
+      val bytes = serializerClient.toBinary(work)
       val commandValue = ClientCommandValue(incrementAndGetRequestId(), bytes)
       val request = Request(Platform.currentTime + timeoutMillis, sender(), commandValue, 1)
       transmit(leaderCounter, request)
-
   }
 
   /**
