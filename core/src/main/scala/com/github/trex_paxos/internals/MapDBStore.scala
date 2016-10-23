@@ -6,8 +6,16 @@ import java.io.{Closeable, File}
 import org.mapdb.{DB, DBMaker}
 
 import scala.collection.JavaConversions
-import com.github.trex_paxos.TrexMembership
 import com.github.trex_paxos.library._
+
+/**
+  * Cluster membership durable store.
+  */
+trait TrexMembership {
+  def saveMembership(cm: CommittedMembership): Unit
+
+  def loadMembership(): Option[CommittedMembership]
+}
 
 
 /**
@@ -85,7 +93,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
     // TODO this needs tests
     val keysAscending = storeMap.navigableKeySet()
     if (storeMap.isEmpty())
-      PaxosActor.minJournalBounds
+      Journal.minJournalBounds
     else {
       JournalBounds(keysAscending.iterator().next(), keysAscending.descendingSet().iterator().next())
     }

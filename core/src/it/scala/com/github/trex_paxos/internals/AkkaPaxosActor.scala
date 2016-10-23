@@ -3,9 +3,8 @@ package com.github.trex_paxos.internals
 import java.security.SecureRandom
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Cancellable}
-import PaxosActor._
-import com.github.trex_paxos.library._
-import com.typesafe.config.Config
+import _root_.com.github.trex_paxos.library._
+import _root_.com.github.trex_paxos.PaxosProperties
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 import scala.collection.mutable
@@ -19,7 +18,7 @@ import scala.util.Try
  * @param nodeUniqueId The unique identifier of this node. This *must* be unique in the cluster which is required as of the Paxos algorithm to work properly and be safe.
  * @param journal The durable journal required to store the state of the node in a stable manner between crashes.
  */
-abstract class PaxosActorNoTimeout(config: PaxosProperties, val nodeUniqueId: Int, val journal: Journal) extends Actor
+abstract class AkkaPaxosActorNoTimeout(config: PaxosProperties, val nodeUniqueId: Int, val journal: Journal) extends Actor
 with PaxosIO
 with ActorLogging
 with AkkaLoggingAdapter {
@@ -27,7 +26,7 @@ with AkkaLoggingAdapter {
 
   def clusterSize: Int
 
-  var paxosAgent = initialAgent(nodeUniqueId, journal.loadProgress(), clusterSize _)
+  var paxosAgent = AkkaPaxosActor.initialAgent(nodeUniqueId, journal.loadProgress(), clusterSize _)
 
   val logger = this
 
@@ -93,7 +92,7 @@ with AkkaLoggingAdapter {
   def highestAcceptedIndex = journal.bounds.max
 
   def randomInterval: Long = {
-    config.leaderTimeoutMin + ((config.leaderTimeoutMax - config.leaderTimeoutMin) * random.nextDouble()).toLong
+    config.leaderTimeoutMin + ((config.leaderTimeoutMax - config.leaderTimeoutMin) * AkkaPaxosActor.random.nextDouble()).toLong
   }
 
   /**
@@ -167,8 +166,8 @@ with AkkaLoggingAdapter {
  * This class reschedules a random interval CheckTimeout used to timeout on responses and an evenly spaced
  * Paxos.HeartBeat which is used by a leader.
  */
-abstract class PaxosActor(config: PaxosProperties, nodeUniqueId: Int, journal: Journal)
-  extends PaxosActorNoTimeout(config, nodeUniqueId, journal) {
+abstract class AkkaPaxosActor(config: PaxosProperties, nodeUniqueId: Int, journal: Journal)
+  extends AkkaPaxosActorNoTimeout(config, nodeUniqueId, journal) {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.duration._
@@ -195,32 +194,7 @@ abstract class PaxosActor(config: PaxosProperties, nodeUniqueId: Int, journal: J
   }
 }
 
-object PaxosProperties {
-  def apply(config: Config) = {
-    /**
-      * To ensure cluster stability you *must* test your max GC under extended peak load and set this as some multiple
-      * of observed GC pause.
-      */
-    val leaderTimeoutMin = Try {
-      config.getInt(leaderTimeoutMinKey)
-    } getOrElse (1000)
-
-    val leaderTimeoutMax = Try {
-      config.getInt(leaderTimeoutMaxKey)
-    } getOrElse (3 * leaderTimeoutMin)
-
-
-    require(leaderTimeoutMax > leaderTimeoutMin)
-
-    new PaxosProperties(leaderTimeoutMin, leaderTimeoutMax)
-  }
-
-  def apply() = new PaxosProperties(1000, 3000)
-}
-
-case class PaxosProperties(val leaderTimeoutMin: Long, val leaderTimeoutMax: Long)
-
-object PaxosActor {
+object AkkaPaxosActor {
 
   val leaderTimeoutMinKey = "trex.leader-timeout-min"
   val leaderTimeoutMaxKey = "trex.leader-timeout-max"
@@ -244,3 +218,50 @@ object PaxosActor {
 
 }
 
+import akka.actor.ActorLogging
+import com.github.trex_paxos.library.PaxosLogging
+
+
+trait AkkaLoggingAdapter extends PaxosLogging {
+  this: ActorLogging =>
+
+  override def info(msg: String): Unit = log.info(msg)
+
+  override def debug(msg: String): Unit = log.debug(msg)
+
+  override def info(msg: String, one: Any): Unit = log.info(msg, one)
+
+  override def info(msg: String, one: Any, two: Any): Unit = log.info(msg, one, two)
+
+  override def info(msg: String, one: Any, two: Any, three: Any): Unit = log.info(msg, one, two, three)
+
+  override def info(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = log.info(msg, one, two, three, four)
+
+  override def debug(msg: String, one: Any): Unit = log.debug(msg, one)
+
+  override def debug(msg: String, one: Any, two: Any): Unit = log.debug(msg, one, two)
+
+  override def debug(msg: String, one: Any, two: Any, three: Any): Unit = log.debug(msg, one, two, three)
+
+  override def debug(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = log.debug(msg, one, two, three, four)
+
+  override def error(msg: String): Unit = log.error(msg)
+
+  override def error(msg: String, one: Any): Unit = log.error(msg, one)
+
+  override def error(msg: String, one: Any, two: Any): Unit = log.error(msg, one, two)
+
+  override def error(msg: String, one: Any, two: Any, three: Any): Unit = log.error(msg, one, two, three)
+
+  override def error(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = log.error(msg, one, two, three, four)
+
+  override def warning(msg: String): Unit = log.warning(msg)
+
+  override def warning(msg: String, one: Any): Unit = log.warning(msg, one)
+
+  override def warning(msg: String, one: Any, two: Any): Unit = log.warning(msg, one, two)
+
+  override def warning(msg: String, one: Any, two: Any, three: Any): Unit = log.warning(msg, one, two, three)
+
+  override def warning(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = log.warning(msg, one, two, three, four)
+}

@@ -4,8 +4,8 @@ import java.io.FileWriter
 import java.util.concurrent.CopyOnWriteArrayList
 
 import akka.actor._
-import com.github.trex_paxos.internals.PaxosActor.TraceData
-import com.github.trex_paxos.internals.{PaxosActor, PaxosProperties}
+import com.github.trex_paxos.internals.AkkaPaxosActor.TraceData
+import com.github.trex_paxos.internals.AkkaPaxosActor
 import com.github.trex_paxos.library._
 import com.typesafe.config.Config
 
@@ -35,8 +35,8 @@ class TestJournal extends Journal {
   }
 }
 
-class TestPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: mutable.Buffer[Payload], tracer: Option[PaxosActor.Tracer])
-  extends PaxosActor(config, nodeUniqueId, journal) {
+class TestAkkaPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: mutable.Buffer[Payload], tracer: Option[AkkaPaxosActor.Tracer])
+  extends AkkaPaxosActor(config, nodeUniqueId, journal) {
 
   override def broadcast(msg: PaxosMessage): Unit = send(broadcastRef, msg)
 
@@ -106,7 +106,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
     journal(journal() + (i -> node))
     val deliver: mutable.Buffer[Payload] = collection.JavaConversions.asScalaBuffer(new CopyOnWriteArrayList[Payload])
     delivered(delivered() + (i -> deliver))
-    val actor: ActorRef = context.actorOf(Props(classOf[TestPaxosActor], PaxosProperties(config), () => size, i, self, node, deliver, Some(recordTraceData _)))
+    val actor: ActorRef = context.actorOf(Props(classOf[TestAkkaPaxosActor], PaxosProperties(config), () => size, i, self, node, deliver, Some(recordTraceData _)))
     children(children() + (i -> actor))
     log.info(s"$i -> $actor")
     lastRespondingLeader(actor)

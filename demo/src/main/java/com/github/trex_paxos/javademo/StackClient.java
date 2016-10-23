@@ -16,9 +16,9 @@ public class StackClient {
 
     static StringStack clusteredStack(final String configName, final String hostname) {
         Config systemConfig = ConfigFactory.load(configName).withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(hostname));
-        ActorSystem system = ActorSystem.create("trex-java-demo", systemConfig);
         Config config = ConfigFactory.load(configName);
         Cluster cluster = Cluster.parseConfig(config);
+        ActorSystem system = ActorSystem.create("trex-java-demo", systemConfig);
         ActorRef driver = system.actorOf(Props.create(DynamicClusterDriver.class, akka.util.Timeout.apply(100), 20));
         DynamicClusterDriver.Initialize init = DynamicClusterDriver$.MODULE$.apply(cluster);
         driver.tell(init, null);

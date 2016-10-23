@@ -129,7 +129,7 @@ with DefaultTimeout with ImplicitSender with SpecLike with Matchers with BeforeA
       //        val node = new InMemoryJournal
       //        journals = journals + (i -> node)
       //        val actor: ActorRef = system.actorOf(Props(classOf[TestPaxosActorWithTimeout],
-      //          PaxosActor.Configuration(MapDBConsistentStoreTests.config, size), i, self, node, node.deliver, recordTraceData _))
+      //          AkkaAkkaPaxosActor.Configuration(MapDBConsistentStoreTests.config, size), i, self, node, node.deliver, recordTraceData _))
       //        children = children + (i -> actor)
       //        log.info(s"$i -> $actor")
       //        lastLeader = actor

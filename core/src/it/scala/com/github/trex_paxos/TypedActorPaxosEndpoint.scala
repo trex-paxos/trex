@@ -2,8 +2,8 @@ package com.github.trex_paxos
 
 import java.net.InetSocketAddress
 
-import _root_.akka.actor.{ActorRef, PoisonPill, Props, TypedActor}
 import _root_.akka.actor.TypedActor.MethodCall
+import _root_.akka.actor.{ActorRef, Props, TypedActor}
 import _root_.akka.serialization.SerializationExtension
 import com.github.trex_paxos.internals._
 import com.github.trex_paxos.library._
@@ -18,7 +18,7 @@ class TypedActorPaxosEndpoint(
                                 membershipStore: TrexMembership,
                                 journal: Journal,
                                 target: AnyRef)
-  extends PaxosActor(config, selfNode.nodeUniqueId, journal) {
+  extends AkkaPaxosActor(config, selfNode.nodeUniqueId, journal) {
 
   val listenerRef = context.system.actorOf(Props(classOf[UdpListener],
     new InetSocketAddress(selfNode.host, selfNode.nodePort), self), s"UdpListener${selfNode.nodeUniqueId}")

@@ -5,7 +5,7 @@ import com.github.trex_paxos.Cluster;
 import com.github.trex_paxos.Node;
 import com.github.trex_paxos.TrexServer$;
 import com.github.trex_paxos.internals.MapDBStore;
-import com.github.trex_paxos.internals.PaxosProperties;
+import com.github.trex_paxos.PaxosProperties;
 import com.github.trex_paxos.internals.PaxosProperties$;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
@@ -46,7 +46,7 @@ public class StackClusterNode {
                 .withValue("akka.remote.netty.tcp.port", ConfigValueFactory.fromAnyRef(node.clientPort()))
                 .withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(node.host()));
 
-        final ActorSystem system = ActorSystem.create(cluster.name(), systemConfig);
+        final ActorSystem system = ActorSystem.create("trex-java-demo", systemConfig);
 
         PaxosProperties conf = PaxosProperties$.MODULE$.apply(config);
 

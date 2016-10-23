@@ -6,6 +6,8 @@ object Journal {
   // timed-out nodes issue the Int.MinValue prepare so we must be one higher at startup
   val minNumber = BallotNumber(Int.MinValue+1, Int.MinValue+1)
   val minBookwork = Progress(minNumber, Identifier(0, minNumber,0))
+  val minJournalBounds = JournalBounds(Long.MinValue, Long.MinValue)
+
 }
 
 /** 

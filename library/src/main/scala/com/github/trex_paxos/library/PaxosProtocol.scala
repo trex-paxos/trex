@@ -28,7 +28,7 @@ case class ClientCommandValue(msgId: String, val bytes: Array[Byte]) extends Com
 case class ReadOnlyClientCommandValue(msgId: String, val bytes: Array[Byte]) extends CommandValue
 
 /**
-  * Cluster administration command which has an id to correlate to the server response.
+  * Cluster administration command which has an id to correlate to the server response. Does not need to be made durable and can be lost during crashes.
   * @param msgId The message id used to correlate sent commands back to server responses.
   * @param bytes The serialized client command read to log to a journal or transit on the wire.
   */

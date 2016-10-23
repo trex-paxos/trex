@@ -10,7 +10,7 @@ import com.github.trex_paxos.library._
 object TrexServer {
 
   def apply(config: PaxosProperties,
-            clazz: Class[_ <: PaxosActorNoTimeout],
+            clazz: Class[_ <: AkkaPaxosActorNoTimeout],
             selfNode: Node,
             membershipStore: TrexMembership,
             journal: Journal,
@@ -33,7 +33,7 @@ object TrexServer {
     target)
 
   def targetPropsFactory(config: PaxosProperties,
-                         clazz: Class[_ <: PaxosActorNoTimeout],
+                         clazz: Class[_ <: AkkaPaxosActorNoTimeout],
                          nodeUniqueId: Int,
                          journal: Journal,
                          target: AnyRef)(broadcast: ActorRef): Props =
@@ -103,15 +103,6 @@ trait TrexRouting extends Actor with ActorLogging {
     case x =>
       None // broadcast
   }
-}
-
-/**
-  * Cluster membership durable store.
-  */
-trait TrexMembership {
-  def saveMembership(cm: CommittedMembership): Unit
-
-  def loadMembership(): Option[CommittedMembership]
 }
 
 private[trex_paxos] class TrexServer(membershipStore: TrexMembership,
