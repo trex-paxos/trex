@@ -72,7 +72,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
       }
       {
         val commandValue = new CommandValue {
-          override def msgId: String = "0"
+          override def msgUuid: String = "0"
 
           override def bytes: Array[Byte] = Array()
         }
@@ -97,7 +97,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
         val a1 = Accept(Identifier(1, BallotNumber(1, 1), 1L), DummyCommandValue("1"))
         val acceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(id -> AcceptResponsesAndTimeout(0L, a1, Map.empty))
         val commandValue = new CommandValue {
-          override def msgId: String = "0"
+          override def msgUuid: String = "0"
 
           override def bytes: Array[Byte] = Array()
         }

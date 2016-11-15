@@ -7,7 +7,7 @@ import scala.collection.immutable.{SortedMap, TreeMap}
 case class DummyCommandValue(id: String) extends CommandValue {
   override def bytes: Array[Byte] = Array()
 
-  override def msgId: String = id
+  override def msgUuid: String = id
 }
 
 object DummyRemoteRef {

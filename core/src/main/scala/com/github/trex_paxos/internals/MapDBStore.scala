@@ -9,22 +9,12 @@ import scala.collection.JavaConversions
 import com.github.trex_paxos.library._
 
 /**
-  * Cluster membership durable store.
-  */
-trait TrexMembership {
-  def saveMembership(cm: CommittedMembership): Unit
-
-  def loadMembership(): Option[CommittedMembership]
-}
-
-
-/**
   * A MapDB storage engine. Note that you must call close on the file for a clean shutdown.
   *
   * @param journalFile File to journal into.
   * @param retained    Minimum number of committed slots to retain for retransmission
   */
-class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMembership with Closeable {
+class MapDBStore(journalFile: File, retained: Int) extends Journal with Closeable {
 
   import com.github.trex_paxos.util.{Pickle,ByteChain}
 
@@ -99,33 +89,4 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
     }
   }
 
-  // stores the current cluster membership at a given slot
-  val memberMap: java.util.concurrent.ConcurrentNavigableMap[Long, Array[Byte]] =
-    db.getTreeMap("MEMBERS")
-
-  val UTF8 = "UTF8"
-
-  override def loadMembership(): Option[CommittedMembership] =
-  {
-    import scala.collection.JavaConverters._
-    val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
-    lastSlotOption map { (s: Long) =>
-      val jsonBytesUtf8 = memberMap.get(s)
-      MemberPickle.fromJson(new String(jsonBytesUtf8, UTF8))
-    }
-  }
-
-  override def saveMembership(cm: CommittedMembership): Unit =
-  {
-    import scala.collection.JavaConverters._
-    val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
-    lastSlotOption foreach {
-      case last if last < cm.slot => // good
-      case last => throw new IllegalArgumentException(s"slot ${cm.slot} is not higher than last ${last}")
-    }
-    val json = MemberPickle.toJson(cm)
-    memberMap.put(cm.slot, json.getBytes(UTF8))
-    db.commit()
-    // TODO consider gc of old values
-  }
 }

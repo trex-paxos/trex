@@ -147,7 +147,7 @@ with ClientCommandHandler {
 
   val notLeaderFunction: PaxosFunction = {
     case PaxosEvent(io, agent, v: CommandValue) =>
-      io.send(NotLeader(agent.nodeUniqueId, v.msgId))
+      io.send(NotLeader(agent.nodeUniqueId, v.msgUuid))
       agent
   }
 

@@ -26,7 +26,7 @@ with AkkaLoggingAdapter {
 
   def clusterSize: Int
 
-  var paxosAgent = AkkaPaxosActor.initialAgent(nodeUniqueId, journal.loadProgress(), clusterSize _)
+  var paxosAgent: PaxosAgent = AkkaPaxosActor.initialAgent(nodeUniqueId, journal.loadProgress(), clusterSize _)
 
   val logger = this
 
@@ -35,7 +35,8 @@ with AkkaLoggingAdapter {
   protected val actorRefWeakMap = new mutable.WeakHashMap[String,ActorRef]
 
   // for the algorithm to have no dependency on akka we need to assign a String IDs
-  // to pass into the algorithm then later resolve the ActorRef by ID FIXME side effects so should have braces in the call
+  // to pass into the algorithm then later resolve the ActorRef by ID
+  // TODO this side effects so should have braces in the call
   override def senderId: String = {
     val ref = sender()
     val pathAsString = ref.path.toString
@@ -140,7 +141,7 @@ with AkkaLoggingAdapter {
   def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = clientCommands foreach {
     case (id, (cmd, client)) =>
       log.warning("Sending NoLongerLeader to client {} the outcome of the client cmd {} at slot {} is unknown.", client, cmd, id.logIndex)
-      respond(client, new LostLeadershipException(nodeUniqueId, cmd.msgId))
+      respond(client, new LostLeadershipException(nodeUniqueId, cmd.msgUuid))
   }
 
   /**

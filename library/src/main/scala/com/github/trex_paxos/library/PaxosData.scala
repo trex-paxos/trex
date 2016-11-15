@@ -12,7 +12,7 @@ import scala.collection.immutable.SortedMap
  *                         Each key is an identifier of a prepare for which we are collecting a majority response to determine the highest proposed value of the previous leader if any.
  * @param epoch The leaders paxos number when leading.
  * @param acceptResponses Tracking of responses to accept messages when Recoverer or Leader. Each key is an identifier of the command we want to commit. Each value is a map of the ack/nacks of each cluster node with a timeout.
- * @param clientCommands The client work outstanding with the leader. The map key is the accept identifier and the value is a tuple of the client command and the client ref.
+ * @param clientCommands The client work outstanding with the leader. The map key is the accept identifier and the value is a tuple of the client command and a key to the remote handle.
  */
 case class PaxosData(progress: Progress,
                      leaderHeartbeat: Long,

@@ -14,7 +14,7 @@ trait ClientCommandHandler extends PaxosLenses {
       case _: AcceptAck => io.journal.accept(accept)
       case _ => // do nothing
     }
-    // respond
+    // transmit within the cluster
     io.send(accept)
     // add the sender our client map
     val clients = agent.data.clientCommands + (accept.id ->(value, client))

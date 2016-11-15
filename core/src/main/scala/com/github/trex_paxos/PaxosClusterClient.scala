@@ -52,7 +52,7 @@ abstract class PaxosClusterClient(requestTimeout: Duration, maxAttempts: Int) {
     * The message ID is used to correlate responses back from the paxos cluster with the request sent out.
     * @return
     */
-  def nextMessageId() = java.util.UUID.randomUUID.toString
+  def nextMessageUuid() = java.util.UUID.randomUUID.toString
 
   /**
     * Paxos is optimal with a stable leader. The leader may change arbitrarily. This means that we may get back a
@@ -64,28 +64,28 @@ abstract class PaxosClusterClient(requestTimeout: Duration, maxAttempts: Int) {
 
   def hold(request: Request): Unit = {
     // this may overwrite an old request if we timed out and are retrying
-    requestById.put(request.command.msgId, request)
+    requestById.put(request.command.msgUuid, request)
 
     requestByTimeoutById.synchronized {
       Option(requestByTimeoutById.get(request.timeoutTime)) match {
         case Some(requestsAtTimeout) =>
           // this may overwrite an old request if we timed out and are retrying
-          requestsAtTimeout.put(request.command.msgId, request)
+          requestsAtTimeout.put(request.command.msgUuid, request)
         case None =>
           val requestsAtTimeout = TrieMap[String, Request]()
-          requestsAtTimeout.put(request.command.msgId, request)
+          requestsAtTimeout.put(request.command.msgUuid, request)
           requestByTimeoutById.put(request.timeoutTime, requestsAtTimeout)
       }
     }
   }
 
   def drop(request: Request): Unit = {
-    requestById.remove(request.command.msgId)
+    requestById.remove(request.command.msgUuid)
 
     requestByTimeoutById.synchronized {
       Option(requestByTimeoutById.get(request.timeoutTime)) match {
         case Some(map) =>
-          map.remove(request.command.msgId)
+          map.remove(request.command.msgUuid)
           if( map.isEmpty )
             requestByTimeoutById.remove(request.timeoutTime)
         case _ =>
@@ -94,7 +94,7 @@ abstract class PaxosClusterClient(requestTimeout: Duration, maxAttempts: Int) {
   }
 
   def swap(out: Request, in: Request): Unit = {
-    require(in.command.msgId == out.command.msgId)
+    require(in.command.msgUuid == out.command.msgUuid)
     drop(out)
     hold(in)
   }
@@ -107,7 +107,7 @@ abstract class PaxosClusterClient(requestTimeout: Duration, maxAttempts: Int) {
     * @return
     */
   def sendToCluster(work: Array[Byte]): Future[ServerResponse] = {
-    val commandValue = ClientCommandValue(nextMessageId(), work)
+    val commandValue = ClientCommandValue(nextMessageUuid(), work)
     val promise: Promise[ServerResponse] = Promise()
     val request = Request(commandValue, promise, Platform.currentTime + timeoutMillis, maxAttempts, notLeaderCounter)
     transmitToCluster(notLeaderCounter, request.command)

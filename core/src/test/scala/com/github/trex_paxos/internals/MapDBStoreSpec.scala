@@ -121,20 +121,6 @@ class MapDBStoreSpec extends WordSpecLike with Matchers with BeforeAndAfter with
 
       j.close()
     }
-    "load nothing when empty" in {
-      val store = new MapDBStore(storeFile, 2)
-      store.loadMembership() shouldBe None
-    }
-    "should throw an exception for an overwrite" in {
-      val m = Membership("default", Seq(Member(1, "one", "xxx", Learning), Member(2, "two", "yyy", Accepting)))
-      val store = new MapDBStore(storeFile, 2)
-      store.saveMembership(CommittedMembership(0L, m))
-      try {
-        store.saveMembership(CommittedMembership(0L, m))
-        fail
-      } catch {
-        case _ :Exception => // good
-      }
-    }
+
   }
 }

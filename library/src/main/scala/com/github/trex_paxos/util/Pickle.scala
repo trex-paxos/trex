@@ -178,7 +178,7 @@ object Pickle {
 
   def unpickleNoOpValue(b: Iterable[Byte]): CommandValue = NoOperationCommandValue
 
-  def pickleCommandValue(c: CommandValue): ByteChain = pickleStringUtf8(c.msgId) ++ pickleInt(c.bytes.length) ++ ByteChain(c.bytes)
+  def pickleCommandValue(c: CommandValue): ByteChain = pickleStringUtf8(c.msgUuid) ++ pickleInt(c.bytes.length) ++ ByteChain(c.bytes)
 
   def unpickleClientValue(b: Iterable[Byte]): ClientCommandValue = {
     val (id: String, r2: Iterable[Byte], lv: Int) = unpackValue(b)
