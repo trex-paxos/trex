@@ -17,7 +17,6 @@ object MemberPickle {
     "{" + s("name") + ":" + s(membership.membership.name) + "," + s("slot") + ":" + membership.slot + "," + s("members") + ":" + ms + "}"
   }
 
-
   // http://stackoverflow.com/a/4186090/329496
   class CC[T] {
     def unapply(a: Any): Option[T] = Some(a.asInstanceOf[T])

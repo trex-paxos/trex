@@ -77,7 +77,7 @@ object MemberStatus {
   }
 }
 
-sealed trait MemberStatus {
+sealed trait  MemberStatus {
   def id: Int
 }
 
@@ -104,6 +104,7 @@ object Member {
 /**
   * Details of a member of the current paxos cluster. Note that the actual transports and discovery are abstract to
   * this class it uses strings so that concrete implementations can use different protocols.
+  * TODO probably generalize the two locations just to be a single string to let implementations pick how to model things as an admin port might be helpful.
   * @param nodeUniqueId The unique paxos number for this membership
   * @param location     The location for server-to-server typically given as "host:port" but could be a url
   * @param clientLocation The location for client-to-server typically given as "host:port" but could be a url

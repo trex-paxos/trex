@@ -13,16 +13,17 @@ import scala.collection.concurrent.{Map, TrieMap}
 import scala.compat.Platform
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Future, Promise}
-import scala.util.Try
+import scala.util.{Success, Try}
 
 /**
   * Bookwork to hold a request.
-  * @param timeoutTime The minimum timeout point in ms.
   * @param command The command in the request so that we can resend. This assumes that you have idempotency if not you should set the maxAttempts to zero.
-  * @param attempt If we allow multiple attempts this is the retry countdown
   * @param promise The callback.
+  * @param timeoutTime The minimum timeout point in ms.
+  * @param attempt If we allow multiple attempts this is the retry countdown.
+  * @param notLeaderCounter The counter value when the request was sent.
   */
-case class Request(timeoutTime: Long, command: CommandValue, attempt: Int, promise: Promise[Try[ServerResponse]])
+case class Request(command: CommandValue, promise: Promise[ServerResponse], timeoutTime: Long, attempt: Int, notLeaderCounter: Int)
 
 /**
   * A meeting point for messages exchanged with the paxos cluster with timeout and retry logic.
@@ -48,7 +49,7 @@ abstract class PaxosClusterClient(requestTimeout: Duration, maxAttempts: Int) {
   private[this] val requestByTimeoutById: java.util.SortedMap[Long, concurrent.Map[String, Request]] = new ConcurrentSkipListMap[Long, concurrent.Map[String, Request]]
 
   /**
-    * The message ID is used to correlate respones back from the paxos cluster with the request sent out.
+    * The message ID is used to correlate responses back from the paxos cluster with the request sent out.
     * @return
     */
   def nextMessageId() = java.util.UUID.randomUUID.toString
@@ -59,7 +60,7 @@ abstract class PaxosClusterClient(requestTimeout: Duration, maxAttempts: Int) {
     * transmission strategy can pick another node to talk to via some strategy. A naive strategy would be to pick
     * a node using notLeaderCounter%clusterSize but a more sophisticated strategies might be possible.
     */
-  protected var notLeaderCounter: Long = 0
+  protected var notLeaderCounter: Int = 0
 
   def hold(request: Request): Unit = {
     // this may overwrite an old request if we timed out and are retrying
@@ -105,10 +106,10 @@ abstract class PaxosClusterClient(requestTimeout: Duration, maxAttempts: Int) {
     * @param work
     * @return
     */
-  def sendToCluster(work: Array[Byte]): Future[Try[ServerResponse]] = {
+  def sendToCluster(work: Array[Byte]): Future[ServerResponse] = {
     val commandValue = ClientCommandValue(nextMessageId(), work)
-    val promise: Promise[Try[ServerResponse]] = Promise()
-    val request = Request(Platform.currentTime + timeoutMillis, commandValue, 1, promise)
+    val promise: Promise[ServerResponse] = Promise()
+    val request = Request(commandValue, promise, Platform.currentTime + timeoutMillis, maxAttempts, notLeaderCounter)
     transmitToCluster(notLeaderCounter, request.command)
     hold(request)
     promise.future
@@ -121,10 +122,16 @@ abstract class PaxosClusterClient(requestTimeout: Duration, maxAttempts: Int) {
     *                     transmit to in the hope that it is currently the leader.
     * @param command The command from the client.
     */
-  def transmitToCluster(notLeaderCounter: Long, command: CommandValue): Unit
+  def transmitToCluster(notLeaderCounter: Int, command: CommandValue): Unit
 
   def receiveFromCluster(response: ServerResponse): Unit = {
-
+    //if (log.isDebugEnabled) log.debug("slot {} with {} found is {} is in map {}", response.logIndex, response.clientMsgId, requestById.contains(response.clientMsgId), requestById)
+    requestById.get(response.clientMsgId) foreach {
+      case request@Request(_, promise, _, _, _) =>
+        promise.complete(Success(response))
+        //log.debug("response {} for {} is {}", cid, client, response)
+        drop(request)
+    }
   }
 }
 
