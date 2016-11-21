@@ -225,6 +225,11 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
           sentTime(System.nanoTime())
           sent += msg
         }
+
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
+          case None => // good
+          case f => fail(f.toString)
+        }
       }
       // which makes a promise to another leader
       val otherHigherPrepare = Prepare(Identifier(2, BallotNumber(lowValue + 1, 2), 1L))
@@ -255,6 +260,11 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         override def send(msg: PaxosMessage): Unit = {
           sentTime(System.nanoTime())
           sent += msg
+        }
+
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
+          case None => // good
+          case f => fail(f.toString)
         }
       }
       val agentNack1 = paxosAlgorithm(new PaxosEvent(io, agent, PrepareNack(prepareId, 1, initialData.progress, 0, 0)))
@@ -464,6 +474,11 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         }
 
         override def deliver(payload: Payload): Any = {}
+
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
+          case None => fail("None")
+          case _ => // good
+        }
       }
       // when a majority prepare response with an ack from node1
       val prepareAck = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
@@ -503,6 +518,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val inMemoryJournal = new InMemoryJournal
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
       val sentTime = Box(0L)
+      val cmd = DummyCommandValue("0")
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
@@ -519,11 +535,16 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
           lastDelivered(payload.command)
           value
         }
+
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
+          case None => fail("should have committed some results")
+          case _ => // good
+        }
       }
       // when a majority prepare response with an ack from node1
       // and some value returned in the promise from node1 with some lower number
       val lowerId = prepareId.copy(number = prepareId.number.copy(counter = prepareId.number.counter - 1))
-      val prepareAck = PrepareAck(prepareId, 1, initialData.progress, 0, 0, Some(Accept(lowerId, DummyCommandValue("0"))))
+      val prepareAck = PrepareAck(prepareId, 1, initialData.progress, 0, 0, Some(Accept(lowerId, cmd)))
       val leader@PaxosAgent(_, role, _, _)= paxosAlgorithm(new PaxosEvent(io, agent, prepareAck))
       // then it boardcasts the payload from the promise under its higher epoch number
       val accept = Accept(prepareId, DummyCommandValue("0"))
@@ -577,6 +598,11 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         }
 
         override def deliver(payload: Payload): Any = {}
+
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
+          case f@None => fail(f.toString)
+          case _ => // good
+        }
       }
       // when a majority prepare response with an ack from node1 and node2
       val ack1 = PrepareAck(prepareId, 1, initialData.progress, 0, 0, None)
@@ -638,6 +664,8 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
           lastDelivered(payload.command)
           value
         }
+
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }
       // when a majority prepare response with an ack from node1
       // and some value returned in the promise from node1 with some lower number

@@ -98,6 +98,7 @@ object TrexKVStore {
     println("Args: conf nodeId")
     println("Where:\tconf is the config file defining the cluster")
     println("\t\tnodeId is node identifier to start")
+    println("\t\texample: server3.conf [2552|2562|2572]")
   }
 
   def main(args: Array[String]): Unit = {

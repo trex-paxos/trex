@@ -93,26 +93,9 @@ with CommitHandler {
 
     io.send(Commit(newProgress.highestCommitted))
 
-    if (agent.data.clientCommands.nonEmpty) {
-      val (multipleCommittedIds, _) = results.unzip
+    io.respond(Option(results.toMap))
 
-      val (responds, remainders) = agent.data.clientCommands.partition {
-        idCmdRef: (Identifier, (CommandValue, String)) =>
-          val (id, (_, _)) = idCmdRef
-          multipleCommittedIds.contains(id)
-      }
-
-      io.logger.debug("Node {} {} post commit has responds.size={}, remainders.size={}", agent.nodeUniqueId, agent.role, responds.size, remainders.size)
-      results foreach { case (id, bytes) =>
-        responds.get(id) foreach { case (cmd, client) =>
-          io.logger.debug("sending client response {} to client {}", id, client)
-          io.respond(client, bytes)
-        }
-      }
-      agent.copy(data = progressLens.set(agent.data, newProgress).copy(clientCommands = remainders))
-    } else {
-      agent.copy(data = progressLens.set(agent.data, newProgress))
-    }
+    agent.copy(data = progressLens.set(agent.data, newProgress))
   }
 }
 

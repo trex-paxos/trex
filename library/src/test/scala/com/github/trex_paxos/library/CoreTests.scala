@@ -37,7 +37,8 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
 
     import Ordering._
 
-    val nodeData = PaxosData(progress, 0, 0, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, String)])
+    val nodeData = PaxosData(progress, 0, 0, TreeMap(), None, TreeMap()
+    )
     val id = Identifier(0, BallotNumber(1, 2), 3L)
 
     "set prepare responses" in {
@@ -65,31 +66,12 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
       }
     }
 
-    "set client commands" in {
-      {
-        val newData = clientCommandsLens.set(nodeData, Map.empty[Identifier, (CommandValue, String)])
-        assert(newData == nodeData)
-      }
-      {
-        val commandValue = new CommandValue {
-          override def msgUuid: String = "0"
-
-          override def bytes: Array[Byte] = Array()
-        }
-        val remoteRef = DummyRemoteRef()
-        val clientCommands = Map(id ->(commandValue, remoteRef))
-        val newData = clientCommandsLens.set(nodeData, clientCommands)
-        assert(newData.clientCommands(id) == (commandValue -> remoteRef))
-      }
-    }
-
     "set leader state" in {
       {
         val newData = leaderLens.set(nodeData, (
           SortedMap.empty[Identifier, Map[Int, PrepareResponse]],
-          SortedMap.empty[Identifier, AcceptResponsesAndTimeout],
-          Map.empty[Identifier, (CommandValue, String)])
-        )
+          SortedMap.empty[Identifier, AcceptResponsesAndTimeout]
+        ))
         assert(newData == nodeData)
       }
       {
@@ -102,11 +84,9 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
           override def bytes: Array[Byte] = Array()
         }
         val remoteRef = DummyRemoteRef()
-        val clientCommands = Map(id ->(commandValue, remoteRef))
-        val newData = leaderLens.set(nodeData, (prepareResponses, acceptResponses, clientCommands))
+        val newData = leaderLens.set(nodeData, (prepareResponses, acceptResponses))
         assert(newData.prepareResponses(id) == Map.empty)
         assert(newData.acceptResponses(id) == AcceptResponsesAndTimeout(0L, a1, Map.empty))
-        assert(newData.clientCommands(id) == (commandValue -> remoteRef))
       }
     }
   }
@@ -127,15 +107,17 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
         timeout = 0,
         prepareResponses = TreeMap(id -> Map.empty),
         epoch = Some(number),
-        acceptResponses = TreeMap(id -> AcceptResponsesAndTimeout(0, accept, Map.empty)),
-        clientCommands = Map(id ->(NoOperationCommandValue, DummyRemoteRef()))
+        acceptResponses = TreeMap(id -> AcceptResponsesAndTimeout(0, accept, Map.empty))
       )
       val handler = new PaxosLenses with BackdownAgent
       val sentNoLongerLeader = Box(false)
       val io = new TestIO(new UndefinedJournal) {
         override def randomTimeout: Long = 99L
 
-        override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = sentNoLongerLeader(true)
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
+          case None => sentNoLongerLeader(true)
+          case Some(f) => fail(f.toString())
+        }
       }
       // when we backdown
       val PaxosAgent(nuid, role, followerData, _) = handler.backdownAgent(io, PaxosAgent(0, Leader, leaderData, TestHelpers.initialQuorumStrategy))
@@ -146,7 +128,6 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
       followerData.prepareResponses.isEmpty shouldBe true
       followerData.epoch shouldBe None
       followerData.acceptResponses.isEmpty shouldBe true
-      followerData.clientCommands.isEmpty shouldBe true
       sentNoLongerLeader() shouldBe true
     }
   }

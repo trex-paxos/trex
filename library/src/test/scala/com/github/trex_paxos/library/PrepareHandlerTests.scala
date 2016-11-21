@@ -58,11 +58,11 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
       val mockJournal = stub[Journal]
       (mockJournal.saveProgress _ ).when(*)
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
-      val io = new TestIO(mockJournal)
+      val io = new TestIO(mockJournal){}
       testPromiseHandler.handlePrepare(io, agentPromise10.copy(data = recoverLikeData, role = Recoverer), Prepare(Identifier(0, BallotNumber(11, 11), 10))) match {
         case PaxosAgent(_, _, data, _) if data.progress.highestPromised == BallotNumber(11, 11) =>
           data match {
-            case p if p.epoch == None && p.acceptResponses.isEmpty && p.prepareResponses.isEmpty && p.clientCommands.isEmpty => // good
+            case p if p.epoch == None && p.acceptResponses.isEmpty && p.prepareResponses.isEmpty => // good
             case x =>
               fail(x.toString)
           }
@@ -72,22 +72,17 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
 
     def `should send out NotLeader and return to follower if leader` {
       val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
-      val clientCommands: Map[Identifier, (CommandValue, String)] = Map(id -> (NoOperationCommandValue -> DummyRemoteRef()))
-      val clientCommandsData = initialData.copy(clientCommands = clientCommands)
       val mockJournal = stub[Journal]
       (mockJournal.saveProgress _ ).when(*)
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
       val sentNoLongerLeader = Box(false)
       val io = new TestIO(mockJournal) {
-        override def sendNoLongerLeader(cmds: Map[Identifier, (CommandValue, String)]): Unit = {
-          sentNoLongerLeader(true)
-          cmds match {
-            case `clientCommands` => // good
-            case x => fail(x.toString())
-          }
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
+          case None => sentNoLongerLeader(true)
+          case f => fail(f.toString)
         }
       }
-      testPromiseHandler.handlePrepare(io, agentPromise10.copy(data = clientCommandsData, role = Leader), Prepare(Identifier(0, BallotNumber(11, 11), 10)))
+      testPromiseHandler.handlePrepare(io, agentPromise10.copy(role = Leader), Prepare(Identifier(0, BallotNumber(11, 11), 10)))
       assert(sentNoLongerLeader())
     }
 

@@ -23,6 +23,10 @@ case class PaxosEvent(io: PaxosIO, agent: PaxosAgent, message: PaxosMessage)
   * Paxos has side effects (writes to the network and read+write to disk) which are isolated into this class to simplify testing.
   */
 trait PaxosIO {
+  ////val clients = agent.data.clientCommands + (accept.id ->(value, client))
+  // * @param clientCommands The client work outstanding with the leader. The map key is the accept identifier and the value is a tuple of the client command and a key to the remote handle.
+  def assocateIdentifierToValue(id: Identifier, value: CommandValue)
+
   /** The durable story to hold the state on disk.
    */
   def journal: Journal

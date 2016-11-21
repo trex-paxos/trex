@@ -3,11 +3,12 @@ package com.github.trex_paxos.internals
 import java.security.SecureRandom
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Cancellable}
-import _root_.com.github.trex_paxos.library._
-import _root_.com.github.trex_paxos.PaxosProperties
+import PaxosActor._
+import com.github.trex_paxos.library._
+import com.typesafe.config.Config
 
 import scala.collection.immutable.{SortedMap, TreeMap}
-import scala.collection.mutable
+import scala.collection.{Map, mutable}
 import scala.util.Try
 
 /**
@@ -18,7 +19,7 @@ import scala.util.Try
  * @param nodeUniqueId The unique identifier of this node. This *must* be unique in the cluster which is required as of the Paxos algorithm to work properly and be safe.
  * @param journal The durable journal required to store the state of the node in a stable manner between crashes.
  */
-abstract class AkkaPaxosActorNoTimeout(config: PaxosProperties, val nodeUniqueId: Int, val journal: Journal) extends Actor
+abstract class PaxosActorNoTimeout(config: PaxosProperties, val nodeUniqueId: Int, val journal: Journal) extends Actor
 with PaxosIO
 with ActorLogging
 with AkkaLoggingAdapter {
@@ -26,30 +27,49 @@ with AkkaLoggingAdapter {
 
   def clusterSize: Int
 
-  var paxosAgent: PaxosAgent = AkkaPaxosActor.initialAgent(nodeUniqueId, journal.loadProgress(), clusterSize _)
+  var paxosAgent = initialAgent(nodeUniqueId, journal.loadProgress(), clusterSize _)
 
   val logger = this
 
   private val paxosAlgorithm = new PaxosAlgorithm
 
-  protected val actorRefWeakMap = new mutable.WeakHashMap[String,ActorRef]
+  protected val actorRefWeakMap = new mutable.WeakHashMap[Identifier,(ActorRef, CommandValue)]
 
-  // for the algorithm to have no dependency on akka we need to assign a String IDs
-  // to pass into the algorithm then later resolve the ActorRef by ID
-  // TODO this side effects so should have braces in the call
-  override def senderId: String = {
-    val ref = sender()
-    val pathAsString = ref.path.toString
-    actorRefWeakMap.put(pathAsString, ref)
-    logger.debug("weak map key {} value {}", pathAsString, ref)
-    pathAsString
-  }
+  /**
+    * Associate a command value with a paxos identifier so that the result of the commit can be routed back to the sender of the command
+    *
+    * @param value The command to asssociate with a message identifer.
+    * @param id    The message identifier
+    */
+  override def associate(value: CommandValue, id: Identifier): Unit = actorRefWeakMap.put(id, (sender(), value))
 
-  def respond(pathAsString: String, data: Any) = actorRefWeakMap.get(pathAsString) match {
-    case Some(ref) =>
-      ref ! data
-    case _ =>
-      logger.debug("weak map does not hold key {} to reply with {}", pathAsString, data)
+  /**
+    * Respond to clients.
+    *
+    * @param results The results of a fast forward commit or None if leadership was lost such that the commit outcome is unknown.
+    */
+   def respond(results: Option[scala.collection.immutable.Map[Identifier, Any]]): Unit = results match {
+    case Some(results) =>
+
+      val valueIds = results.keys.toSet
+
+      val clientsMap: Map[Identifier, (ActorRef, CommandValue)] = actorRefWeakMap filter {
+        case v@(id, _) if valueIds.contains(id) => true
+        case _ => false
+      }
+
+      clientsMap foreach {
+        case (id, (client, command)) =>
+          client ! results(id)
+          actorRefWeakMap.remove(id)
+      }
+
+    case None =>
+      actorRefWeakMap foreach {
+        case (id, (client, cmd)) => client ! LostLeadershipException(nodeUniqueId, cmd.msgUuid);
+      }
+      actorRefWeakMap.clear()
+
   }
 
   override def receive: Receive = {
@@ -93,7 +113,7 @@ with AkkaLoggingAdapter {
   def highestAcceptedIndex = journal.bounds.max
 
   def randomInterval: Long = {
-    config.leaderTimeoutMin + ((config.leaderTimeoutMax - config.leaderTimeoutMin) * AkkaPaxosActor.random.nextDouble()).toLong
+    config.leaderTimeoutMin + ((config.leaderTimeoutMax - config.leaderTimeoutMin) * random.nextDouble()).toLong
   }
 
   /**
@@ -138,11 +158,11 @@ with AkkaLoggingAdapter {
   /**
    * Notifies clients that it is no longer the leader by sending them an exception.
    */
-  def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = clientCommands foreach {
-    case (id, (cmd, client)) =>
-      log.warning("Sending NoLongerLeader to client {} the outcome of the client cmd {} at slot {} is unknown.", client, cmd, id.logIndex)
-      respond(client, new LostLeadershipException(nodeUniqueId, cmd.msgUuid))
-  }
+//  def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = clientCommands foreach {
+//    case (id, (cmd, client)) =>
+//      log.warning("Sending NoLongerLeader to client {} the outcome of the client cmd {} at slot {} is unknown.", client, cmd, id.logIndex)
+//      respond(client, new LostLeadershipException(nodeUniqueId, cmd.msgUuid))
+//  }
 
   /**
    * If you require transactions in the host application then you need to supply a custom Journal which participates
@@ -167,8 +187,8 @@ with AkkaLoggingAdapter {
  * This class reschedules a random interval CheckTimeout used to timeout on responses and an evenly spaced
  * Paxos.HeartBeat which is used by a leader.
  */
-abstract class AkkaPaxosActor(config: PaxosProperties, nodeUniqueId: Int, journal: Journal)
-  extends AkkaPaxosActorNoTimeout(config, nodeUniqueId, journal) {
+abstract class PaxosActor(config: PaxosProperties, nodeUniqueId: Int, journal: Journal)
+  extends PaxosActorNoTimeout(config, nodeUniqueId, journal) {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.duration._
@@ -195,7 +215,32 @@ abstract class AkkaPaxosActor(config: PaxosProperties, nodeUniqueId: Int, journa
   }
 }
 
-object AkkaPaxosActor {
+object PaxosProperties {
+  def apply(config: Config) = {
+    /**
+      * To ensure cluster stability you *must* test your max GC under extended peak load and set this as some multiple
+      * of observed GC pause.
+      */
+    val leaderTimeoutMin = Try {
+      config.getInt(leaderTimeoutMinKey)
+    } getOrElse (1000)
+
+    val leaderTimeoutMax = Try {
+      config.getInt(leaderTimeoutMaxKey)
+    } getOrElse (3 * leaderTimeoutMin)
+
+
+    require(leaderTimeoutMax > leaderTimeoutMin)
+
+    new PaxosProperties(leaderTimeoutMin, leaderTimeoutMax)
+  }
+
+  def apply() = new PaxosProperties(1000, 3000)
+}
+
+case class PaxosProperties(val leaderTimeoutMin: Long, val leaderTimeoutMax: Long)
+
+object PaxosActor {
 
   val leaderTimeoutMinKey = "trex.leader-timeout-min"
   val leaderTimeoutMaxKey = "trex.leader-timeout-max"
@@ -212,57 +257,10 @@ object AkkaPaxosActor {
 
   def initialAgent(nodeUniqueId: Int, progress: Progress, clusterSize: () => Int) =
     new PaxosAgent(nodeUniqueId, Follower, PaxosData(progress, 0, 0,
-    SortedMap.empty[Identifier, Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering), None,
-    SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering),
-    Map.empty[Identifier, (CommandValue, String)]), DefaultQuorumStrategy(clusterSize))
+    SortedMap.empty[Identifier, scala.collection.immutable.Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering), None,
+    SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering)
+    ), DefaultQuorumStrategy(clusterSize))
 
 
 }
 
-import akka.actor.ActorLogging
-import com.github.trex_paxos.library.PaxosLogging
-
-
-trait AkkaLoggingAdapter extends PaxosLogging {
-  this: ActorLogging =>
-
-  override def info(msg: String): Unit = log.info(msg)
-
-  override def debug(msg: String): Unit = log.debug(msg)
-
-  override def info(msg: String, one: Any): Unit = log.info(msg, one)
-
-  override def info(msg: String, one: Any, two: Any): Unit = log.info(msg, one, two)
-
-  override def info(msg: String, one: Any, two: Any, three: Any): Unit = log.info(msg, one, two, three)
-
-  override def info(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = log.info(msg, one, two, three, four)
-
-  override def debug(msg: String, one: Any): Unit = log.debug(msg, one)
-
-  override def debug(msg: String, one: Any, two: Any): Unit = log.debug(msg, one, two)
-
-  override def debug(msg: String, one: Any, two: Any, three: Any): Unit = log.debug(msg, one, two, three)
-
-  override def debug(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = log.debug(msg, one, two, three, four)
-
-  override def error(msg: String): Unit = log.error(msg)
-
-  override def error(msg: String, one: Any): Unit = log.error(msg, one)
-
-  override def error(msg: String, one: Any, two: Any): Unit = log.error(msg, one, two)
-
-  override def error(msg: String, one: Any, two: Any, three: Any): Unit = log.error(msg, one, two, three)
-
-  override def error(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = log.error(msg, one, two, three, four)
-
-  override def warning(msg: String): Unit = log.warning(msg)
-
-  override def warning(msg: String, one: Any): Unit = log.warning(msg, one)
-
-  override def warning(msg: String, one: Any, two: Any): Unit = log.warning(msg, one, two)
-
-  override def warning(msg: String, one: Any, two: Any, three: Any): Unit = log.warning(msg, one, two, three)
-
-  override def warning(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = log.warning(msg, one, two, three, four)
-}

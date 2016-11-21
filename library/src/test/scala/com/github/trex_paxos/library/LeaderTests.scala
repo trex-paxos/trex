@@ -126,8 +126,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
 
     val leader = PaxosAgent(0, Leader, initialDataAgent.data.copy(
       epoch = Option(BallotNumber(Int.MaxValue, Int.MaxValue)),
-      acceptResponses = acceptSelfAck98,
-      clientCommands = initialDataClientCommand
+      acceptResponses = acceptSelfAck98
     ), initialQuorumStrategy)
 
     def `Return to follower handler should do nothing for commit not at higher slot ` = {
@@ -171,29 +170,28 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
     val epoch = BallotNumber(1, 1)
     val dataNewEpoch = epochLens.set(initialData, Some(epoch))
     val freshAcceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering)
-    val initialLeaderData = leaderLens.set(dataNewEpoch, (SortedMap.empty[Identifier, Map[Int, PrepareResponse]], freshAcceptResponses, Map.empty))
+    val initialLeaderData = leaderLens.set(dataNewEpoch, (SortedMap.empty[Identifier, Map[Int, PrepareResponse]], freshAcceptResponses))
     val agentInitialLeaderData = new PaxosAgent(0, Leader, initialLeaderData, initialQuorumStrategy)
     val expectedString2 = "Paxos"
     val expectedBytes2 = expectedString2.getBytes
 
     def `broadcast client values` {
       // given some client commands
-      val expectedString3 = "Lamport"
-      val expectedBytes3 = expectedString3.getBytes
       val c1 = DummyCommandValue("1")
       val c2 = DummyCommandValue("2")
       val c3 = DummyCommandValue("3")
       // and a verifiable IO
       val stubJournal: Journal = stub[Journal]
       val sent = ArrayBuffer[PaxosMessage]()
+      val associated = ArrayBuffer[(Long,CommandValue)]()
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = stubJournal
 
         override def send(msg: PaxosMessage): Unit = sent += msg
 
-        override def senderId: String = 1.toString
-
         override def randomTimeout: Long = 12345L
+
+        override def associate(value: CommandValue, id: Identifier): Unit = associated += (id.logIndex -> value)
       }
       val agent1 = paxosAlgorithm(new PaxosEvent(io, agentInitialLeaderData, c1))
       val agent2 = paxosAlgorithm(new PaxosEvent(io, agent1, c2))
@@ -216,7 +214,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       }
       // and it says as leader
       agent3.role shouldBe Leader
-      // and is read to record responses
+      // and is seen to record responses
       agent3.data.acceptResponses.size shouldBe 3
       // and holds slots in order
       agent3.data.acceptResponses.keys.headOption match {
@@ -231,11 +229,12 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       (stubJournal.accept _).verify(Seq(accept1))
       (stubJournal.accept _).verify(Seq(accept2))
       (stubJournal.accept _).verify(Seq(accept3))
-      // and holds the values
-      agent3.data.clientCommands.size shouldBe 3
-      agent3.data.clientCommands(accept1.id) shouldBe (c1 -> "1")
-      agent3.data.clientCommands(accept2.id) shouldBe (c2 -> "1")
-      agent3.data.clientCommands(accept3.id) shouldBe (c3 -> "1")
+      // and node  associated the commands
+      associated.size shouldBe 3
+
+      associated(0) shouldBe (1 -> c1)
+      associated(1) shouldBe (2 -> c2)
+      associated(2) shouldBe (3 -> c3)
     }
     def `commits when it receives a majority of accept acks` {
       // given a verifiable io
@@ -259,6 +258,10 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
           lastDelivered.set(payload.command)
           value
         }
+
+        override def associate(value: CommandValue, id: Identifier): Unit = {}
+
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }
       // and a leader who has committed slot 98 and broadcast slot 99
       val lastCommitted = Identifier(0, epoch, 98L)
@@ -316,6 +319,10 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
           delivered += payload.command
           value
         }
+
+        override def associate(value: CommandValue, id: Identifier): Unit = {}
+
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }
       // and a leader who has committed slot 98 and broadcast slot 99 and 100
       val lastCommitted = Identifier(0, epoch, 98L)
@@ -407,7 +414,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
     def returnsToFollowerTest(messages: ArrayBuffer[PaxosMessage], sent: ArrayBuffer[PaxosMessage]): Unit = {
       // given a verifiable io
       val inMemoryJournal = new InMemoryJournal
-      val sentNoLongerLeader = new AtomicBoolean()
+      val sentNoLongerLeader = Box(false)
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
@@ -417,8 +424,10 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
 
         override def send(msg: PaxosMessage): Unit = sent += msg
 
-        override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit =
-          sentNoLongerLeader.set(true)
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
+          case None => sentNoLongerLeader(true)
+          case f => fail(f.toString)
+        }
       }
       // and a leader who has committed slot 98 and broadcast slot 99
       val lastCommitted = Identifier(0, epoch, 98L)
@@ -427,8 +436,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       val votes = TreeMap(id99 -> AcceptResponsesAndTimeout(0L, a99, Map(0 -> AcceptAck(id99, 0, initialData.progress))))
       val responses = acceptResponsesLens.set(initialData, votes)
       val committed = Progress.highestPromisedHighestCommitted.set(responses.progress, (lastCommitted.number, lastCommitted))
-      val clientCommands: Map[Identifier, (CommandValue, String)] = Map(id99 -> (DummyCommandValue("99"), "1"))
-      val data = responses.copy(progress = committed, clientCommands = clientCommands)
+      val data = responses.copy(progress = committed)
       val agent = PaxosAgent(0, Leader, data, initialQuorumStrategy)
       val accept = Accept(id99, DummyCommandValue("99"))
       inMemoryJournal.a.put(99L, (0L -> accept))
@@ -442,8 +450,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       follower.data.acceptResponses.isEmpty shouldBe true
       follower.data.epoch shouldBe None
       follower.data.prepareResponses.isEmpty shouldBe true
-      follower.data.clientCommands.isEmpty shouldBe true
-      sentNoLongerLeader.get() shouldBe true
+      sentNoLongerLeader() shouldBe true
     }
     def `returns to follower when it receives a majority of accept nacks`{
       val sent = ArrayBuffer[PaxosMessage]()

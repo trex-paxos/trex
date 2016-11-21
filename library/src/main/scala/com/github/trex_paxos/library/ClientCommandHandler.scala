@@ -16,8 +16,9 @@ trait ClientCommandHandler extends PaxosLenses {
     }
     // transmit within the cluster
     io.send(accept)
-    // add the sender our client map
-    val clients = agent.data.clientCommands + (accept.id ->(value, client))
+    //
+
+    io.assocateIdentifierToValue(accept.id, value)
     agent.copy(data = leaderLens.set(agent.data, (SortedMap.empty, updated, clients)))
   }
 }

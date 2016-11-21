@@ -48,7 +48,7 @@ trait PrepareResponseHandler extends PaxosLenses with BackdownAgent {
             val expandedAccepts = agent.data.acceptResponses + (accept.id -> AcceptResponsesAndTimeout(io.randomTimeout, accept, Map(agent.nodeUniqueId -> selfResponse)))
             // we are no longer awaiting responses to the prepare
             val updatedPrepares = expandedPreparesData - vote.requestId
-            val newData = leaderLens.set(agent.data, (updatedPrepares, expandedAccepts, Map.empty))
+            val newData = leaderLens.set(agent.data, (updatedPrepares, expandedAccepts))
             if (updatedPrepares.isEmpty) {
               // we have completed recovery so we now switch to stable Leader state
               io.logger.info("Node {} {} has issued accept messages for all prepare messages to promoting to be Leader.", agent.nodeUniqueId, agent.role)
