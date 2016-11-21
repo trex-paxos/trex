@@ -7,7 +7,7 @@ import scala.collection.immutable.{SortedMap, TreeMap}
 case class DummyCommandValue(id: String) extends CommandValue {
   override def bytes: Array[Byte] = Array()
 
-  override def msgId: String = id
+  override def msgUuid: String = id
 }
 
 object DummyRemoteRef {
@@ -27,11 +27,9 @@ class UndefinedIO extends PaxosIO{
 
   override def deliver(payload: Payload): Any = throw new AssertionError("deliberately not implemented")
 
-  override def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = throw new AssertionError("deliberately not implemented")
+  override def associate(value: CommandValue, id: Identifier): Unit = throw new AssertionError("deliberately not implemented")
 
-  override def respond(client: String, data: Any): Unit = throw new AssertionError("deliberately not implemented")
-
-  override def senderId: String = throw new AssertionError("deliberately not implemented")
+  override def respond(results: Option[Map[Identifier, Any]]): Unit = throw new AssertionError("deliberately not implemented")
 }
 
 trait SilentLogging {
@@ -79,6 +77,8 @@ class TestIO(j: Journal) extends UndefinedIO {
   override def randomTimeout: Long = 12345L
 
   override def logger: PaxosLogging = NoopPaxosLogging
+
+  override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
 }
 
 class UndefinedAcceptResponse extends AcceptResponse {
@@ -127,14 +127,10 @@ object TestHelpers extends PaxosLenses{
 
   val lowValue = Int.MinValue + 1
 
-  val initialData = PaxosData(
-    progress = Progress(
-      highestPromised = BallotNumber(lowValue, lowValue),
-      highestCommitted = Identifier(from = 0, number = BallotNumber(lowValue, lowValue), logIndex = 0)
-    ),
-    leaderHeartbeat = 0,
-    timeout = 0,
-    prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, String)])
+  val initialData = PaxosData(progress = Progress(
+          highestPromised = BallotNumber(lowValue, lowValue),
+          highestCommitted = Identifier(from = 0, number = BallotNumber(lowValue, lowValue), logIndex = 0)
+  ), leaderHeartbeat = 0, timeout = 0, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap() )
 
   val initialQuorumStrategy = new DefaultQuorumStrategy(() => 3)
 
@@ -201,7 +197,8 @@ object TestHelpers extends PaxosLenses{
   val initialDataCommittedSlotOne = PaxosData(
     Progress(
       BallotNumber(lowValue, lowValue), Identifier(0, BallotNumber(lowValue, lowValue), 1)
-    ), 0, 0, TreeMap(), None, TreeMap(), Map.empty[Identifier, (CommandValue, String)])
+    ), 0, 0, TreeMap(), None, TreeMap()
+  )
 
   val a101 = Accept(identifier101, DummyCommandValue("101"))
 
@@ -253,7 +250,8 @@ object TestHelpers extends PaxosLenses{
     ),
     leaderHeartbeat = 0,
     timeout = 0,
-    prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap(), clientCommands = Map.empty[Identifier, (CommandValue, String)])
+    prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap()
+  )
 
   val initialData96 = initialData97.copy(progress = progress96)
 

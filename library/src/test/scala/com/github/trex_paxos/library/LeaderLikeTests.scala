@@ -45,6 +45,11 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     val commit = Commit(node3slot1Identifier)
     val io = new UndefinedIO with SilentLogging {
       override def randomTimeout: Long = 12345L
+
+      override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
+        case None => // good
+        case f => fail(f.toString)
+      }
     }
     val event = PaxosEvent(io, agent, commit)
     val PaxosAgent(_, newRole, data, _) = paxosAlgorithm(event)
@@ -69,6 +74,11 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
       override def journal: Journal = stubJournal
 
       override def send(msg: PaxosMessage): Unit = messages += msg
+
+      override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
+        case None => // good
+        case f => fail(f.toString)
+      }
     }
     // and commit
     val commit = Commit(greaterThan)
@@ -100,6 +110,8 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
       override def journal: Journal = stubJournal
 
       override def deliver(payload: Payload): Any = delivered += value
+
+      override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
     }
     // and commit
     val commit = Commit(identifier)

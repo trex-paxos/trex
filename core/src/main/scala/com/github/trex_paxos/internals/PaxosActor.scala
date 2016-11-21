@@ -8,7 +8,7 @@ import com.github.trex_paxos.library._
 import com.typesafe.config.Config
 
 import scala.collection.immutable.{SortedMap, TreeMap}
-import scala.collection.mutable
+import scala.collection.{Map, mutable}
 import scala.util.Try
 
 /**
@@ -33,23 +33,43 @@ with AkkaLoggingAdapter {
 
   private val paxosAlgorithm = new PaxosAlgorithm
 
-  protected val actorRefWeakMap = new mutable.WeakHashMap[String,ActorRef]
+  protected val actorRefWeakMap = new mutable.WeakHashMap[Identifier,(ActorRef, CommandValue)]
 
-  // for the algorithm to have no dependency on akka we need to assign a String IDs
-  // to pass into the algorithm then later resolve the ActorRef by ID FIXME side effects so should have braces in the call
-  override def senderId: String = {
-    val ref = sender()
-    val pathAsString = ref.path.toString
-    actorRefWeakMap.put(pathAsString, ref)
-    logger.debug("weak map key {} value {}", pathAsString, ref)
-    pathAsString
-  }
+  /**
+    * Associate a command value with a paxos identifier so that the result of the commit can be routed back to the sender of the command
+    *
+    * @param value The command to asssociate with a message identifer.
+    * @param id    The message identifier
+    */
+  override def associate(value: CommandValue, id: Identifier): Unit = actorRefWeakMap.put(id, (sender(), value))
 
-  def respond(pathAsString: String, data: Any) = actorRefWeakMap.get(pathAsString) match {
-    case Some(ref) =>
-      ref ! data
-    case _ =>
-      logger.debug("weak map does not hold key {} to reply with {}", pathAsString, data)
+  /**
+    * Respond to clients.
+    *
+    * @param results The results of a fast forward commit or None if leadership was lost such that the commit outcome is unknown.
+    */
+   def respond(results: Option[scala.collection.immutable.Map[Identifier, Any]]): Unit = results match {
+    case Some(results) =>
+
+      val valueIds = results.keys.toSet
+
+      val clientsMap: Map[Identifier, (ActorRef, CommandValue)] = actorRefWeakMap filter {
+        case v@(id, _) if valueIds.contains(id) => true
+        case _ => false
+      }
+
+      clientsMap foreach {
+        case (id, (client, command)) =>
+          client ! results(id)
+          actorRefWeakMap.remove(id)
+      }
+
+    case None =>
+      actorRefWeakMap foreach {
+        case (id, (client, cmd)) => client ! LostLeadershipException(nodeUniqueId, cmd.msgUuid);
+      }
+      actorRefWeakMap.clear()
+
   }
 
   override def receive: Receive = {
@@ -138,11 +158,11 @@ with AkkaLoggingAdapter {
   /**
    * Notifies clients that it is no longer the leader by sending them an exception.
    */
-  def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = clientCommands foreach {
-    case (id, (cmd, client)) =>
-      log.warning("Sending NoLongerLeader to client {} the outcome of the client cmd {} at slot {} is unknown.", client, cmd, id.logIndex)
-      respond(client, new LostLeadershipException(nodeUniqueId, cmd.msgId))
-  }
+//  def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = clientCommands foreach {
+//    case (id, (cmd, client)) =>
+//      log.warning("Sending NoLongerLeader to client {} the outcome of the client cmd {} at slot {} is unknown.", client, cmd, id.logIndex)
+//      respond(client, new LostLeadershipException(nodeUniqueId, cmd.msgUuid))
+//  }
 
   /**
    * If you require transactions in the host application then you need to supply a custom Journal which participates
@@ -237,9 +257,9 @@ object PaxosActor {
 
   def initialAgent(nodeUniqueId: Int, progress: Progress, clusterSize: () => Int) =
     new PaxosAgent(nodeUniqueId, Follower, PaxosData(progress, 0, 0,
-    SortedMap.empty[Identifier, Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering), None,
-    SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering),
-    Map.empty[Identifier, (CommandValue, String)]), DefaultQuorumStrategy(clusterSize))
+    SortedMap.empty[Identifier, scala.collection.immutable.Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering), None,
+    SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering)
+    ), DefaultQuorumStrategy(clusterSize))
 
 
 }

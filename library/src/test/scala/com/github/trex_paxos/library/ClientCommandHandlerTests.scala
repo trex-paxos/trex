@@ -97,9 +97,11 @@ with PaxosLenses {
         override def randomTimeout: Long = 12345L
 
         override def send(msg: PaxosMessage): Unit = {}
+
+        override def associate(value: CommandValue, id: Identifier): Unit = {}
       }
       // when
-      val PaxosAgent(_, _, data, _) = handler.handleClientCommand(ioWithTimeout, agent, NoOperationCommandValue, DummyRemoteRef())
+      val PaxosAgent(_, _, data, _) = handler.handleClientCommand(ioWithTimeout, agent, NoOperationCommandValue)
       // then
       data.acceptResponses.size shouldBe 1
       data.acceptResponses.headOption match {
@@ -126,23 +128,24 @@ with PaxosLenses {
         override def send(msg: PaxosMessage): Unit = sent += System.nanoTime()
 
         override def journal: Journal = new UndefinedJournal {
-
           override def accept(a: Accept*): Unit = acceptedTs += System.nanoTime()
         }
+
+        override def associate(value: CommandValue, id: Identifier): Unit = {}
       }
       // when
-      val PaxosAgent(_, _, data, _) = handler.handleClientCommand(ioWithTimeout, agent, NoOperationCommandValue, DummyRemoteRef())
+      val PaxosAgent(_, _, data, _) = handler.handleClientCommand(ioWithTimeout, agent, NoOperationCommandValue)
       // then
       assert( acceptedTs.max < sent.min )
     }
     "holds onto the client ref" in {
-      require(initialData.clientCommands.isEmpty)
       // given a handler
       val handler = new Object with ClientCommandHandler
       // and a leader
       val agent: PaxosAgent = PaxosAgent(5, Leader, initialData.copy(epoch = Option(initialData.progress.highestPromised)), TestHelpers.initialQuorumStrategy)
       // and a minimal IO that captures the sent accept
       val sent = ArrayBuffer[PaxosMessage]()
+      val associated = ArrayBuffer[(Identifier,CommandValue)]()
       val ioWithTimeout = new UndefinedIO {
         override def randomTimeout: Long = 12345L
 
@@ -152,19 +155,27 @@ with PaxosLenses {
 
           override def accept(a: Accept*): Unit = {}
         }
+
+        override def associate(value: CommandValue, id: Identifier): Unit =
+          associated += (id -> value)
       }
       // and a client
       val client = DummyRemoteRef()
       // and a dummy value
       val value = DummyCommandValue("1")
       // when
-      val PaxosAgent(_, _, data, _) = handler.handleClientCommand(ioWithTimeout, agent, value, client)
+      val PaxosAgent(_, _, data, _) = handler.handleClientCommand(ioWithTimeout, agent, value)
       // then
-      assert(data.clientCommands.nonEmpty)
+      assert(associated.nonEmpty)
       // and the sent accept is mapped to the client
       sent.headOption.value match {
         case accept: Accept =>
-        assert(data.clientCommands.headOption.value == (accept.id, (value, client)))
+          associated.headOption.value match {
+            case (id, v) =>
+              id shouldBe accept.id
+              v shouldBe value
+            case f => fail(f.toString())
+          }
         case f => fail(f.toString)
       }
     }

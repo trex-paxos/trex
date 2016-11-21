@@ -10,35 +10,35 @@ trait CommandValue extends PaxosMessage {
 
   def bytes: Array[Byte]
 
-  def msgId: String
+  def msgUuid: String
 }
 
 /**
   * Client request command has an id to correlate to the server response.
-  * @param msgId The client message id used to correlate sent commands back to server responses.
+  * @param msgUuid The client message id used to correlate sent commands back to server responses.
   * @param bytes The serialized client command read to log to a journal or transit on the wire.
   */
-case class ClientCommandValue(msgId: String, val bytes: Array[Byte]) extends CommandValue
+case class ClientCommandValue(msgUuid: String, val bytes: Array[Byte]) extends CommandValue
 
 /**
   * Client request command has an id to correlate to the server response. Does not need to be made durable and can be lost during crashes.
-  * @param msgId The client message id used to correlate sent commands back to server responses.
+  * @param msgUuid The client message id used to correlate sent commands back to server responses.
   * @param bytes The serialized client command read to log to a journal or transit on the wire.
   */
-case class ReadOnlyClientCommandValue(msgId: String, val bytes: Array[Byte]) extends CommandValue
+case class ReadOnlyClientCommandValue(msgUuid: String, val bytes: Array[Byte]) extends CommandValue
 
 /**
   * Cluster administration command which has an id to correlate to the server response.
-  * @param msgId The message id used to correlate sent commands back to server responses.
+  * @param msgUuid The message id used to correlate sent commands back to server responses.
   * @param bytes The serialized client command read to log to a journal or transit on the wire.
   */
-case class ClusterCommandValue(msgId: String, val bytes: Array[Byte]) extends CommandValue
+case class ClusterCommandValue(msgUuid: String, val bytes: Array[Byte]) extends CommandValue
 
 
 case object NoOperationCommandValue extends CommandValue {
   def bytes = emptyArray
 
-  val msgId = ""
+  val msgUuid = ""
 }
 
 
@@ -299,7 +299,7 @@ case class NotFollower(val nodeId: Int, val msgId: String) extends PaxosMessage
 
 /**
  * Response to a client when the nodes has lost its leadership whilst servicing a request during a fail-over due to
- * either a network partition or a long stall. The outcome of the client operation indicated by msgId is unknown as the
+ * either a network partition or a long stall. The outcome of the client operation indicated by msgUuid is unknown as the
  * operation may or may not be committed by the new leader. The application will have to query data to learn whether the
  * operation did actually work. Note that semantically this is no different from sending a tcp request to an open socket
  * and not getting back a response; its not known whether the request was processed as there has been neither positive
@@ -312,7 +312,7 @@ case class NotFollower(val nodeId: Int, val msgId: String) extends PaxosMessage
  * @param msgId The client message which the node is responding to.
  */
 case class LostLeadershipException(val nodeId: Int, val msgId: String) extends RuntimeException with PaxosMessage {
-  override def toString() = s"NoLongerLeaderException($nodeId,$msgId)"
+  override def toString() = s"LostLeadershipException($nodeId,$msgId)"
 }
 
 /**

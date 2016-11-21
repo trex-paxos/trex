@@ -1,7 +1,5 @@
 package com.github.trex_paxos.library
 
-import java.util.concurrent.atomic.AtomicReference
-
 import org.scalatest.{Matchers, OptionValues, WordSpecLike}
 
 import scala.language.postfixOps
@@ -24,27 +22,28 @@ class ReturnToFollowerTests extends WordSpecLike with Matchers with OptionValues
       val optMsg = new Box[PaxosMessage](None)
       handler.handleReturnToFollowerOnHigherCommit(new TestIO(new UndefinedJournal){
         override def send(msg: PaxosMessage): Unit = optMsg(msg)
+
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }, PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy), Commit(id))
       // then
       optMsg() shouldBe RetransmitRequest(from = 0, to = 2, initialData.progress.highestCommitted.logIndex)
     }
 
-    "send no longer leader to any clients" in {
-      // given a handler that collects client commands
-      val clientCommands = collection.mutable.Map[Identifier, (CommandValue, String)]()
+    "signal no response for clients" in {
+      // given a flag to check that we signalled to clients that we are longer leader
+      val noLongerLeader = Box(false)
       val handler = new TestReturnToFollowerHandler
       // and a commit message id higher than the initial data value of 0L
       val id = initialData.progress.highestCommitted.copy(logIndex = 99L, from = 2)
-      // and a some client commands
-      val dataWithClient = initialData.copy(clientCommands = initialDataClientCommand)
       // when we handle that message
       handler.handleReturnToFollowerOnHigherCommit(new TestIO(new UndefinedJournal){
-        override def sendNoLongerLeader(cc: Map[Identifier, (CommandValue, String)]): Unit = {
-          clientCommands ++= cc
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
+          case None => noLongerLeader(true)
+          case f => fail(f.toString)
         }
-      }, PaxosAgent(0, Recoverer, dataWithClient, initialQuorumStrategy), Commit(id))
-      // then the client is sent a NoLongerLeaderException
-      clientCommands shouldBe dataWithClient.clientCommands
+      }, PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy), Commit(id))
+      // then we signaled no responses
+      noLongerLeader() shouldBe true
     }
   }
 }

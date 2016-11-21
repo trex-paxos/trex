@@ -81,15 +81,15 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
   private[this] var requestByTimeoutById: SortedMap[Long, Map[String, Request]] = SortedMap.empty
 
   def hold(request: Request): Unit = {
-    requestById = requestById + (request.command.msgId -> request)
+    requestById = requestById + (request.command.msgUuid -> request)
     val peers = requestByTimeoutById.getOrElse(request.timeoutTime, Map.empty)
-    requestByTimeoutById = requestByTimeoutById + (request.timeoutTime -> (peers + (request.command.msgId -> request)))
+    requestByTimeoutById = requestByTimeoutById + (request.timeoutTime -> (peers + (request.command.msgUuid -> request)))
   }
 
   def drop(request: Request): Unit = {
-    requestById = requestById - request.command.msgId
+    requestById = requestById - request.command.msgUuid
     val peers = requestByTimeoutById.getOrElse(request.timeoutTime, Map.empty)
-    val updated = peers - request.command.msgId
+    val updated = peers - request.command.msgUuid
     if (updated.isEmpty) {
       requestByTimeoutById = requestByTimeoutById - request.timeoutTime
     } else {
@@ -98,7 +98,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
   }
 
   def swap(out: Request, in: Request): Unit = {
-    require(in.command.msgId == out.command.msgId)
+    require(in.command.msgUuid == out.command.msgUuid)
     drop(out)
     hold(in)
   }

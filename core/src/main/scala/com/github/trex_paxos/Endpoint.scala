@@ -49,15 +49,15 @@ class TypedActorPaxosEndpoint(
         response match {
           case Some(result) =>
             val bytes = serializerClient.toBinary(result)
-            ServerResponse(logIndex, c.msgId, Some(bytes))
+            ServerResponse(logIndex, c.msgUuid, Some(bytes))
           case None =>
-            ServerResponse(logIndex, c.msgId, None)
+            ServerResponse(logIndex, c.msgUuid, None)
         }
       } recover {
         case ex =>
           log.error(ex, s"call to $method with $parameters got exception $ex")
           val bytes = serializerClient.toBinary(ex)
-          ServerResponse(logIndex, c.msgId, Option(bytes))
+          ServerResponse(logIndex, c.msgUuid, Option(bytes))
       }
       result.get
   }
@@ -116,5 +116,6 @@ class TypedActorPaxosEndpoint(
         log.warning("routed {} to {} but not found in {}", msg, route(msg), others)
     }
   }
+
 
 }

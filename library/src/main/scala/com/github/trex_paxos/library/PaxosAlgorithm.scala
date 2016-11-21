@@ -23,6 +23,7 @@ case class PaxosEvent(io: PaxosIO, agent: PaxosAgent, message: PaxosMessage)
   * Paxos has side effects (writes to the network and read+write to disk) which are isolated into this class to simplify testing.
   */
 trait PaxosIO {
+
   /** The durable story to hold the state on disk.
    */
   def journal: Journal
@@ -54,18 +55,18 @@ trait PaxosIO {
     */
   def send(msg: PaxosMessage)
 
-  // actor version side-effects by adding id to a weak map
-  def senderId(): String
+  /**
+    * Associate a command value with a paxos identifier so that the result of the commit can be routed back to the sender of the command
+    * @param value The command to asssociate with a message identifer.
+    * @param id The message identifier
+    */
+  def associate(value: CommandValue, id: Identifier): Unit
 
   /**
-    * Send a host application response back to a client.
+    * Respond to clients.
+    * @param results The results of a fast forward commit or None if leadership was lost such that the commit outcome is unknown.
     */
-  def respond(client: String, data: Any)
-
-  /**
-    * Inform a client that we are no longer accepted commands.
-    */
-  def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit
+  def respond(results: Option[scala.collection.immutable.Map[Identifier, Any]]): Unit
 }
 
 object PaxosAlgorithm {
@@ -90,7 +91,7 @@ with ClientCommandHandler {
     // update heartbeat and attempt to commit contiguous accept messages
     case PaxosEvent(io, agent@PaxosAgent(_, Follower, _, _), c@Commit(i, heartbeat)) =>
       handleFollowerCommit(io, agent, c)
-    case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, _, _, _), _), CheckTimeout) if io.clock >= to =>
+    case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, _, _), _), CheckTimeout) if io.clock >= to =>
       handleFollowerTimeout(io, agent)
     case PaxosEvent(io, agent, vote: PrepareResponse) if agent.role == Follower =>
       handelFollowerPrepareResponse(io, agent, vote)
@@ -147,7 +148,7 @@ with ClientCommandHandler {
 
   val notLeaderFunction: PaxosFunction = {
     case PaxosEvent(io, agent, v: CommandValue) =>
-      io.send(NotLeader(agent.nodeUniqueId, v.msgId))
+      io.send(NotLeader(agent.nodeUniqueId, v.msgUuid))
       agent
   }
 
@@ -201,7 +202,7 @@ with ClientCommandHandler {
 
     // broadcasts a new client value
     case PaxosEvent(io, agent, value: CommandValue) =>
-      handleClientCommand(io, agent, value, io.senderId)
+      handleClientCommand(io, agent, value)
 
     // ignore late vote as we would have transitioned on a majority ack
     case PaxosEvent(io, agent, value: PrepareResponse) =>

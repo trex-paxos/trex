@@ -53,6 +53,8 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
           val update = TimeAndMessage(msg, System.nanoTime())
           broadcastValues += update
         }
+
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }, PaxosAgent(0, Recoverer, selfNackPrepares, initialQuorumStrategy), vote)
       // then we are a follower
       role match {
@@ -392,6 +394,8 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
     // and a do nothing IO
     val io = new TestIO(noopJournal) {
       override def logger: PaxosLogging = NoopPaxosLogging
+
+      override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
     }
 
     // when we get the majority

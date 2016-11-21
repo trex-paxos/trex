@@ -7,18 +7,18 @@ trait ClientCommandHandler extends PaxosLenses {
 
   import ClientCommandHandler._
 
-  def handleClientCommand(io: PaxosIO, agent: PaxosAgent, value: CommandValue, client: String): PaxosAgent = {
+  def handleClientCommand(io: PaxosIO, agent: PaxosAgent, value: CommandValue): PaxosAgent = {
     val accept = acceptFor(agent, value)
     val SelfAckOrNack(response, updated) = leaderSelfAckOrNack(io, agent, accept)
     response match {
       case _: AcceptAck => io.journal.accept(accept)
       case _ => // do nothing
     }
-    // respond
+    // let the outside world know the id associated with this value so that it can handle the committed value if needed
+    io.associate(value, accept.id)
+    // forward the accept to the cluster
     io.send(accept)
-    // add the sender our client map
-    val clients = agent.data.clientCommands + (accept.id ->(value, client))
-    agent.copy(data = leaderLens.set(agent.data, (SortedMap.empty, updated, clients)))
+    agent.copy(data = leaderLens.set(agent.data, (SortedMap.empty, updated)))
   }
 }
 

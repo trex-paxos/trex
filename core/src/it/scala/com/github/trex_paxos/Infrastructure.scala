@@ -136,7 +136,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
     case r@ClientCommandValue(msgId, bytes) =>
       r.bytes(0) match {
         case b if b > 0 => // value greater than zero is client request send to leader
-          valueByMsgId(valueByMsgId() + (r.msgId -> r))
+          valueByMsgId(valueByMsgId() + (r.msgUuid -> r))
           valuesToClients(valuesToClients() + ((-b).toByte -> sender))
           val guessedLeader = next()
           log.info("client rq: {} -> {} {}", bytes, invertedChildren(guessedLeader), guessedLeader)

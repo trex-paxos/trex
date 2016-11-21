@@ -84,6 +84,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       handler.handleLowPrepareResponse(new TestIO(new UndefinedJournal){
         override def send(msg: PaxosMessage): Unit = sentMsg(msg)
         override def randomTimeout: Long = 999L
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }, PaxosAgent(0, Follower, initialDataWithTimeoutAndPrepareResponses, initialQuorumStrategy), vote) match {
         case PaxosAgent(0, Follower, data, _) =>
           // it clears its prepares and sets a new timeout
@@ -225,6 +226,8 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       // and io with some timeout
       val io = new UndefinedIO with SilentLogging{
         override def randomTimeout: Long = 12345L
+
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }
       // when
       val handler = new Object with FollowerHandler

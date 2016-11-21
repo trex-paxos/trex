@@ -302,6 +302,7 @@ class FollowerTests extends AllRolesTests {
       val io = new UndefinedIO with SilentLogging{
         override def send(msg: PaxosMessage): Unit = messages += msg
         override def randomTimeout: Long = 987654L
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }
 
       // and a higher committed slot nack to the min prepare
@@ -325,6 +326,7 @@ class FollowerTests extends AllRolesTests {
       val io = new UndefinedIO with SilentLogging{
         override def send(msg: PaxosMessage): Unit = messages += msg
         override def randomTimeout: Long = 987654L
+        override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }
 
       // and a nack that indicates a leader behind a network partition

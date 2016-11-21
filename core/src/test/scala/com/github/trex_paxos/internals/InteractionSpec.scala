@@ -166,7 +166,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       // given node zero leader
       val node0 = new TestJournal
       val actor0 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 0, self, node0, ArrayBuffer.empty, None))
-      actor0.underlyingActor.setAgent(Leader, actor0.underlyingActor.data.copy(clientCommands = Map.empty, acceptResponses = SortedMap.empty, epoch = Some(BallotNumber(1, 1))))
+      actor0.underlyingActor.setAgent(Leader, actor0.underlyingActor.data.copy(acceptResponses = SortedMap.empty, epoch = Some(BallotNumber(1, 1))))
       // and node one
       val node1 = new TestJournal
       val actor1 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 1, self, node1, ArrayBuffer.empty, None))
@@ -212,7 +212,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       // given node0 leader
       val node0 = new TestJournal
       val actor0 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 0, self, node0, ArrayBuffer.empty, None))
-      actor0.underlyingActor.setAgent(Leader, actor0.underlyingActor.data.copy(clientCommands = Map.empty, acceptResponses = SortedMap.empty, epoch = Some(BallotNumber(counter = Int.MinValue + 1, nodeIdentifier = 0))))
+      actor0.underlyingActor.setAgent(Leader, actor0.underlyingActor.data.copy(acceptResponses = SortedMap.empty, epoch = Some(BallotNumber(counter = Int.MinValue + 1, nodeIdentifier = 0))))
 
       // and some higher promise
       val node0progress = node0.loadProgress()
