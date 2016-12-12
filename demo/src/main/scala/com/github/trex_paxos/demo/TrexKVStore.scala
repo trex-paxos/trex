@@ -120,6 +120,7 @@ object TrexKVStore {
     nodeMap.get(nodeId) match {
       case Some(node) =>
         val folder = new java.io.File(cluster.folder + "/" + nodeId)
+        if( !folder.exists() ) folder.mkdirs()
         if (!folder.exists() || !folder.canRead || !folder.canWrite) {
           err.println(s"${folder.getCanonicalPath} does not exist or do not have permission to read and write. Exiting.")
           System.exit(-1)

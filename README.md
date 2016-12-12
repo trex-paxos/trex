@@ -39,9 +39,9 @@ sbt coverageReport
 
 0.3 - practical
 
+- [x] crc32 message integrity 
 - [ ] Remove Akka dependence from core (keep in tests)
 - [ ] dynamic cluster membership
-- [ ] message integrity 
 
 0.6 - enhanced 
 

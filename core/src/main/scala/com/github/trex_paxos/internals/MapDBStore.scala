@@ -42,7 +42,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
 
   def saveProgress(progress: Progress): Unit = {
     // save the bookwork
-    val bytes = Pickle.pickle(progress)
+    val bytes = Pickle.pickle(progress).prependCrcData()
     bookworkMap.put("FileJournal", bytes.toArray)
     db.commit() // eager commit
     // lazy gc of some old values as dont commit until next update
@@ -55,14 +55,15 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
 
   def loadProgress(): Progress = {
     val bytes = bookworkMap.get("FileJournal")
-    Pickle.unpickleProgress(ByteChain(bytes))
+    val checked = ByteChain(bytes).checkCrcData()
+    Pickle.unpickleProgress(checked)
   }
 
   def accept(a: Accept*): Unit = {
     a foreach {
       case a@Accept(Identifier(_, _, logIndex), value) =>
         // store the value in the map
-        val bytes = Pickle.pickle(a)
+        val bytes = Pickle.pickle(a).prependCrcData()
         storeMap.put(logIndex, bytes.toArray)
     }
     if (a.nonEmpty) db.commit()
@@ -73,7 +74,8 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
       case None =>
         None
       case Some(bytes) =>
-        Some(Pickle.unpickleAccept(ByteChain(bytes)))
+        val checked = ByteChain(bytes).checkCrcData()
+        Some(Pickle.unpickleAccept(checked))
     }
   }
 

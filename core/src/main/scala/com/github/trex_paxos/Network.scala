@@ -6,7 +6,7 @@ import _root_.akka.actor.{Actor, ActorLogging, ActorRef}
 import _root_.akka.io.Udp.CommandFailed
 import _root_.akka.io.{IO, Udp}
 import _root_.akka.util.ByteString
-import com.github.trex_paxos.util.Pickle
+import com.github.trex_paxos.util.{ByteChain, Pickle}
 
 // TODO do we really need a UdpSender wrapper seems like its many actors possibly talking to one "IO(Udp)" else many to
 // many in which case why this intermediary.
@@ -31,9 +31,9 @@ class UdpSender(remote: InetSocketAddress) extends Actor with ActorLogging {
       sender ! true // ready
     case msg: AnyRef =>
       log.debug("sending to {} msg {}", remote, msg)
-      val packed = Pickle.pack(msg)
+      val packed = Pickle.pack(msg).prependCrcData()
       if (packed.size > 65535) log.warning("message size > 65,535 may not fit in UDP package") // TODO
-      connection ! Udp.Send(ByteString(Pickle.pack(msg).toBytes), remote) // FIXME makes two copies :-(
+      connection ! Udp.Send(ByteString(packed.toBytes), remote) // FIXME makes two copies :-(
     case unknown =>
       log.warning("Read UdpSender dropping unknown message {}", unknown)
   }
@@ -65,7 +65,8 @@ class UdpListener(socket: InetSocketAddress, nextActor: ActorRef) extends Actor 
       log.info("successfully bound to {}", socket)
       sender ! true // ready
     case Udp.Received(data, remote) =>
-      val msg = Pickle.unpack(data.toArray)
+      val checked = ByteChain(data.toArray).checkCrcData()
+      val msg = Pickle.unpack(checked)
       log.debug("received from {} {}", remote, msg)
       nextActor ! msg
     case Udp.Unbind => s ! Udp.Unbind

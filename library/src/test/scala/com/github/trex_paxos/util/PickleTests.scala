@@ -4,7 +4,10 @@ import com.github.trex_paxos.library._
 import org.scalatest.{Matchers, WordSpecLike}
 import java.util.Arrays.{equals => bequals}
 
+import scala.util.{Failure, Success, Try}
+
 class PickleTests extends WordSpecLike with Matchers {
+
   import com.github.trex_paxos.util.Pickle._
 
   "Pickling simple objects " should {
@@ -50,7 +53,6 @@ class PickleTests extends WordSpecLike with Matchers {
       unpickleLong(pickleLong(Long.MinValue)) should be(Long.MinValue)
     }
   }
-
   "Pickling rich objects" should {
 
     "roundrip Commit" in {
@@ -241,19 +243,71 @@ class PickleTests extends WordSpecLike with Matchers {
     "roundtrip empty ServerResponse" in {
       val s1 = ServerResponse(0, "one", Some(Array[Byte]()))
       Pickle.unpack(Pickle.pack(s1).toBytes) match {
-        case ServerResponse(n,m,Some(a)) if n == 0L && m == "one" && a.length == 0 =>  // good
+        case ServerResponse(n, m, Some(a)) if n == 0L && m == "one" && a.length == 0 => // good
         case f => fail(f.toString)
       }
     }
     "roundtrip some ServerResponse" in {
       val s1 = ServerResponse(0, "one", Some(bytes1))
       Pickle.unpack(Pickle.pack(s1).toBytes) match {
-        case ServerResponse(n,m,Some(bout)) if n == 0L && m == "one" =>
+        case ServerResponse(n, m, Some(bout)) if n == 0L && m == "one" =>
           assert(bequals(Array[Byte](5, 6), bout))
         case f => fail(f.toString)
       }
     }
 
   }
-}
+  "Pickling with crc32" should {
+    "should not fail CRC if not modified data" in {
+      val identifier11: Identifier = Identifier(1, BallotNumber(1, 1), 11L)
+      val v1: CommandValue = ClientCommandValue("hello", Array[Byte](1.toByte))
+      val a11 = Accept(identifier11, v1)
 
+      val buffer = Pickle.pack(a11).prependCrcData()
+
+      val bytes: Array[Byte] = buffer.toArray
+
+      val modified = ByteChain(bytes).checkCrcData()
+
+      val unpacked = Pickle.unpack(modified.toBytes)
+
+      unpacked match {
+        case a11@Accept(id, value) =>
+          id shouldBe identifier11
+          value match {
+            case v1@ClientCommandValue(msgUuid, array) =>
+              msgUuid shouldBe "hello"
+              array(0) shouldBe 1.toByte
+          }
+        case f => fail(f.toString)
+      }
+    }
+  }
+  "should fail on CRC if modified data" in {
+    // if we corrput the first 4 bytes we may think that the size is upto Int.Max so will blow up with out a CRC check failure
+    (4 until 32) foreach { index =>
+      val result = Try {
+        val identifier11: Identifier = Identifier(1, BallotNumber(1, 1), 11L)
+        val v1: CommandValue = ClientCommandValue("hello", Array[Byte](1.toByte))
+        val a11 = Accept(identifier11, v1)
+
+        val buffer = Pickle.pack(a11).prependCrcData()
+
+        val bytes: Array[Byte] = buffer.toArray
+
+        bytes(index) = (bytes(index) + 1).toByte
+
+        val modified = ByteChain(bytes).checkCrcData()
+
+        Pickle.unpack(modified.toBytes)
+      }
+      result match {
+        case Success(f) => fail(f.toString)
+        case Failure(ex) => ex match {
+          case f: IllegalArgumentException if f.getMessage.contains("CRC32") => // good
+          case f => throw f
+        }
+      }
+    }
+  }
+}

@@ -1,6 +1,7 @@
 package com.github.trex_paxos.util
 
 import java.util.NoSuchElementException
+import java.util.zip.CRC32
 
 import com.github.trex_paxos.library._
 
@@ -25,6 +26,37 @@ class ByteChain( val bytes: Vector[Array[Byte]], val length: Int) extends Iterab
   def toBytes: Array[Byte] = {
     val i = this.iterator
     Array.fill[Byte](this.length)(i.next())
+  }
+
+  /**
+    * @return returns a new ByteChain with the length and CRC32 of this one prepended to message integrety checks
+    */
+  def prependCrcData(): ByteChain = {
+    val crc = new CRC32()
+    bytes.foreach(crc.update(_))
+    val crc32 = crc.getValue.toInt // yep the first 4 bytes of the long are always blank it really is a 32bit crc
+    Pickle.pickleInt(this.length) ++ Pickle.pickleInt(crc32) ++ this
+  }
+
+  /**
+    * @return drops the first 8 bytes, interprets the first 4 as the length of the remainder and the second as its crc32
+    * @throws IllegalArgumentException if the crc32 of the remainder does not match the crc32 in bytes 4 thru 7
+    */
+  def checkCrcData(): ByteChain = {
+    val (lenbs, r1) = this.splitAt(Pickle.lengthOfInt)
+    val len = Pickle.unpickleInt(lenbs)
+    val (crc32bs, r2: Iterable[Byte]) = r1.splitAt(Pickle.lengthOfInt)
+    val expectedCrc32 = Pickle.unpickleInt(crc32bs)
+    val rest: Iterable[Byte] = r2.take(len)
+    val i = rest.iterator
+    val payload: Array[Byte] = Array.fill[Byte](len)(i.next())
+    val crc = new CRC32()
+    crc.update(payload)
+    val actualCrc32 = crc.getValue.toInt
+    if(actualCrc32 != expectedCrc32) {
+      throw new IllegalArgumentException(s"CRC32 check ${actualCrc32} != ${expectedCrc32}")
+    }
+    ByteChain(payload)
   }
 }
 
@@ -390,7 +422,7 @@ object Pickle {
       ByteChain.empty
   }
 
-  def unpack(b: Array[Byte]): AnyRef = fromMap(b.head)(b.tail)
+  def unpack(b: Iterable[Byte]): AnyRef = fromMap(b.head)(b.tail)
 
   def pack(a: AnyRef): ByteChain = ByteChain(Array(toMap(a.getClass))) ++ pickle(a)
 }
