@@ -13,7 +13,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
     def `should require accept number at least as high as promise` {
       val handler = new TestAcceptHandler
       val mockJournal = stub[Journal]
-      val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
+      val id = Identifier(0, BallotNumber(0, 0), 0)
       val agent = PaxosAgent(1, Follower, TestHelpers.initialData, TestHelpers.initialQuorumStrategy)
       intercept[IllegalArgumentException] {
         handler.handleHighAccept(new TestIO(mockJournal), agent, Accept(id, NoOperationCommandValue))
@@ -114,7 +114,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
     }
 
     def `sould nack and accept below current promise` {
-      val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
+      val id = Identifier(0, BallotNumber(0, 0), 0)
       val accept = Accept(id, NoOperationCommandValue)
       val handler = new TestAcceptHandler
       val journal = new UndefinedJournal

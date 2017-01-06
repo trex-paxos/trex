@@ -122,7 +122,7 @@ sealed trait PaxosMessage
 case class Prepare(id: Identifier) extends PaxosMessage
 
 /**
- * Base type for a response to a prepare message. It provides additional information beyond that prescribed by the core Paxos alogirth which is used during the leader takeover protocol and to prevent unnecessary leader failover attempts.  
+ * Base type for a response to a prepare message. It provides additional information beyond that prescribed by the core Paxos algorithm which is used during the leader takeover protocol and to prevent unnecessary leader failover attempts.
  */
 trait PrepareResponse extends PaxosMessage {
   /**

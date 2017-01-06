@@ -10,9 +10,7 @@ import Ordering._
 import scala.collection.mutable.ArrayBuffer
 
 object TestFollowerHandler extends PaxosLenses {
-
-
-  val minPrepare: Prepare = Prepare(Identifier(99, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
+  val minPrepare: Prepare = Prepare(Identifier(99, BallotNumber(0, 0), 0))
 
   val selfNack = PrepareNack(minPrepare.id, 0, initialData.progress, 0, 999)
 
@@ -97,7 +95,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
         case x => fail(x.toString)
       }
     }
-    "ignores a response that it is not waiting on" in {
+    "ignore a response that it is not waiting on" in {
       // given a handler
       val handler = new TestFollowerHandler
       // and a prepare response it is not waiting on

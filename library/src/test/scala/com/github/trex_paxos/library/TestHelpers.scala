@@ -95,7 +95,7 @@ case class TimeAndParameter(time: Long, parameter: Any)
 
 object TestHelpers extends PaxosLenses{
 
-  val minPrepare = Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
+  val minPrepare = Prepare(Identifier(0, BallotNumber(0, 0), 0  ))
 
   val undefinedIO = new UndefinedIO
 
@@ -125,7 +125,7 @@ object TestHelpers extends PaxosLenses{
     override def clock: Long = Long.MaxValue
   }
 
-  val lowValue = Int.MinValue + 1
+  val lowValue = 1
 
   val initialData = PaxosData(progress = Progress(
           highestPromised = BallotNumber(lowValue, lowValue),

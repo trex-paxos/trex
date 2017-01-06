@@ -82,7 +82,7 @@ with AkkaLoggingAdapter {
     case f => logger.error("Received unknown messages type {}", f)
   }
 
-  val minPrepare = Prepare(Identifier(nodeUniqueId, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
+  val minPrepare = Prepare(Identifier(nodeUniqueId, BallotNumber(0, 0), 0))
 
   var sent: collection.immutable.Seq[PaxosMessage] = collection.immutable.Seq()
 
@@ -253,7 +253,7 @@ object PaxosActor {
 
   val freshAcceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering)
 
-  val minJournalBounds = JournalBounds(Long.MinValue, Long.MinValue)
+  val minJournalBounds = JournalBounds(0, 0)
 
   def initialAgent(nodeUniqueId: Int, progress: Progress, clusterSize: () => Int) =
     new PaxosAgent(nodeUniqueId, Follower, PaxosData(progress, 0, 0,

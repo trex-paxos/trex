@@ -145,13 +145,24 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
       override def randomTimeout: Long = 12345L
 
       override def send(msg: PaxosMessage): Unit = sent += msg
+
+      val inMemoryJournal = new InMemoryJournal
+
+      override def journal: Journal = inMemoryJournal
     }
     // when
     val event = PaxosEvent(io, agent, CheckTimeout)
     val PaxosAgent(_, newRole, data, _) = paxosAlgorithm(event)
     // then
     newRole shouldBe role
-    sent.headOption.value shouldBe a99
+    // we will have increased our ballot number but resent the same value for the same slot
+    sent.headOption match {
+      case Some(a: Accept) =>
+        a.id.logIndex should be(a99.id.logIndex)
+        a.value should be(a99.value)
+        (a.id.number > a99.id.number) should be(true)
+      case f => fail(f.toString)
+    }
     data.timeout shouldBe 12345L
   }
   def sendHigherAcceptOnLearningOtherNodeHigherPromise(role: PaxosRole){

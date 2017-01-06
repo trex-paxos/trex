@@ -51,7 +51,7 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
     }
 
     def `should clear any none follower data and become follower when recoverer` = {
-      val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
+      val id = Identifier(0, BallotNumber(0, 0), 0)
       val recoverLikeData = initialData.copy(epoch = Some(BallotNumber(10, 10)),
         prepareResponses = TreeMap(id -> Map.empty),
         acceptResponses = emptyAcceptResponses98)
@@ -71,7 +71,7 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
     }
 
     def `should send out NotLeader and return to follower if leader` {
-      val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
+      val id = Identifier(0, BallotNumber(0, 0), 0)
       val mockJournal = stub[Journal]
       (mockJournal.saveProgress _ ).when(*)
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))

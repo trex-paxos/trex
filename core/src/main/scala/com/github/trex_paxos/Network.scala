@@ -66,7 +66,7 @@ class UdpListener(socket: InetSocketAddress, nextActor: ActorRef) extends Actor 
       sender ! true // ready
     case Udp.Received(data, remote) =>
       val checked = ByteChain(data.toArray).checkCrcData()
-      val msg = Pickle.unpack(checked)
+      val msg = Pickle.unpack(checked.iterator)
       log.debug("received from {} {}", remote, msg)
       nextActor ! msg
     case Udp.Unbind => s ! Udp.Unbind

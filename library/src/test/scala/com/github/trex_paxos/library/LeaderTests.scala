@@ -22,7 +22,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
     }
 
     def `should be defined for a leader and a Prepare if the prepare is less than the promise` {
-      assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)))))
+      assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(0, 0), 0)))))
     }
 
     def `should be defined for a leader and a Prepare if the prepare is higher than the promise` {
@@ -34,7 +34,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
     }
 
     def `should be defined for a leader and an Accept with a lower number` {
-      assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Accept(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0), NoOperationCommandValue))))
+      assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Accept(Identifier(0, BallotNumber(0, 0), 0), NoOperationCommandValue))))
     }
 
     def `should be defined for a leader and an Accept with a higher number for a committed slot` {
@@ -106,7 +106,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
 
     def `should be defined for a low commit` {
       val agent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
-      val commit = Commit(Identifier(1, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
+      val commit = Commit(Identifier(1, BallotNumber(0, 0), Long.MinValue))
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
@@ -120,7 +120,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
     }
 
     def `should be defined for a late PrepareResponse`  {
-      val dataPrepareResponses = initialDataAgent.data.copy(prepareResponses = TreeMap(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0) -> Map.empty))
+      val dataPrepareResponses = initialDataAgent.data.copy(prepareResponses = TreeMap(Identifier(0, BallotNumber(0, 0), 0) -> Map.empty))
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent.copy(data = dataPrepareResponses), undefinedPrepareResponse)))
     }
 

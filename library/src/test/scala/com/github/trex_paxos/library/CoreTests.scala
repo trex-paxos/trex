@@ -97,8 +97,8 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
     "should reset data" in {
       import Ordering._
       // given lots of leadership data
-      val number = BallotNumber(Int.MinValue, Int.MinValue)
-      val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
+      val number = BallotNumber(0, 0)
+      val id = Identifier(0, number, 0)
       val leaderData = PaxosData(
         progress = Progress(
           number, id

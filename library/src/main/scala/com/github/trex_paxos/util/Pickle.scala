@@ -11,12 +11,12 @@ import scala.annotation.tailrec
   * An append only and iterable vector of byte arrays. This class does not take defensive copies until you convert
   * it to a Array[Byte] using the toBytes method.
   */
-class ByteChain( val bytes: Vector[Array[Byte]], val length: Int) extends Iterable[Byte] {
+class ByteChain(val bytes: Vector[Array[Byte]], val length: Int) extends Iterable[Byte] {
 
   override def iterator: Iterator[Byte] = new ByteChain.ByteChainIterator(bytes.map(_.iterator))
 
   def ++(that: ByteChain): ByteChain = {
-    val appended: Vector[Array[Byte]]= this.bytes ++ that.bytes
+    val appended: Vector[Array[Byte]] = this.bytes ++ that.bytes
     val l = this.length + that.length
     new ByteChain(appended, l)
   }
@@ -28,6 +28,22 @@ class ByteChain( val bytes: Vector[Array[Byte]], val length: Int) extends Iterab
     Array.fill[Byte](this.length)(i.next())
   }
 
+  import PicklePositiveIntegers._
+
+  def pickleSignedInt(i: Int): ByteChain =
+    ByteChain(Array[Byte](
+      (i >>> 24).toByte,
+      (i >>> 16).toByte,
+      (i >>> 8).toByte,
+      i.toByte))
+
+  def unpickleSignedInt(b: Iterator[Byte]): Int =
+    (unsigned(b.next()) << 24) +
+      (unsigned(b.next()) << 16) +
+      (unsigned(b.next()) << 8) +
+      unsigned(b.next())
+
+
   /**
     * @return returns a new ByteChain with the length and CRC32 of this one prepended to message integrety checks
     */
@@ -35,7 +51,7 @@ class ByteChain( val bytes: Vector[Array[Byte]], val length: Int) extends Iterab
     val crc = new CRC32()
     bytes.foreach(crc.update(_))
     val crc32 = crc.getValue.toInt // yep the first 4 bytes of the long are always blank it really is a 32bit crc
-    Pickle.pickleInt(this.length) ++ Pickle.pickleInt(crc32) ++ this
+    pickleInt(this.length) ++ pickleSignedInt(crc32) ++ this
   }
 
   /**
@@ -43,17 +59,14 @@ class ByteChain( val bytes: Vector[Array[Byte]], val length: Int) extends Iterab
     * @throws IllegalArgumentException if the crc32 of the remainder does not match the crc32 in bytes 4 thru 7
     */
   def checkCrcData(): ByteChain = {
-    val (lenbs, r1) = this.splitAt(Pickle.lengthOfInt)
-    val len = Pickle.unpickleInt(lenbs)
-    val (crc32bs, r2: Iterable[Byte]) = r1.splitAt(Pickle.lengthOfInt)
-    val expectedCrc32 = Pickle.unpickleInt(crc32bs)
-    val rest: Iterable[Byte] = r2.take(len)
-    val i = rest.iterator
+    val i = this.iterator
+    val len = unpickleInt(i)
+    val expectedCrc32 = unpickleSignedInt(i)
     val payload: Array[Byte] = Array.fill[Byte](len)(i.next())
     val crc = new CRC32()
     crc.update(payload)
     val actualCrc32 = crc.getValue.toInt
-    if(actualCrc32 != expectedCrc32) {
+    if (actualCrc32 != expectedCrc32) {
       throw new IllegalArgumentException(s"CRC32 check ${actualCrc32} != ${expectedCrc32}")
     }
     ByteChain(payload)
@@ -72,13 +85,13 @@ object ByteChain {
 
     override def hasNext: Boolean = remainder.headOption match {
       case Some(v) => v.hasNext
-      case _  => false
+      case _ => false
     }
 
     override def next(): Byte = {
       remainder.headOption match {
         case Some(v) =>
-          if( v.hasNext ) {
+          if (v.hasNext) {
             val n = v.next()
             if (!v.hasNext) {
               if (remainder.nonEmpty) {
@@ -89,9 +102,102 @@ object ByteChain {
           } else {
             throw new NoSuchElementException
           }
-        case _  => throw new NoSuchElementException
+        case _ => throw new NoSuchElementException
       }
     }
+  }
+}
+
+object PicklePositiveIntegers {
+
+  case class Constants(maxBits: Int, header: Int, extractHeader: Int, extractBody: Int) {
+    def bytes = maxBits / 7
+  }
+
+  @inline def unsigned(b: Byte): Int = if (b >= 0) {
+    b
+  } else {
+    256 + b
+  }
+
+  val c0 = Constants(7, 0x0, 0x80, 0x7f)
+  val c1 = Constants(14, 0x80, 0xC0, 0x3f)
+  val c2 = Constants(21, 0xC0, 0xE0, 0x1F)
+  val c3 = Constants(28, 0xE0, 0xF0, 0x0F)
+  val c4 = Constants(35, 0xF0, 0xF8, 0x07)
+  val c5 = Constants(42, 0xF8, 0xFC, 0x03)
+  val c6 = Constants(49, 0xFC, 0xFE, 0x01)
+  val c7 = Constants(56, 0xFE, 0xFF, 0x0)
+  val c8 = Constants(63, 0xFF, 0xFF, 0x0)
+
+  val constants = Seq(c0, c1, c2, c3, c4, c5, c6, c7, c8)
+
+  val sizes: Array[Long] = (constants map {
+    c => Math.pow(2, c.maxBits).toLong
+  }).toArray
+
+  def constantsFor(l: Long) = {
+    require(l >= 0)
+
+    def lookupIndex(l: Long): Int = {
+      sizes.foldLeft(0) { (index, long) =>
+        if (l < long) return index
+        else index + 1
+      }
+    }
+
+    constants(Math.min(lookupIndex(l), 8))
+  }
+
+  def pickleInt(i: Int): ByteChain = pickleLong(i)
+
+  def unpickleInt(i: Iterator[Byte]): Int = unpickleLong(i).toInt
+
+  def pickleLong(i: Long): ByteChain = {
+
+    val constant = constantsFor(i)
+
+    def pack(bytes: List[Byte], bs: Int): List[Byte] = {
+      if (bytes.length >= constant.bytes) bytes
+      else pack((i >>> bs).toByte :: bytes, bs + 8)
+    }
+
+    val bytes = pack(List(), 0).toArray
+
+    bytes(0) = (bytes(0) | constant.header).toByte
+
+    ByteChain(bytes)
+  }
+
+  def unpickleLong(i: Iterator[Byte]): Long = {
+
+    val firstWithHeader: Byte = unsigned(i.next()).toByte
+
+    val constant = (constants dropWhile {
+      c => (firstWithHeader & c.extractHeader) != c.header
+    }).head
+
+    val firstWithoutHeader: Byte = (firstWithHeader & constant.extractBody).toByte
+
+    def takeBytes(count: Int, bs: List[Byte]): List[Byte] = {
+      if (count - 1 > 0) takeBytes(count - 1, i.next() :: bs)
+      else bs
+    }
+
+    val bytes = takeBytes( constant.bytes, List(firstWithoutHeader))
+
+    // above 57 bits we end up with 9 bytes the first of which is leading zeros we need to drop
+    val longBytes = if (bytes.length <= 8) bytes else bytes.take(8)
+
+    val bytesWithIndex: Seq[(Byte, Int)] = longBytes.reverse.zipWithIndex
+
+    val value: Long = bytesWithIndex.foldLeft(0L) {
+      case (cumulative: Long, (b: Byte, index: Int)) =>
+        val shift = 8 * (longBytes.length - 1 - index)
+        cumulative + (unsigned(b).toLong << shift)
+    }
+
+    value
   }
 }
 
@@ -102,7 +208,9 @@ object ByteChain {
   */
 object Pickle {
 
-  val config: Map[Byte, (Class[_], Iterable[Byte] => AnyRef)] = Map(
+  val UTF8 = "UTF8"
+
+  val config: Map[Byte, (Class[_], Iterator[Byte] => AnyRef)] = Map(
     0x0.toByte -> (classOf[Accept] -> unpickleAccept _),
     0x1.toByte -> (classOf[AcceptAck] -> unpickleAcceptAck _),
     0x2.toByte -> (classOf[AcceptNack] -> unpickleAcceptNack _),
@@ -123,60 +231,21 @@ object Pickle {
   val toMap: Map[Class[_], Byte] = (config.map {
     case (b, (c, f)) => c -> b
   }).toMap
-  val fromMap: Map[Byte, Iterable[Byte] => AnyRef] = config.map {
+
+  val fromMap: Map[Byte, Iterator[Byte] => AnyRef] = config.map {
     case (b, (c, f)) => b -> f
   }
-  val lengthOfInt = 4
-  val lengthOfLong = 8
-  val lengthOfBool = 1
-  val sizeOfBallotNumber = 2 * lengthOfInt
-  val sizeOfIdentifier = lengthOfInt + sizeOfBallotNumber + lengthOfLong
-  val sizeOfProgress = sizeOfBallotNumber + sizeOfIdentifier
 
-  @inline def unsigned(b: Byte): Int = if (b >= 0) {
-    b
-  } else {
-    256 + b
-  }
-
-  def pickleInt(i: Int): ByteChain =
-    ByteChain(Array[Byte](
-      (i >>> 24).toByte,
-      (i >>> 16).toByte,
-      (i >>> 8).toByte,
-      i.toByte))
-
-  def unpickleInt(b: Iterable[Byte]): Int =
-    (unsigned(b.take(1).last) << 24) +
-      (unsigned(b.drop(1).take(1).last) << 16) +
-      (unsigned(b.drop(2).take(1).last) << 8) +
-      unsigned(b.drop(3).take(1).last)
-
-  def pickleLong(i: Long): ByteChain = ByteChain(Array[Byte](
-    (i >>> 56).toByte,
-    (i >>> 48).toByte,
-    (i >>> 40).toByte,
-    (i >>> 32).toByte,
-    (i >>> 24).toByte,
-    (i >>> 16).toByte,
-    (i >>> 8).toByte,
-    i.toByte)
-  )
-
-  def unpickleLong(b: Iterable[Byte]): Long = {
-    val (high, low) = b.splitAt(4)
-    (unpickleInt(high).toLong << 32) + (unpickleInt(low) & 0xFFFFFFFFL)
-  }
+  import PicklePositiveIntegers._
 
   def pickleStringUtf8(s: String): ByteChain = {
-    val bytes = s.getBytes("UTF8")
+    val bytes = s.getBytes(UTF8)
     pickleInt(bytes.length) ++ ByteChain(bytes)
   }
 
-  def unpickleStringUtf8(b: Iterable[Byte]): String = {
-    val (l, r) = b.splitAt(lengthOfInt)
-    val length = unpickleInt(l)
-    new String(r.take(length).toArray, "UTF8")
+  def unpickleStringUtf8(b: Iterator[Byte]): String = {
+    val length = unpickleInt(b)
+    new String(b.take(length).toArray, UTF8)
   }
 
   def pickleIdentifier(id: Identifier): ByteChain =
@@ -185,20 +254,16 @@ object Pickle {
       pickleInt(id.number.nodeIdentifier) ++
       pickleLong(id.logIndex)
 
-  def unpickleIdentifier(b: Iterable[Byte]): Identifier = {
-    val id = b.take(sizeOfIdentifier)
-    val (from, r1) = id.splitAt(lengthOfInt)
-    val (counter, r2) = r1.splitAt(lengthOfInt)
-    val (nodeIdentifier, logIndex) = r2.splitAt(lengthOfInt)
-    Identifier(unpickleInt(from), BallotNumber(unpickleInt(counter), unpickleInt(nodeIdentifier)), unpickleLong(logIndex))
+  def unpickleIdentifier(i: Iterator[Byte]): Identifier = {
+    Identifier(unpickleInt(i), BallotNumber(unpickleInt(i), unpickleInt(i)), unpickleLong(i))
   }
 
   def pickleCommit(c: Commit): ByteChain = {
     pickleIdentifier(c.identifier) ++ pickleLong(c.heartbeat)
   }
 
-  def unpickleCommit(b: Iterable[Byte]): Commit = {
-    Commit(unpickleIdentifier(b), unpickleLong(b.drop(sizeOfIdentifier)))
+  def unpickleCommit(b: Iterator[Byte]): Commit = {
+    Commit(unpickleIdentifier(b), unpickleLong(b))
   }
 
   def pickleValue(v: CommandValue) = v match {
@@ -208,43 +273,39 @@ object Pickle {
 
   def pickleNoOpValue = ByteChain.empty
 
-  def unpickleNoOpValue(b: Iterable[Byte]): CommandValue = NoOperationCommandValue
+  def unpickleNoOpValue(b: Iterator[Byte]): CommandValue = NoOperationCommandValue
 
   def pickleCommandValue(c: CommandValue): ByteChain = pickleStringUtf8(c.msgUuid) ++ pickleInt(c.bytes.length) ++ ByteChain(c.bytes)
 
-  def unpickleClientValue(b: Iterable[Byte]): ClientCommandValue = {
-    val (id: String, r2: Iterable[Byte], lv: Int) = unpackValue(b)
-    ClientCommandValue(id, r2.take(lv).toArray)
+  def unpickleClientValue(b: Iterator[Byte]): ClientCommandValue = {
+    val (id: String, lv: Int) = unpackMsgIdAndLength(b)
+    ClientCommandValue(id, b.take(lv).toArray)
   }
 
-  def unpickleReadOnlyClientValue(b: Iterable[Byte]): ReadOnlyClientCommandValue = {
-    val (id: String, r2: Iterable[Byte], lv: Int) = unpackValue(b)
-    ReadOnlyClientCommandValue(id, r2.take(lv).toArray)
+  def unpickleReadOnlyClientValue(b: Iterator[Byte]): ReadOnlyClientCommandValue = {
+    val (id: String, lv: Int) = unpackMsgIdAndLength(b)
+    ReadOnlyClientCommandValue(id, b.take(lv).toArray)
   }
 
-  def unpickleClusterValue(b: Iterable[Byte]): ClusterCommandValue = {
-    val (id: String, r2: Iterable[Byte], lv: Int) = unpackValue(b)
-    ClusterCommandValue(id, r2.take(lv).toArray)
+  def unpickleClusterValue(b: Iterator[Byte]): ClusterCommandValue = {
+    val (id: String, lv: Int) = unpackMsgIdAndLength(b)
+    ClusterCommandValue(id, b.take(lv).toArray)
   }
 
-  def unpackValue(b: Iterable[Byte]): (String, Iterable[Byte], Int) = {
-    val (l0, r0) = b.splitAt(lengthOfInt)
-    val lid = unpickleInt(l0)
-    val (i, r1) = r0.splitAt(lid)
-    val id = new String(i.take(lid).toArray)
-    val (l1, r2) = r1.splitAt(lengthOfInt)
-    val lv = unpickleInt(l1)
-    (id, r2, lv)
+  def unpackMsgIdAndLength(b: Iterator[Byte]): (String, Int) = {
+    val lid = unpickleInt(b)
+    val id = new String(b.take(lid).toArray)
+    val lv = unpickleInt(b)
+    (id, lv)
   }
 
   def pickleNotLeader(n: NotLeader): ByteChain = pickleInt(n.nodeId) ++ pickleStringUtf8(n.msgId)
 
-  def unpickleNotLeader(b: Iterable[Byte]): NotLeader = {
-    val (nodeId, r0) = b.splitAt(lengthOfInt)
-    val (l0, r1) = r0.splitAt(lengthOfInt)
-    val lid = unpickleInt(l0)
-    val msgId = new String(r1.take(lid).toArray, "UTF8")
-    NotLeader(unpickleInt(nodeId), msgId)
+  def unpickleNotLeader(i: Iterator[Byte]): NotLeader = {
+    val nodeId = unpickleInt(i)
+    val lid = unpickleInt(i)
+    val msgId = new String(i.take(lid).toArray, UTF8)
+    NotLeader(nodeId, msgId)
   }
 
   def pickleServerResponse(r: ServerResponse): ByteChain = pickleLong(r.logIndex) ++
@@ -253,154 +314,106 @@ object Pickle {
       ByteChain(Array(0.toByte))
     case Some(b) =>
       ByteChain(Array(1.toByte)) ++ pickleInt(b.length) ++ ByteChain(b)
-    })
+  })
 
   val zeroByte = 0x0.toByte
 
-  def unpickleServerResponse(b: Iterable[Byte]): ServerResponse = {
-    val (slot, r0 ) = b.splitAt(lengthOfLong)
-    val logIndex = unpickleLong(slot)
-    val (l, r1) = r0.splitAt(lengthOfInt)
-    val lid = unpickleInt(l)
-    val (s, r2) = r1.splitAt(lid)
-    val msgId = new String(s.take(lid).toArray, "UTF8")
-    val (optArray, r3) = r2.splitAt(1)
-    val bb: Byte = optArray.iterator.next()
+  def unpickleServerResponse(b: Iterator[Byte]): ServerResponse = {
+    val logIndex = unpickleLong(b)
+    val lid = unpickleInt(b)
+    val msgId = new String(b.take(lid).toArray, UTF8)
+    val bb: Byte = b.next()
     val opt = bb match {
       case b if b == zeroByte =>
         None
       case _ =>
-        val (l, r4) = r3.splitAt(lengthOfInt)
-        val length = unpickleInt(l)
-        Some(r4.take(length).toArray)
+        val length = unpickleInt(b)
+        Some(b.take(length).toArray)
     }
     ServerResponse(logIndex, msgId, opt)
   }
 
   def picklePrepare(p: Prepare): ByteChain = pickleIdentifier(p.id)
 
-  def unpicklePrepare(b: Iterable[Byte]): Prepare = Prepare(unpickleIdentifier(b))
+  def unpicklePrepare(b: Iterator[Byte]): Prepare = Prepare(unpickleIdentifier(b))
 
-  // we have a descrimnator which indicates the type of the command value
+  // this uses a discriminator to indicate the type of the command value
   def pickleAccept(a: Accept): ByteChain = pickleIdentifier(a.id) ++ ByteChain(Array(toMap(a.value.getClass))) ++ pickleValue(a.value)
 
-  def unpickleAccept(b: Iterable[Byte]): Accept = {
-    val (id, value) = b.splitAt(sizeOfIdentifier)
-    Accept(unpickleIdentifier(id), fromMap(value.take(1).last)(value.drop(1)).asInstanceOf[CommandValue])
+  def unpickleAccept(b: Iterator[Byte]): Accept = {
+    Accept(unpickleIdentifier(b), fromMap(b.next())(b).asInstanceOf[CommandValue])
   }
 
   def pickleProgress(p: Progress): ByteChain = pickleInt(p.highestPromised.counter) ++
     pickleInt(p.highestPromised.nodeIdentifier) ++ pickleIdentifier(p.highestCommitted)
 
-  def unpickleProgress(b: Iterable[Byte]): Progress = {
-    val (counter, r1) = b.splitAt(lengthOfInt)
-    val (nodeIdentifier, highestCommitted) = r1.splitAt(lengthOfInt)
-    Progress(BallotNumber(unpickleInt(counter), unpickleInt(nodeIdentifier)), unpickleIdentifier(highestCommitted))
+  def unpickleProgress(b: Iterator[Byte]): Progress = {
+    Progress(BallotNumber(unpickleInt(b), unpickleInt(b)), unpickleIdentifier(b))
   }
 
   def pickleAcceptAck(a: AcceptAck): ByteChain = pickleIdentifier(a.requestId) ++
     pickleInt(a.from) ++ pickleProgress(a.progress)
 
-  def unpickleAcceptAck(b: Iterable[Byte]): AcceptAck = {
-    val (requestId, r1) = b.splitAt(sizeOfIdentifier)
-    val (from, progress) = r1.splitAt(lengthOfInt)
-    AcceptAck(unpickleIdentifier(requestId), unpickleInt(from), unpickleProgress(progress))
+  def unpickleAcceptAck(b: Iterator[Byte]): AcceptAck = {
+    AcceptAck(unpickleIdentifier(b), unpickleInt(b), unpickleProgress(b))
   }
 
   def pickleAcceptNack(a: AcceptNack): ByteChain = pickleIdentifier(a.requestId) ++ pickleInt(a.from) ++
     pickleProgress(a.progress)
 
-  def unpickleAcceptNack(b: Iterable[Byte]): AcceptNack = {
-    val (requestId, r1) = b.splitAt(sizeOfIdentifier)
-    val (from, progress) = r1.splitAt(lengthOfInt)
-    AcceptNack(unpickleIdentifier(requestId), unpickleInt(from), unpickleProgress(progress))
+  def unpickleAcceptNack(b: Iterator[Byte]): AcceptNack = {
+    AcceptNack(unpickleIdentifier(b), unpickleInt(b), unpickleProgress(b))
   }
 
   def picklePrepareNack(p: PrepareNack): ByteChain = pickleIdentifier(p.requestId) ++ pickleInt(p.from) ++ pickleProgress(p.progress) ++ pickleLong(p.highestAcceptedIndex) ++ pickleLong(p.leaderHeartbeat)
 
-  def unpicklePrepareNack(b: Iterable[Byte]): PrepareNack = {
-    val (requestId: Iterable[Byte], from: Iterable[Byte], progress: Iterable[Byte], r3: Iterable[Byte]) = extractPrepare(b)
-    val (highestAcceptedIndex, leaderHeartbeat) = r3.splitAt(lengthOfLong)
-    PrepareNack(unpickleIdentifier(requestId), unpickleInt(from), unpickleProgress(progress), unpickleLong(highestAcceptedIndex), unpickleLong(leaderHeartbeat))
-  }
-
-  def extractPrepare(b: Iterable[Byte]): (Iterable[Byte], Iterable[Byte], Iterable[Byte], Iterable[Byte]) = {
-    val (requestId, r1) = b.splitAt(sizeOfIdentifier)
-    val (from, r2) = r1.splitAt(lengthOfInt)
-    val (progress, r3) = r2.splitAt(sizeOfProgress)
-    (requestId, from, progress, r3)
+  def unpicklePrepareNack(b: Iterator[Byte]): PrepareNack = {
+    PrepareNack(unpickleIdentifier(b), unpickleInt(b), unpickleProgress(b), unpickleLong(b), unpickleLong(b))
   }
 
   def picklePrepareAck(p: PrepareAck): ByteChain = {
-    val optionOfAccept = if (p.highestUncommitted.isDefined) ByteChain(Array(1.toByte)) ++ pickleAccept(p.highestUncommitted.get) else ByteChain(Array(0.toByte))
-    pickleIdentifier(p.requestId) ++ pickleInt(p.from) ++ pickleProgress(p.progress) ++ pickleLong(p.highestAcceptedIndex) ++ pickleLong(p.leaderHeartbeat) ++ optionOfAccept
+    val optionOfAccept =
+      if (p.highestUncommitted.isDefined)
+        ByteChain(Array(1.toByte)) ++ pickleAccept(p.highestUncommitted.get)
+      else
+        ByteChain(Array(0.toByte))
+    optionOfAccept ++ pickleIdentifier(p.requestId) ++ pickleInt(p.from) ++ pickleProgress(p.progress) ++ pickleLong(p.highestAcceptedIndex) ++ pickleLong(p.leaderHeartbeat)
   }
 
-  def unpicklePrepareAck(b: Iterable[Byte]): PrepareAck = {
-    val (requestId: Iterable[Byte], from: Iterable[Byte], progress: Iterable[Byte], r3: Iterable[Byte]) = extractPrepare(b)
-
-    val (highestAcceptedIndex, r4) = r3.splitAt(lengthOfLong)
-    val (leaderHeartbeat, r5) = r4.splitAt(lengthOfLong)
-    val (bool, accept) = r5.splitAt(lengthOfBool)
-
-    bool.lastOption match {
-      case Some(0x0) =>
-        PrepareAck(unpickleIdentifier(requestId), unpickleInt(from), unpickleProgress(progress), unpickleLong(highestAcceptedIndex), unpickleLong(leaderHeartbeat), None)
-      case _ =>
-        val a = unpickleAccept(accept)
-        PrepareAck(unpickleIdentifier(requestId), unpickleInt(from), unpickleProgress(progress), unpickleLong(highestAcceptedIndex), unpickleLong(leaderHeartbeat), Option(a))
+  def unpicklePrepareAck(b: Iterator[Byte]): PrepareAck = {
+    val optAccept = b.next() match {
+      case 0x0 => None
+      case _ => Some(unpickleAccept(b))
     }
+    PrepareAck(unpickleIdentifier(b), unpickleInt(b), unpickleProgress(b), unpickleLong(b), unpickleLong(b), optAccept)
   }
 
   def pickleRetransmitRequest(r: RetransmitRequest): ByteChain = pickleInt(r.from) ++ pickleInt(r.to) ++ pickleLong(r.logIndex)
 
-  def unpickleRetransitRequest(b: Iterable[Byte]): RetransmitRequest = {
-    val (from, r1) = b.splitAt(lengthOfInt)
-    val (to, logIndex) = r1.splitAt(lengthOfInt)
-    RetransmitRequest(unpickleInt(from), unpickleInt(to), unpickleLong(logIndex))
+  def unpickleRetransitRequest(b: Iterator[Byte]): RetransmitRequest = {
+    RetransmitRequest(unpickleInt(b), unpickleInt(b), unpickleLong(b))
   }
 
   def pickleSeqAccept(seq: Seq[Accept]): ByteChain = {
     seq.foldLeft(pickleInt(seq.length)) { (b, a) =>
-      val ap = pickleAccept(a)
-      val l = ap.length
-      // here we pickle the length so that we know how many bytes to drop to scroll to the next accept
-      b ++ pickleInt(l) ++ ap
+      b ++ pickleAccept(a)
     }
+  }
+
+  def unpickleSeqAccept(i: Iterator[Byte]): Seq[Accept] = {
+    val count = unpickleInt(i)
+    0.until(count).map(_ => unpickleAccept(i))
   }
 
   def pickleRetransmitResponse(r: RetransmitResponse): ByteChain = {
-    val b = pickleInt(r.from) ++
+    pickleInt(r.from) ++
       pickleInt(r.to) ++
       pickleSeqAccept(r.committed) ++
       pickleSeqAccept(r.uncommitted)
-    b
   }
 
-  def unpickleSeqAccept(bytes: Iterable[Byte]): (Seq[Accept], Iterable[Byte]) = {
-    @tailrec
-    def ups(count: Int, b: Iterable[Byte], seq: Seq[Accept]): (Seq[Accept], Iterable[Byte]) = {
-      if (count == 0) {
-        (seq, b)
-      } else {
-        val (length, abytes) = b.splitAt(lengthOfInt)
-        val l = unpickleInt(length)
-        ups(count - 1, abytes.drop(l), seq :+ unpickleAccept(abytes))
-      }
-    }
-    val (count, remainder) = bytes.splitAt(lengthOfInt)
-    ups(unpickleInt(count), remainder, Seq.empty)
-  }
-
-  def unpickleRetransmitResponse(b: Iterable[Byte]): RetransmitResponse = {
-
-    val (from, fromRemainder) = b.splitAt(lengthOfInt)
-    val (to, toRemainder) = fromRemainder.splitAt(lengthOfInt)
-
-    val (committed, committedRemainder) = unpickleSeqAccept(toRemainder)
-    val (uncommitted, uncommittedRemainder) = unpickleSeqAccept(committedRemainder)
-    require(uncommittedRemainder.isEmpty)
-    RetransmitResponse(unpickleInt(from), unpickleInt(to), committed, uncommitted)
+  def unpickleRetransmitResponse(b: Iterator[Byte]): RetransmitResponse = {
+    RetransmitResponse(unpickleInt(b), unpickleInt(b), unpickleSeqAccept(b), unpickleSeqAccept(b))
   }
 
   def pickle(a: AnyRef): ByteChain = a match {
@@ -422,7 +435,7 @@ object Pickle {
       ByteChain.empty
   }
 
-  def unpack(b: Iterable[Byte]): AnyRef = fromMap(b.head)(b.tail)
+  def unpack(b: Iterator[Byte]): AnyRef = fromMap(b.next)(b)
 
   def pack(a: AnyRef): ByteChain = ByteChain(Array(toMap(a.getClass))) ++ pickle(a)
 }

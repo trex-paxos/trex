@@ -43,7 +43,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
     TestKit.shutdownActorSystem(system)
   }
 
-  val minPrepare = Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
+  val minPrepare = Prepare(Identifier(0, BallotNumber(0, 0), 0))
 
   object `A three node cluster` {
 
@@ -212,7 +212,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       // given node0 leader
       val node0 = new TestJournal
       val actor0 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 0, self, node0, ArrayBuffer.empty, None))
-      actor0.underlyingActor.setAgent(Leader, actor0.underlyingActor.data.copy(acceptResponses = SortedMap.empty, epoch = Some(BallotNumber(counter = Int.MinValue + 1, nodeIdentifier = 0))))
+      actor0.underlyingActor.setAgent(Leader, actor0.underlyingActor.data.copy(acceptResponses = SortedMap.empty, epoch = Some(BallotNumber(counter = 1, nodeIdentifier = 0))))
 
       // and some higher promise
       val node0progress = node0.loadProgress()
@@ -290,9 +290,9 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       val v3 = ClientCommandValue("22", Array[Byte] {
         3
       })
-      val a1 = Accept(Identifier(0, BallotNumber(Int.MinValue + 1, Int.MinValue + 1), 1L), v1)
-      val a2 = Accept(Identifier(0, BallotNumber(Int.MinValue + 1, Int.MinValue + 1), 2L), v2)
-      val a3 = Accept(Identifier(0, BallotNumber(Int.MinValue + 1, Int.MinValue + 1), 3L), v3)
+      val a1 = Accept(Identifier(0, BallotNumber(1, 1), 1L), v1)
+      val a2 = Accept(Identifier(0, BallotNumber(1, 1), 2L), v2)
+      val a3 = Accept(Identifier(0, BallotNumber(1, 1), 3L), v3)
       journal1.accept(Seq(a1, a2, a3): _*)
       val actor1 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 1, self, journal1, ArrayBuffer.empty, None))
       // when node zero times-out

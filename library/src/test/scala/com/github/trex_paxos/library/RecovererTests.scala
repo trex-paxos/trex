@@ -26,7 +26,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
     }
 
     def `should be defined for a recoverer and a Prepare if the prepare is less than the promise` {
-      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)))))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(0, 0), 0)))))
     }
 
     def `should be defined for a recoverer and a Prepare if the prepare is higher than the promise` {
@@ -38,7 +38,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
     }
 
     def `should be defined for a recoverer and an Accept with a lower number` {
-      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Accept(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0), NoOperationCommandValue))))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Accept(Identifier(0, BallotNumber(0, 0), 0), NoOperationCommandValue))))
     }
 
     def `should be defined for a recoverer and an Accept with a higher number for a committed slot` {
@@ -121,7 +121,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
 
     def `should be defined for a low commit` {
       val agent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
-      val commit = Commit(Identifier(1, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
+      val commit = Commit(Identifier(1, BallotNumber(0, 0), Long.MinValue))
       assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
@@ -138,7 +138,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
     }
 
     def `should be defined for a Prepare if the prepare is less than the promise` {
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)))))
+      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(0, 0), 0)))))
     }
 
     def `should be defined for a Prepare if the prepare is higher than the promise` {
@@ -150,7 +150,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
     }
 
     def `should be defined for an Accept with a lower number` {
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Accept(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0), NoOperationCommandValue))))
+      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Accept(Identifier(0, BallotNumber(0, 0), 0), NoOperationCommandValue))))
     }
 
     def `should be defined for an Accept with a higher number for a committed slot` {

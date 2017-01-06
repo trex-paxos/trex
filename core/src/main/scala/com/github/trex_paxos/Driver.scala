@@ -261,7 +261,7 @@ class DynamicClusterDriver(timeout: Timeout, maxAttempts: Int) extends BaseDrive
 
   def localReceive: Receive = {
     case i: DynamicClusterDriver.Initialize =>
-      membership = Option(CommittedMembership(Long.MinValue, i.membership))
+      membership = Option(CommittedMembership(0, i.membership))
       log.info("membership initialized to {}", membership)
     case CheckMembership =>
       // FIXME

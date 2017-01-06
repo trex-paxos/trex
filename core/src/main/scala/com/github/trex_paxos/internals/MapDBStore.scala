@@ -56,7 +56,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
   def loadProgress(): Progress = {
     val bytes = bookworkMap.get("FileJournal")
     val checked = ByteChain(bytes).checkCrcData()
-    Pickle.unpickleProgress(checked)
+    Pickle.unpickleProgress(checked.iterator)
   }
 
   def accept(a: Accept*): Unit = {
@@ -75,7 +75,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
         None
       case Some(bytes) =>
         val checked = ByteChain(bytes).checkCrcData()
-        Some(Pickle.unpickleAccept(checked))
+        Some(Pickle.unpickleAccept(checked.iterator))
     }
   }
 

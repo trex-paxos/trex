@@ -65,7 +65,7 @@ with PaxosLenses {
         override def randomTimeout: Long = 12345L
       }
       // and a low accept
-      val highAccept = Accept(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MaxValue), NoOperationCommandValue)
+      val highAccept = Accept(Identifier(0, BallotNumber(0, 0), Long.MaxValue), NoOperationCommandValue)
       // when
       val SelfAckOrNack(response, acceptResponses) = ClientCommandHandler.leaderSelfAckOrNack(ioWithTimeout, agent, highAccept)
       // then
@@ -91,7 +91,7 @@ with PaxosLenses {
       // and a Leader agent with a high promise
       val highPromiseData = highestPromisedLens.set(initialData, BallotNumber(Int.MaxValue, Int.MaxValue))
       val agent: PaxosAgent =
-        PaxosAgent(5, Leader, highPromiseData.copy(epoch = Option(BallotNumber(Int.MinValue, Int.MinValue))), TestHelpers.initialQuorumStrategy)
+        PaxosAgent(5, Leader, highPromiseData.copy(epoch = Option(BallotNumber(0, 0))), TestHelpers.initialQuorumStrategy)
       // and a fresh timeout
       val ioWithTimeout = new UndefinedIO {
         override def randomTimeout: Long = 12345L
