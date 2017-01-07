@@ -108,10 +108,21 @@ object ByteChain {
   }
 }
 
+/**
+  * Pickles positive integers in a 7 bit big-endian format. The leading byte has a bit header of zero to eight consecutive
+  * 1s that indicates how many following bytes are part of the number. A leading 0 bit says no following bytes implying
+  * 7 bits of data whereas a leading 1110 says three following bytes implying 28 bits of data.
+  */
 object PicklePositiveIntegers {
 
+  /**
+    * @param maxBits Bits of data
+    * @param header Leading bit header of zero or more consecutive 1s.
+    * @param extractHeader Mask to extract the header.
+    * @param extractBody Mask to remove the header.
+    */
   case class Constants(maxBits: Int, header: Int, extractHeader: Int, extractBody: Int) {
-    def bytes = maxBits / 7
+    val bytes = maxBits / 7
   }
 
   @inline def unsigned(b: Byte): Int = if (b >= 0) {
@@ -132,7 +143,7 @@ object PicklePositiveIntegers {
 
   val constants = Seq(c0, c1, c2, c3, c4, c5, c6, c7, c8)
 
-  val sizes: Array[Long] = (constants map {
+  val numberMaxSizes: Array[Long] = (constants map {
     c => Math.pow(2, c.maxBits).toLong
   }).toArray
 
@@ -140,7 +151,7 @@ object PicklePositiveIntegers {
     require(l >= 0)
 
     def lookupIndex(l: Long): Int = {
-      sizes.foldLeft(0) { (index, long) =>
+      numberMaxSizes.foldLeft(0) { (index, long) =>
         if (l < long) return index
         else index + 1
       }
@@ -189,12 +200,9 @@ object PicklePositiveIntegers {
     // above 57 bits we end up with 9 bytes the first of which is leading zeros we need to drop
     val longBytes = if (bytes.length <= 8) bytes else bytes.take(8)
 
-    val bytesWithIndex: Seq[(Byte, Int)] = longBytes.reverse.zipWithIndex
-
-    val value: Long = bytesWithIndex.foldLeft(0L) {
+    val value: Long = longBytes.zipWithIndex.foldLeft(0L) {
       case (cumulative: Long, (b: Byte, index: Int)) =>
-        val shift = 8 * (longBytes.length - 1 - index)
-        cumulative + (unsigned(b).toLong << shift)
+        cumulative + (unsigned(b).toLong << (8 * index))
     }
 
     value
