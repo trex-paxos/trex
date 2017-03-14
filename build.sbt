@@ -3,7 +3,9 @@ val mapdbVersion = "1.0.9"
 val scalatestVersion = "2.2.5"
 val scalmockVersion = "3.2.2"
 val akkaVersion = "2.3.15"
-val logbackVersion = "1.1.7"
+val logbackVersion = "1.2.1"
+val nettyVersion = "4.1.8.Final"
+val metricsVersion = "3.2.1"
 
 lazy val commonSettings = Seq(
   scalaVersion := "2.11.8",
@@ -22,6 +24,19 @@ lazy val library = project.settings(commonSettings: _*).
     libraryDependencies ++= Seq(
       "org.scalatest" % "scalatest_2.11" % scalatestVersion % "test",
       "org.scalamock" %% "scalamock-scalatest-support" % scalmockVersion % "test"
+    )
+  )
+
+lazy val netty = project.dependsOn(library).
+  configs(IntegrationTest).
+  settings(commonSettings: _*).
+  settings(Defaults.itSettings: _*).
+  settings(name := "trex-netty").
+  settings(
+    libraryDependencies ++= Seq(
+      "io.netty" % "netty-all" % nettyVersion,
+      "ch.qos.logback" % "logback-classic" % logbackVersion,
+      "io.dropwizard.metrics" % "metrics-core" % metricsVersion
     )
   )
 
