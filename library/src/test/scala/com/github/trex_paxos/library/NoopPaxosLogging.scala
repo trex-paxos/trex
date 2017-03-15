@@ -11,6 +11,8 @@ class EmptyLogging extends PaxosLogging {
 
   override def info(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = {}
 
+  override def info(msg: String, one: Any, two: Any, three: Any, four: Any, five: Any): Unit = {}
+
   override def debug(msg: String): Unit = {}
 
   override def debug(msg: String, one: Any): Unit = {}
@@ -40,6 +42,12 @@ class EmptyLogging extends PaxosLogging {
   override def error(msg: String, one: Any, two: Any, three: Any): Unit = {}
 
   override def error(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = {}
+
+  override def debug(msg: String, one: Any, two: Any, three: Any, four: Any, five: Any): Unit = {}
+
+  override def error(msg: String, one: Any, two: Any, three: Any, four: Any, five: Any): Unit = {}
+
+  override def warning(msg: String, one: Any, two: Any, three: Any, four: Any, five: Any): Unit = {}
 }
 
 object NoopPaxosLogging extends EmptyLogging

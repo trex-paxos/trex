@@ -97,8 +97,8 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
     "should reset data" in {
       import Ordering._
       // given lots of leadership data
-      val number = BallotNumber(Int.MinValue, Int.MinValue)
-      val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
+      val number = BallotNumber(0, 0)
+      val id = Identifier(0, number, 0)
       val leaderData = PaxosData(
         progress = Progress(
           number, id
@@ -112,7 +112,7 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
       val handler = new PaxosLenses with BackdownAgent
       val sentNoLongerLeader = Box(false)
       val io = new TestIO(new UndefinedJournal) {
-        override def randomTimeout: Long = 99L
+        override def scheduleRandomCheckTimeout: Long = 99L
 
         override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
           case None => sentNoLongerLeader(true)
@@ -156,6 +156,8 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
 
       override def warning(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = captured += "warning:" + msg + "," + one + "," + two + "," + three + "," + four
 
+      override def warning(msg: String, one: Any, two: Any, three: Any, four: Any, five: Any): Unit = captured += "warning:" + msg + "," + one + "," + two + "," + three + "," + four + "," + five
+
       override def error(msg: String): Unit = captured += "error:" + msg
 
       override def error(msg: String, one: Any): Unit = captured += "error:" + msg + "," + one
@@ -165,6 +167,8 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
       override def error(msg: String, one: Any, two: Any, three: Any): Unit = captured += "error:" + msg + "," + one + "," + two + "," + three
 
       override def error(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = captured += "error:" + msg + "," + one + "," + two + "," + three + "," + four
+
+      override def error(msg: String, one: Any, two: Any, three: Any, four: Any, five: Any): Unit = captured += "error:" + msg + "," + one + "," + two + "," + three + "," + four + "," + five
 
       override def debug(msg: String): Unit = captured += "debug:" + msg
 
@@ -176,6 +180,8 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
 
       override def debug(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = captured += "debug:" + msg + "," + one + "," + two + "," + three + "," + four
 
+      override def debug(msg: String, one: Any, two: Any, three: Any, four: Any, five: Any): Unit = captured += "debug:" + msg + "," + one + "," + two + "," + three + "," + four + "," + five
+
       override def info(msg: String): Unit = captured += "info:" + msg
 
       override def info(msg: String, one: Any): Unit = captured += "info:" + msg + "," + one
@@ -185,6 +191,11 @@ class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
       override def info(msg: String, one: Any, two: Any, three: Any): Unit = captured += "info:" + msg + "," + one + "," + two + "," + three
 
       override def info(msg: String, one: Any, two: Any, three: Any, four: Any): Unit = captured += "info:" + msg + "," + one + "," + two + "," + three + "," + four
+
+      override def info(msg: String, one: Any, two: Any, three: Any, four: Any, five: Any): Unit = captured += "info:" + msg + "," + one + "," + two + "," + three + "," + four + "," + five
+
+
+
     }
 
     "should log debug" in {

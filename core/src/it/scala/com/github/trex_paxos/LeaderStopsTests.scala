@@ -5,6 +5,7 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import akka.util.Timeout
 import com.github.trex_paxos.library._
 import org.scalatest._
+import org.scalatest.refspec.{RefSpecLike}
 
 import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, Buffer}
@@ -12,7 +13,7 @@ import scala.concurrent.Await
 import scala.language.postfixOps
 
 class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
-  NoFailureTests.spacedTimeoutConfig)) with SpecLike with ImplicitSender with BeforeAndAfterAll with BeforeAndAfter with Matchers {
+  NoFailureTests.spacedTimeoutConfig)) with RefSpecLike with ImplicitSender with BeforeAndAfterAll with BeforeAndAfter with Matchers {
 
   import scala.concurrent.duration._
 
@@ -92,14 +93,12 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
 
   def consistentDeliveries(delivered: Map[Int, Buffer[Payload]]): Unit = {
 
-    // slots are committed in ascending order with possible repeats and no gaps
+    // slots are committed in ascending order.
+    // note that we will see gaps due to chosen Noops during leader takeovers which are not delivered.
     delivered.values foreach { values =>
       values.foldLeft(0L) {
         case (lastCommitted, Payload(nextCommitted, value)) =>
           lastCommitted should be <= nextCommitted
-          if( nextCommitted > lastCommitted) {
-            (nextCommitted - lastCommitted) shouldBe 1
-          }
           nextCommitted
       }
     }

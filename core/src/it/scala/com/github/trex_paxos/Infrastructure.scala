@@ -4,8 +4,6 @@ import java.io.FileWriter
 import java.util.concurrent.CopyOnWriteArrayList
 
 import akka.actor._
-import com.github.trex_paxos.internals.AkkaPaxosActor.TraceData
-import com.github.trex_paxos.internals.AkkaPaxosActor
 import com.github.trex_paxos.library._
 import com.typesafe.config.Config
 
@@ -14,26 +12,6 @@ import scala.collection.immutable.{Seq, SortedMap}
 import scala.collection.mutable
 import scala.language.postfixOps
 import scala.util.Try
-
-class TestJournal extends Journal {
-  private val _progress = Box(Journal.minBookwork.copy())
-  private val _map = Box(SortedMap[Long, Accept]())
-
-  def saveProgress(progress: Progress): Unit = _progress(progress)
-
-  def loadProgress(): Progress = _progress()
-
-  def accept(accepted: Accept*): Unit = accepted foreach { a =>
-    _map(_map() + (a.id.logIndex -> a))
-  }
-
-  def accepted(logIndex: Long): Option[Accept] = _map().get(logIndex)
-
-  def bounds: JournalBounds = {
-    val keys = _map().keys
-    if (keys.isEmpty) JournalBounds(0L, 0L) else JournalBounds(keys.head, keys.last)
-  }
-}
 
 class TestAkkaPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: mutable.Buffer[Payload], tracer: Option[AkkaPaxosActor.Tracer])
   extends AkkaPaxosActor(config, nodeUniqueId, journal) {
@@ -78,6 +56,26 @@ object ClusterHarness {
   * @param config The cluster config
   */
 class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogging {
+
+  class TestJournal extends Journal {
+    private val _progress = Box(Journal.minBookwork.copy())
+    private val _map = Box(SortedMap[Long, Accept]())
+
+    def saveProgress(progress: Progress): Unit = _progress(progress)
+
+    def loadProgress(): Progress = _progress()
+
+    def accept(accepted: Accept*): Unit = accepted foreach { a =>
+      _map(_map() + (a.id.logIndex -> a))
+    }
+
+    def accepted(logIndex: Long): Option[Accept] = _map().get(logIndex)
+
+    def bounds: JournalBounds = {
+      val keys = _map().keys
+      if (keys.isEmpty) JournalBounds(0L, 0L) else JournalBounds(keys.head, keys.last)
+    }
+  }
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.duration._

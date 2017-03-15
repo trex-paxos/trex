@@ -1,4 +1,4 @@
-package com.github.trex_paxos.internals
+package com.github.trex_paxos.core
 
 import akka.actor.ActorRef
 import _root_.com.github.trex_paxos.library._

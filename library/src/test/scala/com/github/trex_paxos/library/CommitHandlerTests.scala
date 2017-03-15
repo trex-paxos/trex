@@ -82,7 +82,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareSelfAck, leaderHeartbeat = Long.MinValue), initialQuorumStrategy)
       // and an io with a new timeout
       val io = new UndefinedIO with SilentLogging {
-        override def randomTimeout: Long = Long.MaxValue
+        override def scheduleRandomCheckTimeout: Long = Long.MaxValue
       }
       // and a commit with a higher heartbeat
       val commitWithHigherHeartbeat = Commit(initialData.progress.highestCommitted, Long.MaxValue)
@@ -102,7 +102,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val agent = PaxosAgent(0, Follower, initialData.copy(prepareResponses = prepareSelfAck, leaderHeartbeat = Long.MinValue), initialQuorumStrategy)
       // and an io with a new timeout
       val io = new UndefinedIO with SilentLogging {
-        override def randomTimeout: Long = Long.MaxValue
+        override def scheduleRandomCheckTimeout: Long = Long.MaxValue
       }
       // and a commit with a higher number
       val commitWithHigherNumber = Commit(initialData.progress.highestCommitted.copy(number = high), Long.MinValue)
@@ -127,7 +127,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val PaxosAgent(_, _, data, _) = handler.handleFollowerCommit(new UndefinedIO with SilentLogging {
         override def journal: Journal = emptyJournal
 
-        override def randomTimeout: Long = 1234L
+        override def scheduleRandomCheckTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage) = sent += msg
       }, agent, Commit(a98.id))
@@ -150,7 +150,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val PaxosAgent(_, _, data, _) = handler.handleFollowerCommit(new UndefinedIO with SilentLogging {
         override def journal: Journal = stubJournal
 
-        override def randomTimeout: Long = 1234L
+        override def scheduleRandomCheckTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage) = sent += msg
       }, agent, Commit(a98.id))
@@ -182,7 +182,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val sentMessages: ArrayBuffer[PaxosMessage] = ArrayBuffer()
       val io = new TestIO(stubJournal) {
 
-        override def randomTimeout: Long = 1234L
+        override def scheduleRandomCheckTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage) = sentMessages += msg
 
@@ -221,7 +221,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val sentMessages: ArrayBuffer[PaxosMessage] = ArrayBuffer()
       val io = new TestIO(stubJournal) {
 
-        override def randomTimeout: Long = 1234L
+        override def scheduleRandomCheckTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage) = sentMessages += msg
 
@@ -247,7 +247,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       // then
       data shouldBe initialData
     }
-    "should commit next slow on different number and set new timeout" in {
+    "should commit next slot on different number and set new timeout" in {
       // given we have a11 thru a14 in the journal
       val stubJournal: Journal = new UndefinedJournal {
         override def saveProgress(progress: Progress): Unit = ()
@@ -269,7 +269,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       // then we will have made new progress
       data.progress.highestCommitted shouldBe a12.id
       // and set a new timeout
-      data.timeout shouldBe io.randomTimeout
+      data.timeout shouldBe io.scheduleRandomCheckTimeout
     }
     "should perform a fast-forward commit and set new timeout" in {
       // given we have a11 thru a14 in the journal
@@ -293,7 +293,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       // then we will have made new progress
       data.progress.highestCommitted shouldBe accepts11thru14.lastOption.value.id
       // and set a new timeout
-      data.timeout shouldBe io.randomTimeout
+      data.timeout shouldBe io.scheduleRandomCheckTimeout
     }
   }
 }

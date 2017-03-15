@@ -1,8 +1,9 @@
 
-package com.github.trex_paxos.internals
+package com.github.trex_paxos.core
 
 import java.io.{Closeable, File}
 
+import com.github.trex_paxos.Membership
 import org.mapdb.{DB, DBMaker}
 
 import scala.collection.JavaConversions
@@ -14,7 +15,7 @@ import com.github.trex_paxos.library._
   * @param journalFile File to journal into.
   * @param retained    Minimum number of committed slots to retain for retransmission
   */
-class MapDBStore(journalFile: File, retained: Int) extends Journal with Closeable {
+class MapDBStore(journalFile: File, retained: Int) extends Journal with MemberStore with Closeable {
 
   import com.github.trex_paxos.util.{Pickle,ByteChain}
 
@@ -40,7 +41,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with Closeabl
 
   def saveProgress(progress: Progress): Unit = {
     // save the bookwork
-    val bytes = Pickle.pickle(progress)
+    val bytes = Pickle.pickle(progress).prependCrcData()
     bookworkMap.put("FileJournal", bytes.toArray)
     db.commit() // eager commit
     // lazy gc of some old values as dont commit until next update
@@ -52,15 +53,17 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with Closeabl
   }
 
   def loadProgress(): Progress = {
+    // init() method means that this should never return null
     val bytes = bookworkMap.get("FileJournal")
-    Pickle.unpickleProgress(ByteChain(bytes))
+    val checked = ByteChain(bytes).checkCrcData()
+    Pickle.unpickleProgress(checked.iterator)
   }
 
   def accept(a: Accept*): Unit = {
     a foreach {
       case a@Accept(Identifier(_, _, logIndex), value) =>
         // store the value in the map
-        val bytes = Pickle.pickle(a)
+        val bytes = Pickle.pickle(a).prependCrcData()
         storeMap.put(logIndex, bytes.toArray)
     }
     if (a.nonEmpty) db.commit()
@@ -71,7 +74,8 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with Closeabl
       case None =>
         None
       case Some(bytes) =>
-        Some(Pickle.unpickleAccept(ByteChain(bytes)))
+        val checked = ByteChain(bytes).checkCrcData()
+        Some(Pickle.unpickleAccept(checked.iterator))
     }
   }
 
@@ -89,4 +93,30 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with Closeabl
     }
   }
 
+  // stores the current cluster membership at a given slot
+  val memberMap: java.util.concurrent.ConcurrentNavigableMap[Long, Array[Byte]] =
+    db.getTreeMap("MEMBERS")
+
+  val UTF8 = "UTF8"
+
+  override def saveMembership(slot: Long, membership: Membership): Unit = {
+    import scala.collection.JavaConverters._
+    val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
+    lastSlotOption foreach {
+      case last if last < slot => // good
+      case last => throw new IllegalArgumentException(s"slot ${slot} is not higher than last ${last}")
+    }
+    val json = MemberPickle.toJson(membership)
+    memberMap.put(slot, json.getBytes(UTF8))
+    db.commit()
+  }
+
+  override def loadMembership(): Option[Membership] = {
+    import scala.collection.JavaConverters._
+    val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
+    lastSlotOption map { (s: Long) =>
+      val jsonBytesUtf8 = memberMap.get(s)
+      MemberPickle.fromJson(new String(jsonBytesUtf8, UTF8))
+    }
+  }
 }

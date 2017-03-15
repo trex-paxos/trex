@@ -1,9 +1,10 @@
-package com.github.trex_paxos.internals
+package com.github.trex_paxos.core
 
 import java.security.SecureRandom
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Cancellable}
-import PaxosActor._
+import AkkaPaxosActor._
+import com.github.trex_paxos.PaxosProperties
 import com.github.trex_paxos.library._
 import com.typesafe.config.Config
 
@@ -19,7 +20,7 @@ import scala.util.Try
  * @param nodeUniqueId The unique identifier of this node. This *must* be unique in the cluster which is required as of the Paxos algorithm to work properly and be safe.
  * @param journal The durable journal required to store the state of the node in a stable manner between crashes.
  */
-abstract class PaxosActorNoTimeout(config: PaxosProperties, val nodeUniqueId: Int, val journal: Journal) extends Actor
+abstract class AkkaPaxosActorNoTimeout(config: PaxosProperties, val nodeUniqueId: Int, val journal: Journal) extends Actor
 with PaxosIO
 with ActorLogging
 with AkkaLoggingAdapter {
@@ -82,7 +83,7 @@ with AkkaLoggingAdapter {
     case f => logger.error("Received unknown messages type {}", f)
   }
 
-  val minPrepare = Prepare(Identifier(nodeUniqueId, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
+  val minPrepare = Prepare(Identifier(nodeUniqueId, BallotNumber(0, 0), 0))
 
   var sent: collection.immutable.Seq[PaxosMessage] = collection.immutable.Seq()
 
@@ -124,7 +125,7 @@ with AkkaLoggingAdapter {
     t
   }
 
-  def randomTimeout = freshTimeout(randomInterval)
+  def scheduleRandomCheckTimeout = freshTimeout(randomInterval)
 
   type Epoch = Option[BallotNumber]
   type PrepareSelfVotes = SortedMap[Identifier, Option[Map[Int, PrepareResponse]]]
@@ -136,15 +137,7 @@ with AkkaLoggingAdapter {
    * @param payload The selected value and a delivery id that can be used to deduplicate deliveries during crash recovery.
    * @return The response to the value command that has been delivered. May be an empty array.
    */
-  def deliver(payload: Payload): Any = (filteredDeliverClient orElse deliverMembership)(payload)
-
-  /**
-   * The consensus algorithm my commit noop values which are filtered out rather than being passed to the client code.
-   */
-  val filteredDeliverClient: PartialFunction[Payload, Any] = {
-    case Payload(_, NoOperationCommandValue) => NoOperationCommandValue.bytes
-    case p@Payload(_, c: ClientCommandValue) => deliverClient(p)
-  }
+  def deliver(payload: Payload): Any = (deliverClient orElse deliverMembership)(payload)
 
   /**
    * The cluster membership finite state machine. The new membership has been chosen but will come into effect
@@ -154,15 +147,6 @@ with AkkaLoggingAdapter {
     case Payload(_, _) =>
       throw new AssertionError("not yet implemented") // FIXME
   }
-
-  /**
-   * Notifies clients that it is no longer the leader by sending them an exception.
-   */
-//  def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit = clientCommands foreach {
-//    case (id, (cmd, client)) =>
-//      log.warning("Sending NoLongerLeader to client {} the outcome of the client cmd {} at slot {} is unknown.", client, cmd, id.logIndex)
-//      respond(client, new LostLeadershipException(nodeUniqueId, cmd.msgUuid))
-//  }
 
   /**
    * If you require transactions in the host application then you need to supply a custom Journal which participates
@@ -187,8 +171,8 @@ with AkkaLoggingAdapter {
  * This class reschedules a random interval CheckTimeout used to timeout on responses and an evenly spaced
  * Paxos.HeartBeat which is used by a leader.
  */
-abstract class PaxosActor(config: PaxosProperties, nodeUniqueId: Int, journal: Journal)
-  extends PaxosActorNoTimeout(config, nodeUniqueId, journal) {
+abstract class AkkaPaxosActor(config: PaxosProperties, nodeUniqueId: Int, journal: Journal)
+  extends AkkaPaxosActorNoTimeout(config, nodeUniqueId, journal) {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.duration._
@@ -215,32 +199,7 @@ abstract class PaxosActor(config: PaxosProperties, nodeUniqueId: Int, journal: J
   }
 }
 
-object PaxosProperties {
-  def apply(config: Config) = {
-    /**
-      * To ensure cluster stability you *must* test your max GC under extended peak load and set this as some multiple
-      * of observed GC pause.
-      */
-    val leaderTimeoutMin = Try {
-      config.getInt(leaderTimeoutMinKey)
-    } getOrElse (1000)
-
-    val leaderTimeoutMax = Try {
-      config.getInt(leaderTimeoutMaxKey)
-    } getOrElse (3 * leaderTimeoutMin)
-
-
-    require(leaderTimeoutMax > leaderTimeoutMin)
-
-    new PaxosProperties(leaderTimeoutMin, leaderTimeoutMax)
-  }
-
-  def apply() = new PaxosProperties(1000, 3000)
-}
-
-case class PaxosProperties(val leaderTimeoutMin: Long, val leaderTimeoutMax: Long)
-
-object PaxosActor {
+object AkkaPaxosActor {
 
   val leaderTimeoutMinKey = "trex.leader-timeout-min"
   val leaderTimeoutMaxKey = "trex.leader-timeout-max"
@@ -253,7 +212,7 @@ object PaxosActor {
 
   val freshAcceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering)
 
-  val minJournalBounds = JournalBounds(Long.MinValue, Long.MinValue)
+  val minJournalBounds = JournalBounds(0, 0)
 
   def initialAgent(nodeUniqueId: Int, progress: Progress, clusterSize: () => Int) =
     new PaxosAgent(nodeUniqueId, Follower, PaxosData(progress, 0, 0,

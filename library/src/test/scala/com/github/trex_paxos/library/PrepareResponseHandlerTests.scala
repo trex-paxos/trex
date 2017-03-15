@@ -28,7 +28,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       val handler = new TestPrepareResponseHandlerNoRetransmission
       val vote = PrepareAck(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), 12, 13, None)
       val PaxosAgent(_, role, state, _) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
-        override def randomTimeout: Long = 1234L
+        override def scheduleRandomCheckTimeout: Long = 1234L
       }, PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy), vote)
       // then
       role match {
@@ -47,7 +47,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       val vote = PrepareNack(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), 12, 13)
       // when
       val PaxosAgent(_, role, _, _) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
-        override def randomTimeout: Long = 1234L
+        override def scheduleRandomCheckTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
           val update = TimeAndMessage(msg, System.nanoTime())
@@ -72,7 +72,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       val vote = PrepareAck(recoverHighPrepare.id, 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), otherAcceptedIndex, 13, None)
       // when
       val PaxosAgent(_, role, data, _) = handler.handlePrepareResponse(new TestIO(emptyJournal) {
-        override def randomTimeout: Long = 1234L
+        override def scheduleRandomCheckTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
           val update = TimeAndMessage(msg, System.nanoTime())
@@ -115,7 +115,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       val higherPromise = Progress.highestPromisedLens.set(selfAckPrepares.progress, BallotNumber(Int.MaxValue, Int.MaxValue))
       // when
       val PaxosAgent(_, role, data, _) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
-        override def randomTimeout: Long = 1234L
+        override def scheduleRandomCheckTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
           val update = TimeAndMessage(msg, System.nanoTime())
@@ -162,7 +162,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       }
       // and an IO that records send time
       val io = new TestIO(journal) {
-        override def randomTimeout: Long = 1234L
+        override def scheduleRandomCheckTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
           val update = TimeAndMessage(msg, System.nanoTime())
@@ -214,7 +214,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
       // when
       val higherPromise = Progress.highestPromisedLens.set(selfAckPrepares.progress, BallotNumber(Int.MaxValue, Int.MaxValue))
       val PaxosAgent(_, role, data, _) = handler.handlePrepareResponse(new TestIO(new UndefinedJournal) {
-        override def randomTimeout: Long = 1234L
+        override def scheduleRandomCheckTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
           val update = TimeAndMessage(msg, System.nanoTime())
@@ -256,7 +256,7 @@ class PrepareResponseHandlerTests extends WordSpecLike with Matchers with Option
 
       // when
       val PaxosAgent(_, role, data, _) = handler.handlePrepareResponse(new TestIO(emptyJournal) {
-        override def randomTimeout: Long = 1234L
+        override def scheduleRandomCheckTimeout: Long = 1234L
 
         override def send(msg: PaxosMessage): Unit = {
           sentValues += msg

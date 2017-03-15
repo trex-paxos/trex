@@ -12,7 +12,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
   def handleFollowerResendLowPrepares(io: PaxosIO, agent: PaxosAgent): PaxosAgent = {
     io.logger.debug("Node {} {} timed-out having already issued a low. rebroadcasting", agent.nodeUniqueId, agent.role)
     io.send(agent.minPrepare)
-    agent.copy(data = timeoutLens.set(agent.data, io.randomTimeout))
+    agent.copy(data = timeoutLens.set(agent.data, io.scheduleRandomCheckTimeout))
   }
 
   def handleFollowerTimeout(io: PaxosIO, agent: PaxosAgent): PaxosAgent = {
@@ -30,7 +30,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
     val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
       Map(agent.minPrepare.id -> Map(agent.nodeUniqueId -> PrepareNack(agent.minPrepare.id, agent.nodeUniqueId, agent.data.progress, highestAcceptedIndex(io), agent.data.leaderHeartbeat)))
     io.send(agent.minPrepare)
-    PaxosAgent(agent.nodeUniqueId, Follower, timeoutPrepareResponsesLens.set(agent.data, (io.randomTimeout, prepareSelfVotes)), agent.quorumStrategy)
+    PaxosAgent(agent.nodeUniqueId, Follower, timeoutPrepareResponsesLens.set(agent.data, (io.scheduleRandomCheckTimeout, prepareSelfVotes)), agent.quorumStrategy)
   }
 
   def handelFollowerPrepareResponse(io: PaxosIO, agent: PaxosAgent, vote: PrepareResponse): PaxosAgent = {
@@ -99,7 +99,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
             val epoch: Option[BallotNumber] = Some(selfPromise)
             io.logger.info("Node {} Follower broadcast {} prepare messages with {} transitioning Recoverer max slot index {}.", agent.nodeUniqueId, prepares.size, selfPromise, maxAcceptedSlot)
             // make a promise to self not to accept higher numbered messages and journal that
-            val newData = highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens.set(agent.data, (selfPromise, io.randomTimeout, epoch, prepareSelfVotes, SortedMap.empty))
+            val newData = highestPromisedTimeoutEpochPrepareResponsesAcceptResponseLens.set(agent.data, (selfPromise, io.scheduleRandomCheckTimeout, epoch, prepareSelfVotes, SortedMap.empty))
             io.journal.saveProgress(newData.progress)
             prepares.foreach(io.send(_))
             agent.copy(role = Recoverer,

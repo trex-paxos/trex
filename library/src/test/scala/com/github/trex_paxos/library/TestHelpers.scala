@@ -19,7 +19,7 @@ class UndefinedIO extends PaxosIO{
 
   override def logger: PaxosLogging = throw new AssertionError("deliberately not implemented")
 
-  override def randomTimeout: Long = throw new AssertionError("deliberately not implemented")
+  override def scheduleRandomCheckTimeout: Long = throw new AssertionError("deliberately not implemented")
 
   override def clock: Long = throw new AssertionError("deliberately not implemented")
 
@@ -74,7 +74,7 @@ class TestIO(j: Journal) extends UndefinedIO {
 
   override def journal: Journal = j
 
-  override def randomTimeout: Long = 12345L
+  override def scheduleRandomCheckTimeout: Long = 12345L
 
   override def logger: PaxosLogging = NoopPaxosLogging
 
@@ -95,7 +95,7 @@ case class TimeAndParameter(time: Long, parameter: Any)
 
 object TestHelpers extends PaxosLenses{
 
-  val minPrepare = Prepare(Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
+  val minPrepare = Prepare(Identifier(0, BallotNumber(0, 0), 0  ))
 
   val undefinedIO = new UndefinedIO
 
@@ -125,7 +125,7 @@ object TestHelpers extends PaxosLenses{
     override def clock: Long = Long.MaxValue
   }
 
-  val lowValue = Int.MinValue + 1
+  val lowValue = 1
 
   val initialData = PaxosData(progress = Progress(
           highestPromised = BallotNumber(lowValue, lowValue),
@@ -144,9 +144,11 @@ object TestHelpers extends PaxosLenses{
 
   val undefinedAcceptResponse = new UndefinedAcceptResponse
 
-  val identifier98: Identifier = Identifier(1, BallotNumber(2, 2), 98L)
+  val identifier98 = Identifier(1, BallotNumber(2, 2), 98L)
 
-  val a98 = Accept(identifier98, NoOperationCommandValue)
+  val clientCommandValue98 = ClientCommandValue("98", Array[Byte](98.toByte))
+
+  val a98 = Accept(identifier98, clientCommandValue98)
 
   val emptyAcceptResponses98: SortedMap[Identifier, AcceptResponsesAndTimeout] = TreeMap(
     a98.id -> AcceptResponsesAndTimeout(100L, a98, Map.empty)
@@ -159,7 +161,10 @@ object TestHelpers extends PaxosLenses{
 
   val identifier99: Identifier = Identifier(2, BallotNumber(2, 2), 99L)
   val identifier100: Identifier = Identifier(3, BallotNumber(3, 3), 100L)
-  val a99 = Accept(identifier99, NoOperationCommandValue)
+
+  val clientCommandValue99 = ClientCommandValue("99", Array[Byte](99.toByte))
+
+  val a99 = Accept(identifier99, clientCommandValue99)
 
   val a100 = Accept(identifier100, DummyCommandValue("100"))
 

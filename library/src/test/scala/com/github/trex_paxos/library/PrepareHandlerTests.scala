@@ -1,17 +1,16 @@
 package com.github.trex_paxos.library
 
-import TestHelpers._
+import com.github.trex_paxos.library.Ordering._
+import com.github.trex_paxos.library.TestHelpers._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{OptionValues, Spec}
+import org.scalatest.OptionValues
+import org.scalatest.refspec.RefSpec
 
 import scala.collection.immutable.TreeMap
-import scala.compat.Platform
-
-import Ordering._
 
 class TestPrepareHandler extends PrepareHandler
 
-class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
+class PrepareHandlerTests extends RefSpec with MockFactory with OptionValues {
   val agentPromise10 = PaxosAgent(0, Follower, initialData.copy(progress = initialData.progress.copy(highestPromised = BallotNumber(10, 10))), initialQuorumStrategy)
 
   object `A PromiseHandler` {
@@ -51,7 +50,7 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
     }
 
     def `should clear any none follower data and become follower when recoverer` = {
-      val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
+      val id = Identifier(0, BallotNumber(0, 0), 0)
       val recoverLikeData = initialData.copy(epoch = Some(BallotNumber(10, 10)),
         prepareResponses = TreeMap(id -> Map.empty),
         acceptResponses = emptyAcceptResponses98)
@@ -71,7 +70,7 @@ class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
     }
 
     def `should send out NotLeader and return to follower if leader` {
-      val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
+      val id = Identifier(0, BallotNumber(0, 0), 0)
       val mockJournal = stub[Journal]
       (mockJournal.saveProgress _ ).when(*)
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))

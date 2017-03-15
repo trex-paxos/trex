@@ -78,7 +78,7 @@ with CommitHandler {
 
       case None =>
         // insufficient votes keep counting
-        val updated = agent.data.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(io.randomTimeout, accept, votes))
+        val updated = agent.data.acceptResponses + (vote.requestId -> AcceptResponsesAndTimeout(io.scheduleRandomCheckTimeout, accept, votes))
         io.logger.debug("Node {} {} insufficient votes for {} have {}", agent.nodeUniqueId, agent.role, vote.requestId, updated)
         agent.copy(data = acceptResponsesLens.set(agent.data, updated))
     }
@@ -89,12 +89,17 @@ with CommitHandler {
 
     io.logger.debug("Node {} committed {} with new progress {} and results {}", agent.nodeUniqueId, lastId, newProgress, results)
 
+    // flushing progress to disk must always occur before sending any messages.
     io.journal.saveProgress(newProgress)
 
+    // sending of commit notification must happen after the disk flush. io.send may defer by buffering to serialize and transit on a different thread.
     io.send(Commit(newProgress.highestCommitted))
 
+    // responding to the client should happen after flushing the progress to disk to ensure all nodes eventually agree.
+    // the sending of the response to the client may be reordered with respect to sending the commit by buffering and serialization of commit or resposne on different threads
     io.respond(Option(results.toMap))
 
+    // update the in memory state so that we are ready for the next message to be processed.
     agent.copy(data = progressLens.set(agent.data, newProgress))
   }
 }

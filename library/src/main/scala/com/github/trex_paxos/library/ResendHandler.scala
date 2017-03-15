@@ -39,7 +39,7 @@ trait ResendHandler extends PaxosLenses {
       case (id, _) =>
         io.send(Prepare(id))
     }
-    agent.copy(data = timeoutLens.set(agent.data, io.randomTimeout))
+    agent.copy(data = timeoutLens.set(agent.data, io.scheduleRandomCheckTimeout))
   }
 
   def computeResendAccepts(io: PaxosIO, agent: PaxosAgent, time: Long): AcceptsAndData = {
@@ -55,10 +55,10 @@ trait ResendHandler extends PaxosLenses {
 
       val oldEpoch: BallotNumber = agent.data.epoch.getOrElse(Journal.minBookwork.highestPromised)
 
-      val newTimeout = io.randomTimeout
+      val newTimeout = io.scheduleRandomCheckTimeout
 
       // update the top level timeout which is a fast check guard on timeouts
-      val data = timeoutLens.set(agent.data, io.randomTimeout)
+      val data = timeoutLens.set(agent.data, io.scheduleRandomCheckTimeout)
 
       // the accepts we timed out on responses for
       val oldAccepts = late.map {

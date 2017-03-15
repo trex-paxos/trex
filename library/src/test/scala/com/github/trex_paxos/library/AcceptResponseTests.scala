@@ -56,7 +56,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       val handler = new Object with AcceptResponseHandler
       val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98), TestHelpers.initialQuorumStrategy)
       val randomTimeoutIO = new UndefinedIO with SilentLogging {
-        override def randomTimeout: Long = Long.MaxValue
+        override def scheduleRandomCheckTimeout: Long = Long.MaxValue
       }
 
       // when
@@ -80,7 +80,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       val handler = new Object with AcceptResponseHandler
       val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98), TestHelpers.initialQuorumStrategy)
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
-        override def randomTimeout: Long = Long.MaxValue
+        override def scheduleRandomCheckTimeout: Long = Long.MaxValue
         override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }
 
@@ -98,7 +98,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       val handler = new Object with AcceptResponseHandler
       val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSplitAckAndNack), TestHelpers.initialQuorumStrategy)
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
-        override def randomTimeout: Long = Long.MaxValue
+        override def scheduleRandomCheckTimeout: Long = Long.MaxValue
         override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }
 
@@ -116,7 +116,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       val handler = new Object with AcceptResponseHandler
       val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptSelfAck98and99), TestHelpers.initialQuorumStrategy)
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
-        override def randomTimeout: Long = Long.MaxValue
+        override def scheduleRandomCheckTimeout: Long = Long.MaxValue
       }
 
       // when
@@ -144,7 +144,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       val handler = new Object with AcceptResponseHandler
       val agent = PaxosAgent(0, Leader, initialData96.copy(acceptResponses = acceptSelfAck98), TestHelpers.initialQuorumStrategy)
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
-        override def randomTimeout: Long = Long.MaxValue
+        override def scheduleRandomCheckTimeout: Long = Long.MaxValue
         override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }
 
@@ -257,7 +257,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       val handler = new Object with AcceptResponseHandler
       val agent = PaxosAgent(0, Leader, initialData97.copy(acceptResponses = acceptkAndTwoNack98), TestHelpers.initialQuorumSimpleStrategy4)
       val ioRandomTimeout = new UndefinedIO with SilentLogging {
-        override def randomTimeout: Long = Long.MaxValue
+        override def scheduleRandomCheckTimeout: Long = Long.MaxValue
 
         override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
           case None => // good
@@ -282,7 +282,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
       val agent = PaxosAgent(0, Leader, initialData96.copy(acceptResponses = acceptkAndTwoNack98), TestHelpers.initialQuorumStrategy)
       val errorLog = ArrayBuffer[String]()
       val ioRandomTimeout = new UndefinedIO {
-        override def randomTimeout: Long = Long.MaxValue
+        override def scheduleRandomCheckTimeout: Long = Long.MaxValue
 
         override def logger: PaxosLogging = new EmptyLogging {
           override def error(msg: String): Unit = errorLog += msg

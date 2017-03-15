@@ -10,9 +10,7 @@ import Ordering._
 import scala.collection.mutable.ArrayBuffer
 
 object TestFollowerHandler extends PaxosLenses {
-
-
-  val minPrepare: Prepare = Prepare(Identifier(99, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
+  val minPrepare: Prepare = Prepare(Identifier(99, BallotNumber(0, 0), 0))
 
   val selfNack = PrepareNack(minPrepare.id, 0, initialData.progress, 0, 999)
 
@@ -37,7 +35,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       // when timeout on minPrepare logic is invoked
       handler.sendLowPrepares(new TestIO(new UndefinedJournal){
         override def send(msg: PaxosMessage): Unit = sentMsg(msg)
-        override def randomTimeout: Long = 12345L
+        override def scheduleRandomCheckTimeout: Long = 12345L
       }, agent) match {
         case PaxosAgent(99, Follower, data: PaxosData, _) =>
           // it should set a fresh timeout
@@ -58,7 +56,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       // when timeout on minPrepare logic is invoked
       handler.handleFollowerResendLowPrepares(new TestIO(new UndefinedJournal){
         override def send(msg: PaxosMessage): Unit = sentMsg(msg)
-        override def randomTimeout: Long = 12345L
+        override def scheduleRandomCheckTimeout: Long = 12345L
       }, PaxosAgent(99, Follower, initialData, initialQuorumStrategy)) match {
         case PaxosAgent(_, _, data, _) =>
           // it should set a fresh timeout
@@ -83,7 +81,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       // when it sees a higher committed slot index in a response
       handler.handleLowPrepareResponse(new TestIO(new UndefinedJournal){
         override def send(msg: PaxosMessage): Unit = sentMsg(msg)
-        override def randomTimeout: Long = 999L
+        override def scheduleRandomCheckTimeout: Long = 999L
         override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }, PaxosAgent(0, Follower, initialDataWithTimeoutAndPrepareResponses, initialQuorumStrategy), vote) match {
         case PaxosAgent(0, Follower, data, _) =>
@@ -97,7 +95,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
         case x => fail(x.toString)
       }
     }
-    "ignores a response that it is not waiting on" in {
+    "ignore a response that it is not waiting on" in {
       // given a handler
       val handler = new TestFollowerHandler
       // and a prepare response it is not waiting on
@@ -167,7 +165,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
           case p: Prepare => highPrepares += p
           case _ =>
         }
-        override def randomTimeout: Long = 12345L
+        override def scheduleRandomCheckTimeout: Long = 12345L
       }, PaxosAgent(99, Follower, initialDataWithTimeoutAndPrepareResponses.copy(leaderHeartbeat = 999L), initialQuorumStrategy), vote) match {
         case PaxosAgent(99, Recoverer, data, _) =>
           // issue #13 we are ignoring the highest accepted in the responses so only send 1 high prepare here rather than 3
@@ -225,7 +223,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       val agent = PaxosAgent(0, Follower, data.copy(leaderHeartbeat = 888), initialQuorumStrategy)
       // and io with some timeout
       val io = new UndefinedIO with SilentLogging{
-        override def randomTimeout: Long = 12345L
+        override def scheduleRandomCheckTimeout: Long = 12345L
 
         override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }

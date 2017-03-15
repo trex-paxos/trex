@@ -1,4 +1,4 @@
-package com.github.trex_paxos.internals
+package com.github.trex_paxos.core
 
 import java.io.File
 
@@ -27,7 +27,7 @@ class MapDBStoreSpec extends WordSpecLike with Matchers with BeforeAndAfter with
     deleteMapDbFiles
   }
 
-  val minValue = BallotNumber(Int.MinValue, Int.MinValue)
+  val minValue = BallotNumber(0, 0)
 
   val expectedString = "Knossos"
   val expectedBytes = expectedString.getBytes

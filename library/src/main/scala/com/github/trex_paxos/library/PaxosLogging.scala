@@ -23,6 +23,8 @@ trait PaxosLogging {
 
   def info(msg: String, one: Any, two: Any, three: Any, four: Any): Unit
 
+  def info(msg: String, one: Any, two: Any, three: Any, four: Any, five: Any): Unit
+
   def debug(msg: String): Unit
 
   def debug(msg: String, one: Any): Unit
@@ -32,6 +34,8 @@ trait PaxosLogging {
   def debug(msg: String, one: Any, two: Any, three: Any): Unit
 
   def debug(msg: String, one: Any, two: Any, three: Any, four: Any): Unit
+
+  def debug(msg: String, one: Any, two: Any, three: Any, four: Any, five: Any): Unit
 
   def error(msg: String): Unit
 
@@ -43,6 +47,8 @@ trait PaxosLogging {
 
   def error(msg: String, one: Any, two: Any, three: Any, four: Any): Unit
 
+  def error(msg: String, one: Any, two: Any, three: Any, four: Any, five: Any): Unit
+
   def warning(msg: String): Unit
 
   def warning(msg: String, one: Any): Unit
@@ -52,5 +58,7 @@ trait PaxosLogging {
   def warning(msg: String, one: Any, two: Any, three: Any): Unit
 
   def warning(msg: String, one: Any, two: Any, three: Any, four: Any): Unit
+
+  def warning(msg: String, one: Any, two: Any, three: Any, four: Any, five: Any): Unit
 
 }

@@ -2,15 +2,17 @@ package com.github.trex_paxos.javademo
 
 import java.io.File
 
-import org.scalatest.{Matchers, Spec}
+import com.github.trex_paxos.demo.StringStackShared
+import org.scalatest.refspec.RefSpec
+import org.scalatest.Matchers
 
-class StringStackTests extends Spec with Matchers {
+class StringStackTests extends RefSpec with Matchers {
 
   object `A StringStack` {
 
     object `when empty` {
 
-      object `should push, peek and pop` {
+      def `should push, peek and pop` {
         val stack: StringStack = new StringStackImpl
         stack.empty() shouldBe true
         stack.push("hello")
@@ -23,7 +25,7 @@ class StringStackTests extends Spec with Matchers {
         h2 shouldBe "hello"
       }
 
-      object `should multi push and pop` {
+      def `should multi push and pop` {
         val stack: StringStack = new StringStackImpl
         stack.push("hello")
         stack.push("world")
@@ -33,7 +35,7 @@ class StringStackTests extends Spec with Matchers {
         h shouldBe "hello"
       }
 
-      object `should retain state` {
+      def `should retain state` {
         val file = File.createTempFile("stack", "data")
 
         def one() {
@@ -60,7 +62,7 @@ class StringStackTests extends Spec with Matchers {
         empty.empty() shouldBe true
       }
 
-      object `pop should only pop one` {
+      def `should should only pop one` {
         val file = File.createTempFile("stack", "data")
 
         def one() {
@@ -92,10 +94,22 @@ class StringStackTests extends Spec with Matchers {
 
         val empty = new StringStackImpl(file)
         empty.empty() shouldBe true
+
       }
 
+      def `should parse network locations` {
+
+          "127.0.0.1:2562|10.0.0.1:2563" match {
+            case StringStackShared.LocationsRegex(one, two, three, four) =>
+              one should be("127.0.0.1")
+              two should be("2562")
+              three should be("10.0.0.1")
+              four should be("2563")
+
+            case f => fail(f.toString)
+          }
+
+      }
     }
-
   }
-
 }

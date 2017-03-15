@@ -2,18 +2,19 @@ package com.github.trex_paxos.library
 
 import java.util.concurrent.atomic.AtomicLong
 
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.{OptionValues, Spec, Matchers}
+import _root_.org.scalamock.scalatest.proxy.MockFactory
+import _root_.org.scalatest.{Matchers, OptionValues}
+import org.scalatest.refspec.RefSpec
 
 class TestAcceptHandler extends AcceptHandler
 
-class AcceptHandlerTests extends Spec with Matchers with MockFactory with OptionValues with PaxosLenses {
+class AcceptHandlerTests extends RefSpec with Matchers with MockFactory with OptionValues with PaxosLenses {
 
   object `A HighAcceptHandler` {
     def `should require accept number at least as high as promise` {
       val handler = new TestAcceptHandler
       val mockJournal = stub[Journal]
-      val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
+      val id = Identifier(0, BallotNumber(0, 0), 0)
       val agent = PaxosAgent(1, Follower, TestHelpers.initialData, TestHelpers.initialQuorumStrategy)
       intercept[IllegalArgumentException] {
         handler.handleHighAccept(new TestIO(mockJournal), agent, Accept(id, NoOperationCommandValue))
@@ -68,19 +69,34 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
     val expectedBytes = expectedString.getBytes
 
     def `should ack duplicated accept` {
-      val stubJournal: Journal = stub[Journal]
       // given initial state
       val promised = BallotNumber(6, 1)
       val data = highestPromisedLens.set(TestHelpers.initialData, promised)
       val identifier = Identifier(0, promised, 1)
       // and some already journaled accept
-      val accepted = Accept(identifier, DummyCommandValue("1"))
-      stubJournal.accepted _ when 0L returns Some(accepted)
+      val acc = Accept(identifier, DummyCommandValue("1"))
+
+      // updating to latest async scalatest broke stubbing :-(
+      val stubJournal: Journal = new Journal {
+        override def bounds: JournalBounds = ???
+
+        override def loadProgress(): Progress = ???
+
+        override def accepted(logIndex: Long): Option[Accept] = logIndex match {
+          case 0L => Option(acc)
+          case f => fail(f.toString)
+        }
+
+        override def accept(a: Accept*): Unit = {}
+
+        override def saveProgress(progress: Progress): Unit = ???
+      }
+
       // when our node sees this
       val handler = new TestAcceptHandler
       val agent = PaxosAgent(1, Follower, data, TestHelpers.initialQuorumStrategy)
       val io = new TestIO(stubJournal)
-      val PaxosAgent(_, Follower, newData, _) = handler.handleAccept(io, agent, accepted)
+      val PaxosAgent(_, Follower, newData, _) = handler.handleAccept(io, agent, acc)
       // it acks
       io.sent().headOption.value match {
         case MessageAndTimestamp(ack: AcceptAck, _) => // good
@@ -95,13 +111,13 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
       // given initial state
       val committedLogIndex = 1
       val promised = BallotNumber(5, 0)
-      val initialData = TestHelpers.initialData.copy( progress = Progress(promised, Identifier(0, promised, committedLogIndex)))
+      val initialData = TestHelpers.initialData.copy(progress = Progress(promised, Identifier(0, promised, committedLogIndex)))
       // and some higher identifier but for a slot already committed
       val higherIdentifier = Identifier(0, BallotNumber(6, 0), committedLogIndex)
       val acceptedAccept = Accept(higherIdentifier, DummyCommandValue("2"))
       // when our node sees this
       val handler = new TestAcceptHandler
-      val agent = PaxosAgent(1, Follower, initialData, TestHelpers.initialQuorumStrategy )
+      val agent = PaxosAgent(1, Follower, initialData, TestHelpers.initialQuorumStrategy)
       val io = new TestIO(stubJournal)
       val PaxosAgent(_, Follower, newData, _) = handler.handleAccept(io, agent, acceptedAccept)
       // it nacks
@@ -114,7 +130,7 @@ class AcceptHandlerTests extends Spec with Matchers with MockFactory with Option
     }
 
     def `sould nack and accept below current promise` {
-      val id = Identifier(0, BallotNumber(Int.MinValue, Int.MinValue), 0)
+      val id = Identifier(0, BallotNumber(0, 0), 0)
       val accept = Accept(id, NoOperationCommandValue)
       val handler = new TestAcceptHandler
       val journal = new UndefinedJournal

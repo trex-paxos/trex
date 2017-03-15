@@ -8,7 +8,7 @@ package com.github.trex_paxos.library
   * @param quorumStrategy The current quorum strategy (which could be any FPaxos flexible paxos strategy)
   */
 case class PaxosAgent(nodeUniqueId: Int, role: PaxosRole, data: PaxosData, quorumStrategy: QuorumStrategy) {
-  def minPrepare: Prepare = Prepare(Identifier(nodeUniqueId, BallotNumber(Int.MinValue, Int.MinValue), Long.MinValue))
+  def minPrepare: Prepare = Prepare(Identifier(nodeUniqueId, BallotNumber(0, 0), 0))
 }
 
 /**
@@ -20,15 +20,19 @@ case class PaxosAgent(nodeUniqueId: Int, role: PaxosRole, data: PaxosData, quoru
 case class PaxosEvent(io: PaxosIO, agent: PaxosAgent, message: PaxosMessage)
 
 /**
-  * Paxos has side effects (writes to the network and read+write to disk) which are isolated into this class to simplify testing.
+  * The result of processing an event.
+  * @param agent The new agent state
+  * @param messages The message to pass within the cluster
+  */
+case class PaxosResult(agent: PaxosAgent, messages: Seq[PaxosMessage])
+
+/**
+  * Paxos has side effects (writes to the network and read+write to disk) which are isolated into this trait to simplify testing.
   */
 trait PaxosIO {
-  ////val clients = agent.data.clientCommands + (accept.id ->(value, client))
-  // * @param clientCommands The client work outstanding with the leader. The map key is the accept identifier and the value is a tuple of the client command and a key to the remote handle.
-  def assocateIdentifierToValue(id: Identifier, value: CommandValue)
 
-  /** The durable story to hold the state on disk.
-   */
+  /** The durable store to hold the state on disk.
+    */
   def journal: Journal
 
   /**
@@ -37,12 +41,13 @@ trait PaxosIO {
   def logger: PaxosLogging
 
   /**
-    * Randomised timeouts.
-   */
-  def randomTimeout: Long
+    * Schedule a future CheckTimeout PaxosMessage after a randomised interval.
+    * @return The local clock wall time at which the timeout has occurred.
+    */
+  def scheduleRandomCheckTimeout: Long
 
   /**
-    * The current time (so that we can test timeout permutations and behaviours).
+    * The current time (we use a def so that we can override when testing).
     */
   def clock: Long
 
@@ -58,35 +63,35 @@ trait PaxosIO {
     */
   def send(msg: PaxosMessage)
 
-  // actor version side-effects by adding id to a weak map
-  def senderId(): String
+  /**
+    * Associate a command value with a paxos identifier so that the result of the commit can be routed back to the sender of the command
+    * @param value The command to asssociate with a message identifer.
+    * @param id The message identifier
+    */
+  def associate(value: CommandValue, id: Identifier): Unit
 
   /**
-    * Send a host application response back to a client.
+    * Respond to clients.
+    * @param results The results of a fast forward commit or None if leadership was lost such that the commit outcome is unknown.
     */
-  def respond(client: String, data: Any)
-
-  /**
-    * Inform a client that we are no longer accepted commands.
-    */
-  def sendNoLongerLeader(clientCommands: Map[Identifier, (CommandValue, String)]): Unit
+  def respond(results: Option[scala.collection.immutable.Map[Identifier, Any]]): Unit
 }
 
 object PaxosAlgorithm {
-  type PaxosFunction = PartialFunction[PaxosEvent, PaxosAgent]
+  type PaxosFunction = PartialFunction[PaxosEvent, PaxosResult]
 }
 
 class PaxosAlgorithm extends PaxosLenses
-with CommitHandler
-with FollowerHandler
-with RetransmitHandler
-with PrepareHandler
-with AcceptHandler
-with PrepareResponseHandler
-with AcceptResponseHandler
-with ResendHandler
-with ReturnToFollowerHandler
-with ClientCommandHandler {
+  with CommitHandler
+  with FollowerHandler
+  with RetransmitHandler
+  with PrepareHandler
+  with AcceptHandler
+  with PrepareResponseHandler
+  with AcceptResponseHandler
+  with ResendHandler
+  with ReturnToFollowerHandler
+  with ClientCommandHandler {
 
   import PaxosAlgorithm._
 
@@ -94,7 +99,7 @@ with ClientCommandHandler {
     // update heartbeat and attempt to commit contiguous accept messages
     case PaxosEvent(io, agent@PaxosAgent(_, Follower, _, _), c@Commit(i, heartbeat)) =>
       handleFollowerCommit(io, agent, c)
-    case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, _, _, _), _), CheckTimeout) if io.clock >= to =>
+    case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, _, _), _), CheckTimeout) if io.clock >= to =>
       handleFollowerTimeout(io, agent)
     case PaxosEvent(io, agent, vote: PrepareResponse) if agent.role == Follower =>
       handelFollowerPrepareResponse(io, agent, vote)
@@ -134,8 +139,8 @@ with ClientCommandHandler {
   }
 
   /**
-   * If no other logic has caught a timeout then do nothing.
-   */
+    * If no other logic has caught a timeout then do nothing.
+    */
   val ignoreNotTimedOutCheck: PaxosFunction = {
     case PaxosEvent(_, agent, CheckTimeout) =>
       agent
@@ -168,10 +173,10 @@ with ClientCommandHandler {
   }
 
   /**
-   * Here on a timeout we deal with either pending prepares or pending accepts putting a priority on prepare handling
-   * which backs down easily. Only if we have dealt with all timed out prepares do we handle timed out accepts which
-   * is more aggressive as it attempts to go-higher than any other node number.
-   */
+    * Here on a timeout we deal with either pending prepares or pending accepts putting a priority on prepare handling
+    * which backs down easily. Only if we have dealt with all timed out prepares do we handle timed out accepts which
+    * is more aggressive as it attempts to go-higher than any other node number.
+    */
   val resendFunction: PaxosFunction = {
     // if we have timed-out on prepare messages
     case PaxosEvent(io, agent, CheckTimeout) if agent.data.prepareResponses.nonEmpty && io.clock > agent.data.timeout =>
@@ -205,7 +210,7 @@ with ClientCommandHandler {
 
     // broadcasts a new client value
     case PaxosEvent(io, agent, value: CommandValue) =>
-      handleClientCommand(io, agent, value, io.senderId)
+      handleClientCommand(io, agent, value)
 
     // ignore late vote as we would have transitioned on a majority ack
     case PaxosEvent(io, agent, value: PrepareResponse) =>

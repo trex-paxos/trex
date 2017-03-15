@@ -1,9 +1,10 @@
 package com.github.trex_paxos.library
 
+// WARNING you should only return 0 if objects are equal else standard library red black trees will return random values on map lookups
 object Ordering {
 
   implicit object IdentifierLogOrdering extends Ordering[Identifier] {
-    def compare(o1: Identifier, o2: Identifier) = if (o1.logIndex == o2.logIndex) 0 else if (o1.logIndex >= o2.logIndex) 1 else -1
+    def compare(o1: Identifier, o2: Identifier) = if (o1.logIndex == o2.logIndex) BallotNumberOrdering.compare(o1.number, o2.number) else if (o1.logIndex >= o2.logIndex) 1 else -1
   }
 
   implicit object BallotNumberOrdering extends Ordering[BallotNumber] {

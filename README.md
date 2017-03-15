@@ -4,6 +4,7 @@ Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more informa
 
 [![Build Status](https://travis-ci.org/trex-paxos/trex.svg?branch=master)](https://travis-ci.org/trex-paxos/trex)
 [![Codacy Badge](https://www.codacy.com/project/badge/73b345d5a4c74a4d9d458596e64fe212)](https://www.codacy.com/app/simbo1905remixed/trex)
+[![Codacy Badge](https://api.codacy.com/project/badge/Coverage/73b345d5a4c74a4d9d458596e64fe212)](https://www.codacy.com/app/simbo1905remixed/trex?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=trex-paxos/trex&amp;utm_campaign=Badge_Coverage)
 [![Join the chat at https://gitter.im/trex-paxos/trex](https://badges.gitter.im/trex-paxos/trex.svg)](https://gitter.im/trex-paxos/trex?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ## Releases
@@ -39,17 +40,17 @@ sbt coverageReport
 
 0.3 - practical
 
+- [x] crc32 message integrity 
 - [ ] Remove Akka dependence from core (keep in tests)
 - [ ] dynamic cluster membership
-- [ ] message integrity 
 
 0.6 - enhanced 
 
-- [ ] learners / scale-out multicast
+- [ ] unbounded paxos with learners
 - [ ] timeline reads
 - [ ] noop heartbeats (less duels and partitioned leader detection)
 - [ ] snapshots and out of band retransmission
-- [ ] metrics/akka-tracing
+- [ ] metrics
 - [ ] binary tracing 
 - [ ] jumbo UDP packets
 - [ ] complete the TODOs

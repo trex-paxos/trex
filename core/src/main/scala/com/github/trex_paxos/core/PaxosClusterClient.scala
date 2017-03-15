@@ -1,39 +1,50 @@
-package com.github.trex_paxos
+package com.github.trex_paxos.core
 
 import java.io.{ByteArrayOutputStream, ObjectOutputStream}
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListMap}
 
-import com.github.trex_paxos.library.{ClientCommandValue, CommandValue, ServerResponse}
+import com.github.trex_paxos.library.{ClientCommandValue, CommandValue, PaxosLogging, ServerResponse}
+import com.github.trex_paxos.util.Pickle
+import io.netty.buffer.ByteBuf
 
-import scala.collection.{Map, _}
+import scala.collection._
+import scala.collection.concurrent.TrieMap
 import scala.collection.convert.decorateAsScala._
-import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap, ConcurrentSkipListMap}
-
-import scala.collection.concurrent.{Map, TrieMap}
 import scala.compat.Platform
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Future, Promise}
-import scala.util.{Success, Try}
+import scala.util.Success
 
 /**
   * Bookwork to hold a request.
-  * @param command The command in the request so that we can resend. This assumes that you have idempotency if not you should set the maxAttempts to zero.
-  * @param promise The callback.
-  * @param timeoutTime The minimum timeout point in ms.
-  * @param attempt If we allow multiple attempts this is the retry countdown.
+  *
+  * @param command          The command in the request so that we can resend. This assumes that you have idempotency if not you should set the maxAttempts to zero.
+  * @param promise          The callback.
+  * @param timeoutTime      The minimum timeout point in ms.
+  * @param attempt          If we allow multiple attempts this is the retry countdown.
   * @param notLeaderCounter The counter value when the request was sent.
   */
 case class Request(command: CommandValue, promise: Promise[ServerResponse], timeoutTime: Long, attempt: Int, notLeaderCounter: Int)
 
 /**
   * A meeting point for messages exchanged with the paxos cluster with timeout and retry logic.
-  * @param requestTimeout The timeout at which point our future returns a timeout exception. This means that we dont know
-  *                       whether the command was actually run. During a leader failover the value may be selected but
-  *                       as our connection to the dead leader is gone we won't get notified that the command was run.
-  *                       Instead the application has to requery.
-  * @param maxAttempts The number of retry attempts. Should be set to zero if the messages are not idempotent
   */
-abstract class PaxosClusterClient(requestTimeout: Duration, maxAttempts: Int) {
+trait PaxosClusterClient {
+
+  def log: PaxosLogging
+
+  /**
+    * @return The timeout at which point our future returns a timeout exception. This means that we dont know
+    *                       whether the command was actually run. During a leader failover the value may be selected but
+    *                       as our connection to the dead leader is gone we won't get notified that the command was run.
+    *                       Instead the application has to requery.
+    */
+  def requestTimeout: Duration
+
+  /**
+    * @return The number of retry attempts. Should be set to zero if the messages are not idempotent
+    */
+  def maxAttempts: Int
 
   val timeoutMillis = requestTimeout.toMillis
 
@@ -50,6 +61,7 @@ abstract class PaxosClusterClient(requestTimeout: Duration, maxAttempts: Int) {
 
   /**
     * The message ID is used to correlate responses back from the paxos cluster with the request sent out.
+    *
     * @return
     */
   def nextMessageUuid() = java.util.UUID.randomUUID.toString
@@ -57,13 +69,13 @@ abstract class PaxosClusterClient(requestTimeout: Duration, maxAttempts: Int) {
   /**
     * Paxos is optimal with a stable leader. The leader may change arbitrarily. This means that we may get back a
     * NotLeader for a given message. When we see that we increment the following counter. That means that the
-    * transmission strategy can pick another node to talk to via some strategy. A naive strategy would be to pick
-    * a node using notLeaderCounter%clusterSize but a more sophisticated strategies might be possible.
+    * transmission strategy can pick another node to try. A naive strategy would be to pick
+    * a node using "notLeaderCounter % clusterSize" but a more sophisticated strategies might be possible.
     */
-  protected var notLeaderCounter: Int = 0
+  @volatile protected var notLeaderCounter: Int = 0
 
   def hold(request: Request): Unit = {
-    // this may overwrite an old request if we timed out and are retrying
+    // this should overwrite an old request if we timed out and are retrying with a new timeout
     requestById.put(request.command.msgUuid, request)
 
     requestByTimeoutById.synchronized {
@@ -86,7 +98,7 @@ abstract class PaxosClusterClient(requestTimeout: Duration, maxAttempts: Int) {
       Option(requestByTimeoutById.get(request.timeoutTime)) match {
         case Some(map) =>
           map.remove(request.command.msgUuid)
-          if( map.isEmpty )
+          if (map.isEmpty)
             requestByTimeoutById.remove(request.timeoutTime)
         case _ =>
       }
@@ -116,16 +128,17 @@ abstract class PaxosClusterClient(requestTimeout: Duration, maxAttempts: Int) {
   }
 
   /**
-    * Abstract method which transmits to the paxos cluster. Coulbe be implimented as TCP or UDT.
+    * Abstract method which transmits to the paxos cluster. Coulbe be implimented as TCP or UDP or even UDT.
+    *
     * @param notLeaderCounter A value which is incremented whenever we learn that the node we are sending to is not the leader.
-    *                     It is anticipated that a leaderCursor%cluterSize could be used to pick the node in the cluster to
-    *                     transmit to in the hope that it is currently the leader.
-    * @param command The command from the client.
+    *                         It is anticipated that a leaderCursor%cluterSize could be used to pick the node in the cluster to
+    *                         transmit to in the hope that it is currently the leader.
+    * @param command          The command from the client.
     */
   def transmitToCluster(notLeaderCounter: Int, command: CommandValue): Unit
 
   def receiveFromCluster(response: ServerResponse): Unit = {
-    //if (log.isDebugEnabled) log.debug("slot {} with {} found is {} is in map {}", response.logIndex, response.clientMsgId, requestById.contains(response.clientMsgId), requestById)
+    if (log.isDebugEnabled) log.debug("slot {} with {} found is {} is in map {}", response.logIndex, response.clientMsgId, requestById.contains(response.clientMsgId), requestById)
     requestById.get(response.clientMsgId) foreach {
       case request@Request(_, promise, _, _, _) =>
         promise.complete(Success(response))
@@ -138,6 +151,7 @@ abstract class PaxosClusterClient(requestTimeout: Duration, maxAttempts: Int) {
 object PaxosClusterClient {
   /**
     * You should consider overriding this to have a more stable client to server protocol.
+    *
     * @param work Something to send to the paxos cluster. We assumes that you have written a custom handler somewhere out there that knows how to run deserialize and run your work.
     * @return A binary representation of your command to be transmitted on the wire and made durable by the paxos cluster.
     */
@@ -147,5 +161,15 @@ object PaxosClusterClient {
     oos.writeObject(work)
     oos.close
     baos.toByteArray
+  }
+
+  def cmdToByteBuf(command: CommandValue): ByteBuf = {
+    import ByteBufUtils._
+    Pickle.pack(command)
+  }
+
+  def byteBufToCmd(buffer: ByteBuf): CommandValue = {
+    import ByteBufUtils._
+    Pickle.unpack(buffer.iterator).asInstanceOf[CommandValue]
   }
 }

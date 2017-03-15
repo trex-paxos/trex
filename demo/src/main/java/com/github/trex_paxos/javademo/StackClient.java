@@ -1,29 +1,24 @@
 package com.github.trex_paxos.javademo;
 
-import akka.actor.*;
-import com.github.trex_paxos.Cluster;
-import com.github.trex_paxos.DynamicClusterDriver;
-import com.github.trex_paxos.DynamicClusterDriver$;
-import com.typesafe.config.Config;
-import com.typesafe.config.ConfigFactory;
-import com.typesafe.config.ConfigValueFactory;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
 public class StackClient {
 
+
+
     static StringStack clusteredStack(final String configName, final String hostname) {
-        Config systemConfig = ConfigFactory.load(configName).withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(hostname));
-        Config config = ConfigFactory.load(configName);
-        Cluster cluster = Cluster.parseConfig(config);
-        ActorSystem system = ActorSystem.create("trex-java-demo", systemConfig);
-        ActorRef driver = system.actorOf(Props.create(DynamicClusterDriver.class, akka.util.Timeout.apply(100), 20));
-        DynamicClusterDriver.Initialize init = DynamicClusterDriver$.MODULE$.apply(cluster);
-        driver.tell(init, null);
-        StringStack stack = TypedActor.get(system).typedActorOf(new TypedProps<StringStackImpl>(StringStack.class, StringStackImpl.class), driver);
-        return stack;
+//        Config systemConfig = ConfigFactory.load(configName).withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(hostname));
+//        Config config = ConfigFactory.load(configName);
+//        Cluster cluster = Cluster.parseConfig(config);
+//        ActorSystem system = ActorSystem.create("trex-java-demo", systemConfig);
+//        ActorRef driver = system.actorOf(Props.create(DynamicClusterDriver.class, akka.util.Timeout.apply(100), 20));
+//        DynamicClusterDriver.Initialize init = DynamicClusterDriver$.MODULE$.apply(cluster);
+//        driver.tell(init, null);
+//        StringStack stack = TypedActor.get(system).typedActorOf(new TypedProps<StringStackImpl>(StringStack.class, StringStackImpl.class), driver);
+//        return stack;
+        return null;
     }
 
     public static void usage(int returned) {

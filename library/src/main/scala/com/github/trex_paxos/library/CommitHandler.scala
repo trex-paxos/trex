@@ -23,7 +23,12 @@ trait CommitHandler extends PaxosLenses {
 
     committable.lastOption match {
       case Some(newHighestCommitted) =>
-        val results = committable map { a =>
+        // do not attempt to deliver to clients any Noops chosen to speed up recovery
+        val resultsWithoutNoops = committable filter {
+          case Accept(_, NoOperationCommandValue) => false
+          case _ => true
+        }
+        val results = resultsWithoutNoops map { a =>
           val p = Payload(a.id.logIndex, a.value)
           io.logger.debug("Node {} delivering {}", agent.nodeUniqueId, p)
           val bytes = io.deliver(p)
@@ -48,7 +53,7 @@ trait CommitHandler extends PaxosLenses {
       case heartbeat if heartbeat > oldData.leaderHeartbeat || i.number > oldData.progress.highestCommitted.number =>
         oldData.copy(leaderHeartbeat = heartbeat,
           prepareResponses = SortedMap.empty[Identifier, Map[Int, PrepareResponse]],
-          timeout = io.randomTimeout)
+          timeout = io.scheduleRandomCheckTimeout)
       case _ =>
         oldData
     }

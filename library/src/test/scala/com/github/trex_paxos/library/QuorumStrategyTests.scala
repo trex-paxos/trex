@@ -1,7 +1,8 @@
 package com.github.trex_paxos.library
 
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{Matchers, OptionValues, Spec}
+import org.scalatest.refspec.RefSpec
+import org.scalatest.{Matchers, OptionValues}
 
 /**
   * The stunning result in FPaxos is that accept quorums dont have to overlap
@@ -12,7 +13,7 @@ import org.scalatest.{Matchers, OptionValues, Spec}
   * plus the size of the accept quorum must be greater than the number of
   * nodes.
   */
-class QuorumStrategyTests extends Spec with Matchers with MockFactory with OptionValues {
+class QuorumStrategyTests extends RefSpec with Matchers with MockFactory with OptionValues {
   import TestHelpers._
   object `The DefaultQuorumStrategy` {
     def `should see a quorum of 1 in a cluster size of 1`: Unit = {

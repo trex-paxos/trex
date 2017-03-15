@@ -48,7 +48,7 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
       val handler = new TestResendHandler
       // when
       val AcceptsAndData(accepts, data) = handler.computeResendAccepts(new TestIO(new UndefinedJournal) {
-        override def randomTimeout: Long = 121L
+        override def scheduleRandomCheckTimeout: Long = 121L
       }, PaxosAgent(99, Leader, initialData.copy(acceptResponses = emptyAcceptResponses), initialQuorumStrategy), 100L)
       // then
       data.timeout shouldBe 121L
@@ -63,7 +63,7 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
       val newEpoch = BallotNumber(100, 100)
       // when
       val AcceptsAndData(accepts, data) = handler.computeResendAccepts(new TestIO(new UndefinedJournal) {
-        override def randomTimeout: Long = 121L
+        override def scheduleRandomCheckTimeout: Long = 121L
       }
         , PaxosAgent(100, Leader, initialData.copy(acceptResponses = higherPromise), initialQuorumStrategy), 100L)
       // then it move to the 1-higher epoch
@@ -94,7 +94,7 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
         (a99.id -> AcceptResponsesAndTimeout(50L, a99, Map(0 -> AcceptNack(a99.id, 0, progressWith(zeroProgress.highestPromised, BallotNumber(99, 99))))))
       // when
       val AcceptsAndData(accepts, data) = handler.computeResendAccepts(new TestIO(new UndefinedJournal) {
-        override def randomTimeout: Long = 121L
+        override def scheduleRandomCheckTimeout: Long = 121L
       }, PaxosAgent(99, Leader, initialData.copy(acceptResponses = higherPromise), initialQuorumStrategy), 100L)
       // then
       data.timeout shouldBe 121L
@@ -116,7 +116,7 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
       // when we get it to do work
 
       handler.handleResendAccepts(new TestIO(tempJournal) {
-        override def randomTimeout: Long = 121L
+        override def scheduleRandomCheckTimeout: Long = 121L
 
         override def send(msg: PaxosMessage): Unit = sendTime(System.nanoTime())
       }, PaxosAgent(99, Leader, initialData.copy(acceptResponses = emptyAcceptResponses), initialQuorumStrategy), 100L)
@@ -131,7 +131,7 @@ class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
       val handler = new ResendHandler{}
       val sent = ArrayBuffer[PaxosMessage]()
       val ioWithTimeout = new UndefinedIO with SilentLogging {
-        override def randomTimeout: Long = 12345L
+        override def scheduleRandomCheckTimeout: Long = 12345L
 
         override def send(msg: PaxosMessage): Unit = sent += msg
       }

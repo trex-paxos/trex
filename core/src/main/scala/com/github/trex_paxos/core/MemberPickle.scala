@@ -1,4 +1,6 @@
-package com.github.trex_paxos.internals
+package com.github.trex_paxos.core
+
+import com.github.trex_paxos.Membership
 
 import scala.util.parsing.json._
 

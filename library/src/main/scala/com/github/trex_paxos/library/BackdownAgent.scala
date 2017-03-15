@@ -10,7 +10,7 @@ trait BackdownAgent { this: PaxosLenses =>
     io.logger.info("Node {} is backing down", agent.nodeUniqueId)
     // tell any waiting clients that we are no longer leader so have no results for them
     io.respond(None)
-    agent.copy( role = Follower, data = backdownLens.set(agent.data, (SortedMap.empty, SortedMap.empty, None, io.randomTimeout)))
+    agent.copy( role = Follower, data = backdownLens.set(agent.data, (SortedMap.empty, SortedMap.empty, None, io.scheduleRandomCheckTimeout)))
   }
 
 }
