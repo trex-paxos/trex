@@ -11,7 +11,7 @@ import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 
 case class Node(nodeUniqueId: Int, host: String, leaderPort: Int, peerPort: Int)
 
-object TcpShared {
+object Shared {
 
   val nodes = Seq(Node(1, "localhost", 1110, 1111),
     Node(2, "localhost", 1220, 1221),
@@ -32,7 +32,7 @@ object TcpShared {
   }
 }
 
-object TcpServer {
+object Server {
 
   class LeaderHandler(nodeUniqueId: Int) extends ChannelInboundHandlerAdapter {
     override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = {
@@ -42,7 +42,7 @@ object TcpServer {
 
     override def channelRead(ctx: ChannelHandlerContext, msg: scala.Any): Unit = {
       val in = msg.asInstanceOf[ByteBuf]
-      val m = Pickle.unpack(TcpShared.iterator(in))
+      val m = Pickle.unpack(Shared.iterator(in))
       System.out.println(s"leader nodeUniqueId: $nodeUniqueId sees $m")
       in.release()
     }
@@ -51,7 +51,7 @@ object TcpServer {
   class PeerHandler(nodeUniqueId: Int) extends ChannelInboundHandlerAdapter {
     override def channelRead(ctx: ChannelHandlerContext, msg: Object) {
       val in = msg.asInstanceOf[ByteBuf]
-      val m = Pickle.unpack(TcpShared.iterator(in))
+      val m = Pickle.unpack(Shared.iterator(in))
       System.out.println(s"leader nodeUniqueId: $nodeUniqueId sees $m")
       in.release()
     }
@@ -99,16 +99,15 @@ object TcpServer {
 
   def main(args: Array[String]): Unit = {
     val node = args.toSeq.headOption match {
-      case Some("1") => TcpShared.nodes(0)
-      case Some("2") => TcpShared.nodes(1)
-      case Some("3") => TcpShared.nodes(2)
+      case Some("1") => Shared.nodes(0)
+      case Some("2") => Shared.nodes(1)
+      case Some("3") => Shared.nodes(2)
       case _ => throw new IllegalArgumentException("must pass a number between 1 and 3 inclusive")
     }
-    runServer(TcpShared.nodes, node)
+    runServer(Shared.nodes, node)
   }
 }
-// TODO abstract this out to a component which keeps on trying to send until told to stop
-// recall that sending is async on netty.
+
 object Driver {
 
   class DriverHandler extends ChannelInboundHandlerAdapter {
@@ -119,7 +118,7 @@ object Driver {
 
     override def channelRead(ctx: ChannelHandlerContext, msg: scala.Any): Unit = {
       val in = msg.asInstanceOf[ByteBuf]
-      val m = Pickle.unpack(TcpShared.iterator(in))
+      val m = Pickle.unpack(Shared.iterator(in))
       System.out.println(s"client received back: $m")
       in.release()
     }
@@ -127,9 +126,9 @@ object Driver {
 
   def main(args: Array[String]) {
     val node = args.toSeq.headOption match {
-      case Some("1") => TcpShared.nodes(0)
-      case Some("2") => TcpShared.nodes(1)
-      case Some("3") => TcpShared.nodes(2)
+      case Some("1") => Shared.nodes(0)
+      case Some("2") => Shared.nodes(1)
+      case Some("3") => Shared.nodes(2)
       case _ => throw new IllegalArgumentException("must pass a number between 1 and 3 inclusive")
     }
     System.out.println(s"sending to node $node")
@@ -160,7 +159,7 @@ object Driver {
                 case _ => System.out.println("pardon?")
                   None
               }
-              if( p.isDefined ) future.channel().write(TcpShared.marshal(Pickle.pack(p.get)))
+              if( p.isDefined ) future.channel().write(Shared.marshal(Pickle.pack(p.get)))
 
             }
           }

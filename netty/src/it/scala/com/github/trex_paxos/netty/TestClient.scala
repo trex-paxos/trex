@@ -13,7 +13,7 @@ object TestClient {
     val handler = new ChannelInboundHandlerAdapter {
       override def channelRead(ctx: ChannelHandlerContext, msg: scala.Any): Unit = {
         val in = msg.asInstanceOf[ByteBuf]
-        val m = Pickle.unpack(TcpShared.iterator(in))
+        val m = Pickle.unpack(Shared.iterator(in))
         logger.info("{}", m)
       }
     }
@@ -23,7 +23,7 @@ object TestClient {
     while(true){
       val p = Prepare(Identifier(count, BallotNumber(2, 3), 4L))
       count = count + 1
-      client.send(TcpShared.marshal(Pickle.pack(p)))
+      client.send(Shared.marshal(Pickle.pack(p)))
       Thread.sleep(1000L)
     }
   }
