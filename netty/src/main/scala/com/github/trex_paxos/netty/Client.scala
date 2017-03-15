@@ -9,21 +9,21 @@ import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
 import org.slf4j.LoggerFactory
 
-object TcpClient {
+object Client {
   val registry = new MetricRegistry()
-  JmxReporter.forRegistry(registry).build().start();
+  JmxReporter.forRegistry(registry).build().start()
 }
 
-class TcpClient(val node: Node, channelHandler: Option[ChannelHandler] = None) {
+class Client(val node: Node, channelHandler: Option[ChannelHandler] = None) {
   val logger = LoggerFactory.getLogger(this.getClass)
 
   class LoggingChannelHandler extends ChannelInboundHandlerAdapter {
     override def channelRead(ctx: ChannelHandlerContext, msg: scala.Any): Unit = {
-      logger.debug("ignoring response {}", msg)
+      logger.debug("received {}", msg)
     }
   }
 
-  class DisconnectChannelHandler(client: TcpClient) extends ChannelInboundHandlerAdapter {
+  class DisconnectChannelHandler(client: Client) extends ChannelInboundHandlerAdapter {
     override def channelInactive(ctx: ChannelHandlerContext): Unit = {
       logger.info("disconnected from {}", node)
       connectCounter.dec()
@@ -33,10 +33,10 @@ class TcpClient(val node: Node, channelHandler: Option[ChannelHandler] = None) {
 
   private[this] var channel: Option[Channel] = None
 
-  val connectCounter = TcpClient.registry.counter(s"connect.hits.${node.nodeUniqueId}")
-  val noConnectCounter = TcpClient.registry.counter(s"connects.miss.${node.nodeUniqueId}")
+  val connectCounter = Client.registry.counter(s"connect.hits.${node.nodeUniqueId}")
+  val noConnectCounter = Client.registry.counter(s"connects.miss.${node.nodeUniqueId}")
 
-  class ConnectionListener(val client: TcpClient) extends ChannelFutureListener {
+  class ConnectionListener(val client: Client) extends ChannelFutureListener {
     override def operationComplete(channelFuture: ChannelFuture): Unit = {
       if (channelFuture.isSuccess()) {
         channel = Some(channelFuture.channel())
@@ -66,15 +66,15 @@ class TcpClient(val node: Node, channelHandler: Option[ChannelHandler] = None) {
         def initChannel(ch: SocketChannel) {
           val p = ch.pipeline()
           val h = channelHandler.getOrElse(new LoggingChannelHandler)
-          p.addLast(h, new DisconnectChannelHandler(TcpClient.this))
+          p.addLast(h, new DisconnectChannelHandler(Client.this))
         }
       })
     logger.debug("connecting to {}", node)
     b.connect(node.host, node.leaderPort).addListener(new ConnectionListener(this))
   }
 
-  val sentMeter = TcpClient.registry.meter(s"requests.sent.${node.nodeUniqueId}")
-  val dropMeter = TcpClient.registry.meter(s"requests.drop.${node.nodeUniqueId}")
+  val sentMeter = Client.registry.meter(s"requests.sent.${node.nodeUniqueId}")
+  val dropMeter = Client.registry.meter(s"requests.drop.${node.nodeUniqueId}")
 
   def send(msg: scala.Any): Unit = {
     channel match {

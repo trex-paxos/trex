@@ -2,14 +2,27 @@ package com.github.trex_paxos.netty
 
 import com.github.trex_paxos.library.{BallotNumber, Identifier, Prepare}
 import com.github.trex_paxos.util.Pickle
+import io.netty.buffer.ByteBuf
+import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.channel.nio.NioEventLoopGroup
+import org.slf4j.LoggerFactory
 
 object TestClient {
+  val logger = LoggerFactory.getLogger(this.getClass)
   def main(args: Array[String]): Unit = {
-    val client = new TcpClient(Node(99, "localhost", 8007, 8007))
+    val handler = new ChannelInboundHandlerAdapter {
+      override def channelRead(ctx: ChannelHandlerContext, msg: scala.Any): Unit = {
+        val in = msg.asInstanceOf[ByteBuf]
+        val m = Pickle.unpack(TcpShared.iterator(in))
+        logger.info("{}", m)
+      }
+    }
+    val client = new Client(Node(99, "localhost", 8007, 8007), Option(handler))
     client.connect(new NioEventLoopGroup())
-    val p = Prepare(Identifier(1, BallotNumber(2, 3), 4L))
+    var count = 0
     while(true){
+      val p = Prepare(Identifier(count, BallotNumber(2, 3), 4L))
+      count = count + 1
       client.send(TcpShared.marshal(Pickle.pack(p)))
       Thread.sleep(1000L)
     }
