@@ -78,7 +78,7 @@ trait PaxosIO {
 }
 
 object PaxosAlgorithm {
-  type PaxosFunction = PartialFunction[PaxosEvent, PaxosResult]
+  type PaxosFunction = PartialFunction[PaxosEvent, PaxosAgent]
 }
 
 class PaxosAlgorithm extends PaxosLenses

@@ -1,24 +1,24 @@
 package com.github.trex_paxos.demo
 
-import java.io.{BufferedReader, File, IOException, InputStreamReader}
+import java.io.{BufferedReader, IOException, InputStreamReader}
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
 
-import com.github.trex_paxos.{Membership, PaxosProperties, Quorum}
 import com.github.trex_paxos.core._
 import com.github.trex_paxos.javademo.{StringStack, StringStackImpl}
 import com.github.trex_paxos.library._
-import org.apache.logging.log4j.LogManager
+import com.github.trex_paxos._
+import org.slf4j.LoggerFactory
 
-import scala.concurrent.Await
 import scala.concurrent.duration.FiniteDuration
 
 object StringStackShared {
-  val quorum = Quorum(2, Set(2552, 2562, 2572))
-  val membership = Membership(0, quorum, quorum, Map(
-    2552 -> "127.0.0.1:2552|127.0.0.1:2553",
-    2562 -> "127.0.0.1:2562|127.0.0.1:2563",
-    2572 -> "127.0.0.1:2572|127.0.0.1:2573"
+  val quorum = Quorum(2, Set(Weight(2552,1), Weight(2562,1), Weight(2572,1)))
+  val membership = Membership(0, quorum, quorum, Set(
+    Node(2552, Addresses(Address("localhost", 2552), Address("localhost", 2553)) )
+    , Node(2562, Addresses(Address("localhost", 2562), Address("localhost", 2563)) )
+    , Node(2572, Addresses(Address("localhost", 2572), Address("localhost", 2573)) )
+
   ))
 
   val LocationsRegex = """([^:]*):([0-9]*)\|([^:]*):([0-9]*)""".r
@@ -78,24 +78,35 @@ object StringStackServer {
           }
       }
     }
+//
+//    def clusterAddresses: Iterable[InetSocketAddress] =
+//      m.nodes.filter({ case Node(id, _) => id != nodeUniqueId }) map {
+//        case Node(_, Addresses(_, )) =>
+//          location match {
+//            case LocationsRegex(_, _, host, port) =>
+//              new InetSocketAddress(host, port.toInt)
+//            case f => throw new IllegalArgumentException(s"could not parse $location")
+//          }
+//      }
 
-    def clusterAddresses: Iterable[InetSocketAddress] =
-      membership.locations.filter({ case (port, _) => port != nodeUniqueId }) map {
-        case (_, location) =>
-          location match {
-            case LocationsRegex(_, _, host, port) =>
-              new InetSocketAddress(host, port.toInt)
-            case f => throw new IllegalArgumentException(s"could not parse $location")
-          }
-      }
+    val addresss = ???
 
-    val addresss = clusterAddresses
+    def transitMessages(msg: Seq[PaxosMessage]): Unit = {
 
-    val nettyServer = new NettyServer(PaxosProperties(1000, 3000), journal, initialAgent, deliverMembership, deliverClient, clusterAddresses) with ByteArraySerializer with Log4jPaxosLogging {
+    }
+
+    val paxosSystem = new PaxosEngine(
+      PaxosProperties(1000, 3000),
+      journal,
+      initialAgent,
+      deliverMembership,
+      deliverClient,
+      ByteArraySerializer.serialize _,
+      transitMessages _
+    ) with LogbackPaxosLogging {
       override def logger: PaxosLogging = this
     }
 
-    NettyServer.run(nodeUniqueId, nettyServer)
   }
 
   def usage(returned: Int) {
@@ -107,7 +118,7 @@ object StringStackServer {
 
 object StringStackClient {
 
-  val logger = LogManager.getLogger(classOf[PaxosLogging]);
+  val logger = LoggerFactory.getLogger(classOf[PaxosLogging]);
 
   import StringStackShared._
 
@@ -126,7 +137,7 @@ object StringStackClient {
     else if (args(0).startsWith("clustered")) {
       if (args.length != 3) usage(2)
       System.out.println("using clustered stack")
-      val nettyClusterClient = driver(args(1), args(2))
+      //val nettyClusterClient = driver(args(1), args(2))
 
       stack = new StringStack {
         override def peek(): String = sendStringCommand("peek")
@@ -137,12 +148,13 @@ object StringStackClient {
 
         def sendStringCommand(cmd: String): String = {
           logger.info("sending command {}", cmd)
-          val f = nettyClusterClient.sendToCluster(cmd.getBytes(UTF8))
-          val r = Await.result(f, fiveSecDuration)
-          r.response match {
-            case Some(bytes) => new String(bytes, UTF8)
-            case f => throw new AssertionError(f.toString)
-          }
+//          val f = nettyClusterClient.sendToCluster(cmd.getBytes(UTF8))
+//          val r = Await.result(f, fiveSecDuration)
+//          r.response match {
+//            case Some(bytes) => new String(bytes, UTF8)
+//            case f => throw new AssertionError(f.toString)
+//          }
+          ""
         }
 
         override def empty(): Boolean = ???
@@ -151,7 +163,7 @@ object StringStackClient {
         override def search(o: scala.Any): Int = ???
       }
 
-      NettyClusterClient.startServer(nettyClusterClient)
+      //NettyClusterClient.startServer(nettyClusterClient)
     }
     else {
       stack = null
@@ -181,11 +193,11 @@ object StringStackClient {
     System.exit(returned)
   }
 
-  def driver(configName: String, hostname: String): NettyClusterClient = {
-    new NettyClusterClient(fiveMsDuration, Int.MaxValue, StringStackShared.membership) with Log4jPaxosLogging {
-      override def log: PaxosLogging = this
-    }
-  }
+//  def driver(configName: String, hostname: String): NettyClusterClient = {
+//    new NettyClusterClient(fiveMsDuration, Int.MaxValue, StringStackShared.m) with LogbackjPaxosLogging {
+//      override def log: PaxosLogging = this
+//    }
+//  }
 
 
 }

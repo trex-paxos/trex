@@ -93,7 +93,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with MemberSt
     }
   }
 
-  // stores the current cluster membership at a given slot
+  // stores the current cluster m at a given slot
   val memberMap: java.util.concurrent.ConcurrentNavigableMap[Long, Array[Byte]] =
     db.getTreeMap("MEMBERS")
 
@@ -116,7 +116,8 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with MemberSt
     val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
     lastSlotOption map { (s: Long) =>
       val jsonBytesUtf8 = memberMap.get(s)
-      MemberPickle.fromJson(new String(jsonBytesUtf8, UTF8))
+      val js = new String(jsonBytesUtf8, UTF8)
+      MemberPickle.fromJson(js).getOrElse(throw new IllegalArgumentException(js))
     }
   }
 }

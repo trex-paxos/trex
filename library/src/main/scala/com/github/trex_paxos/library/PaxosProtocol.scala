@@ -305,8 +305,7 @@ case class NotFollower(val nodeId: Int, val msgId: String) extends PaxosMessage
  * and not getting back a response; its not known whether the request was processed as there has been neither positive
  * nor negative acknowledgement. Trex doesn't know if it is safe to retry the operation nor how to query to check it
  * happened so the host application will have to decided what to do next. Note that this may be thrown for read only
- * work if the application used strong or single reads as those avoid returning stale data which may occur doing a
- * leader failover.
+ * work if the application used strong or single reads as those go via the leader to avoid returning stale data.
  *
  * @param nodeId The node replying that it is has lost the leader.
  * @param msgId The client message which the node is responding to.

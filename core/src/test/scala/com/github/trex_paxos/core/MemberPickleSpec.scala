@@ -1,25 +1,44 @@
 package com.github.trex_paxos.core
 
+import com.github.trex_paxos._
 import org.scalatest.{Matchers, WordSpecLike}
 
 class MemberPickleSpec extends WordSpecLike with Matchers {
-//
-//  "Pickling simple objects " should {
-//    "roundtrip empty CommittedMembership" in {
-//      val cm = CommittedMembership(0L, Membership("", Seq()))
-//      val js = MemberPickle.toJson(cm)
-//      val cm2 = MemberPickle.fromJson(js)
-//      cm2 shouldBe cm
-//    }
-//    "roundtrip some CommittedMembership" in {
-//      val cm = CommittedMembership(99L, Membership("some", Seq(
-//        Member(1, "one", "two", Learning),
-//        Member(2, "one2", "two2", Accepting)
-//      )))
-//      val js = MemberPickle.toJson(cm)
-//      val cm2 = MemberPickle.fromJson(js)
-//      cm2 shouldBe cm
-//    }
-//
-//  }
+
+  val address1 = Address("aa", 2)
+  val addresses = Addresses(address1, Address("bb", 3))
+
+  val node1 = Node(101, addresses)
+  val node2 = Node(102, Addresses(Address("cc", 4), Address("dd", 5)))
+  val node3 = Node(103, Addresses(Address("ee", 6), Address("ff", 7)))
+
+  val quorum1 = Quorum(2, Set(Weight(101, 1), Weight(102, 2)))
+
+  val nodes = Set(node1, node2, node3)
+
+  val membership = Membership(99L, quorum1, Quorum(4, Set(Weight(101, 2), Weight(102, 2), Weight(103, 2))), nodes)
+
+  "MemberPickle" should {
+    "roundtrip node" in {
+      val js = MemberPickle.nodeTo(node1)
+      MemberPickle.nodeFrom(js) match {
+        case Some(`node1`) => // good
+        case f => fail(f.toString)
+      }
+    }
+    "roundtrip quorum" in {
+      val js = MemberPickle.quorumTo(quorum1)
+      MemberPickle.quorumFrom(js) match {
+        case Some(`quorum1`) => // good
+        case f => fail(f.toString)
+      }
+    }
+    "roundtrip membership" in {
+      val js = MemberPickle.toJson(membership)
+      MemberPickle.fromJson(js) match {
+        case Some(`membership`) => // good
+        case f => fail(f.toString)
+      }
+    }
+  }
 }

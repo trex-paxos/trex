@@ -3,8 +3,17 @@ package com.github.trex_paxos.core
 import com.github.trex_paxos.PaxosProperties
 import com.github.trex_paxos.library._
 
-class TestPaxosEngine(val paxosProperties: PaxosProperties, val journal: Journal, val initialAgent: PaxosAgent)
-  extends PaxosEngine {
+import scala.util.Try
+
+object TestPaxosEngine {
+  val deliverMembership: PartialFunction[Payload, Any] = ???
+  val deliverClient: PartialFunction[Payload, AnyRef] = ???
+  val serialize: (Any) => Try[Array[Byte]] = ???
+  val transmitMessages: (Seq[PaxosMessage]) => Unit = ???
+}
+
+class TestPaxosEngine(override val paxosProperties: PaxosProperties, override val journal: Journal, override val initialAgent: PaxosAgent)
+  extends PaxosEngine(paxosProperties, journal, initialAgent, TestPaxosEngine.deliverMembership, TestPaxosEngine.deliverClient, TestPaxosEngine.serialize, TestPaxosEngine.transmitMessages) {
   override def logger: PaxosLogging = NoopPaxosLogging
 
   override def deliver(payload: Payload): Any = ???

@@ -15,3 +15,5 @@ store.trex.*
 library/project/
 library/target/
 async.log
+netty/target/
+/experimental.iml

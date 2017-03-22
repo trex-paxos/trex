@@ -140,7 +140,7 @@ with AkkaLoggingAdapter {
   def deliver(payload: Payload): Any = (deliverClient orElse deliverMembership)(payload)
 
   /**
-   * The cluster membership finite state machine. The new membership has been chosen but will come into effect
+   * The cluster m finite state machine. The new m has been chosen but will come into effect
    * only for the next message for which we generate an accept message.
    */
   val deliverMembership: PartialFunction[Payload, Any] = {

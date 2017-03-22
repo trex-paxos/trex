@@ -4,6 +4,8 @@ import java.io.FileWriter
 import java.util.concurrent.CopyOnWriteArrayList
 
 import akka.actor._
+import com.github.trex_paxos.core.AkkaPaxosActor
+import com.github.trex_paxos.core.AkkaPaxosActor.TraceData
 import com.github.trex_paxos.library._
 import com.typesafe.config.Config
 
