@@ -1,6 +1,6 @@
 ## Trex: An embeddable Paxos engine for the JVM
 
-Checkout the [GitHub pages] (http://trex-paxos.github.io/trex/) for more information else the wiki here on Github.
+Checkout the [blog posts] (https://simbo1905.wordpress.com/2016/01/09/trex-a-paxos-replication-engine/) for a description of this implementation of [Paxos Made Simple] (https://www.microsoft.com/en-us/research/wp-content/uploads/2016/12/paxos-simple-Copy.pdf).
 
 [![Build Status](https://travis-ci.org/trex-paxos/trex.svg?branch=master)](https://travis-ci.org/trex-paxos/trex)
 [![Codacy Badge](https://www.codacy.com/project/badge/73b345d5a4c74a4d9d458596e64fe212)](https://www.codacy.com/app/simbo1905remixed/trex)
