@@ -48,6 +48,7 @@ class TestPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniqu
 
   override def deliver(payload: Payload): Array[Byte] = {
     delivered.append(payload)
+    log.info("Node ")
     payload.command match {
       case ClientCommandValue(_, bytes) =>
         if (bytes.length > 0) Array[Byte]((-bytes(0)).toByte) else bytes
@@ -139,7 +140,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
           valueByMsgId(valueByMsgId() + (r.msgUuid -> r))
           valuesToClients(valuesToClients() + ((-b).toByte -> sender))
           val guessedLeader = next()
-          log.info("client rq: {} -> {} {}", bytes, invertedChildren(guessedLeader), guessedLeader)
+          log.info("ClusterHarness client rq: {} -> {} {}", bytes, invertedChildren(guessedLeader), guessedLeader)
           guessedLeader ! r
         case b =>
           assert(false)
@@ -152,7 +153,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       response(0) match {
         case b if b < 0 => // value less than zero is the committed response send back to client
           lastRespondingLeader(sender)
-          log.info(s"client rs: from {}", invertedChildren(sender))
+          log.info(s"ClusterHarness client rs: from {}", invertedChildren(sender))
           valuesToClients()(b) ! response
           valuesToClients(valuesToClients() - b)
         case b =>
@@ -165,7 +166,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
     case NotLeader(from, msgId) =>
       val guessedLeader = next()
       val v@ClientCommandValue(_, bytes) = valueByMsgId()(msgId)
-      log.info("NotLeader {} trying {} to {}", from, bytes(0), invertedChildren(guessedLeader))
+      log.info("ClusterHarness NotLeader {} trying {} to {}", from, bytes(0), invertedChildren(guessedLeader))
       context.system.scheduler.scheduleOnce(10 millis, guessedLeader, v)
 
     /**
@@ -173,7 +174,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       * Naturally a real client would not know who was alive or dead and would have to timeout on the request to a dead node.
       */
     case "KillLeader" =>
-      log.info(s"killing leader {}", invertedChildren(lastRespondingLeader()))
+      log.info(s"ClusterHarness killing leader {}", invertedChildren(lastRespondingLeader()))
       lastRespondingLeader() ! PoisonPill.getInstance
       killedNodes(killedNodes() + lastRespondingLeader())
 
@@ -181,13 +182,13 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       * A node that we sent to have lost a leadership election due to stalls so we forward that onto the client.
       */
     case nlle: LostLeadershipException =>
-      log.info("got {} with valueByMsgId {} and valuesToClients {}", nlle, this.valueByMsgId, this.valuesToClients)
+      log.info("ClusterHarness got {} with valueByMsgId {} and valuesToClients {}", nlle, this.valueByMsgId, this.valuesToClients)
       val value = this.valueByMsgId()(nlle.msgId)
       value.bytes.headOption match {
         case Some(b) =>
           val client = this.valuesToClients()((-b).toByte)
           client ! nlle
-        case _ => throw new AssertionError(s"should be unreachable value=$value")
+        case _ => throw new AssertionError(s"ClusterHarness should be unreachable value=$value")
       }
 
     /**
@@ -195,7 +196,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       */
 
     case p: Prepare =>
-      log.info(s"$sender sent $p broadcasting")
+      log.info(s"ClusterHarness $sender sent $p broadcasting")
       children() foreach {
         case (id, actor) if id != p.id.from =>
           log.info(s"$id <- $p : $actor <- $sender")
@@ -205,43 +206,42 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
     case p: PrepareResponse =>
       children() foreach {
         case (id, actor) if id == p.to =>
-          log.info(s"$id <- $p : $actor <- $sender")
+          log.info(s"ClusterHarness $id <- $p : $actor <- $sender")
           actor ! p
         case _ =>
       }
     case a: Accept =>
       children() foreach {
         case (id, actor) if id != a.id.from =>
-          log.info(s"$id <- $a : $actor <- $sender")
+          log.info(s"ClusterHarness $id <- $a : $actor <- $sender")
           actor ! a
         case _ =>
       }
     case a: AcceptResponse =>
       children() foreach {
         case (id, actor) if id == a.to =>
-          log.info(s"$id <- $a : $actor <- $sender")
+          log.info(s"ClusterHarness $id <- $a : $actor <- $sender")
           actor ! a
         case _ =>
       }
     case c: Commit =>
-      log.info(s"$sender sent $c broadcasting")
       children() foreach {
         case (id, actor) if id != c.identifier.from =>
-          log.info(s"$id <- $c : $actor <- $sender")
+          log.info(s"ClusterHarness $id <- $c : $actor <- $sender")
           actor ! c
         case _ =>
       }
     case r@RetransmitRequest(_, to, _) =>
       children() foreach {
         case (id, actor) if to == id =>
-          log.info(s"$id <- $r : $actor <- $sender")
+          log.info(s"ClusterHarness $id <- $r : $actor <- $sender")
           actor ! r
         case _ =>
       }
     case r: RetransmitResponse =>
       children() foreach {
         case (id, actor) if r.to == id =>
-          log.info(s"$id <- $r : $actor <- $sender")
+          log.info(s"ClusterHarness $id <- $r : $actor <- $sender")
           actor ! r
         case _ =>
       }
@@ -264,7 +264,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
         case _ => fw.close()
       }
 
-      log.info("halting all nodes")
+      log.info("ClusterHarness halting all nodes")
       children().values foreach {
         c => c ! PoisonPill.getInstance
       }
@@ -274,7 +274,8 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       sender ! delivered()
 
     case m =>
-      System.err.println(s"unknown message $m")
-      throw new IllegalArgumentException(m.getClass.getCanonicalName)
+      val msg =
+      log.error(s"ClusterHarness unknown message $m")
+      throw new IllegalArgumentException(m.getClass.getCanonicalName + " : " + m.toString)
   }
 }
