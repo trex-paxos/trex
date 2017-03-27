@@ -302,10 +302,10 @@ case class NotFollower(val nodeId: Int, val msgId: String) extends PaxosMessage
  * either a network partition or a long stall. The outcome of the client operation indicated by msgUuid is unknown as the
  * operation may or may not be committed by the new leader. The application will have to query data to learn whether the
  * operation did actually work. Note that semantically this is no different from sending a tcp request to an open socket
- * and not getting back a response; its not known whether the request was processed as there has been neither positive
+ * and not getting back a response; it is not known whether the request was processed as there has been neither positive
  * nor negative acknowledgement. Trex doesn't know if it is safe to retry the operation nor how to query to check it
- * happened so the host application will have to decided what to do next. Note that this may be thrown for read only
- * work if the application used strong or single reads as those go via the leader to avoid returning stale data.
+ * happened so the host application will have to decided what to do next. Note that in future releases this may be thrown
+ * for read only work if the application usee strong or single reads in which case the application should simply retry.
  *
  * @param nodeId The node replying that it is has lost the leader.
  * @param msgId The client message which the node is responding to.

@@ -5,17 +5,29 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import akka.util.Timeout
 import com.github.trex_paxos.library._
 import org.scalatest._
-import org.scalatest.refspec.{RefSpecLike}
+import org.scalatest.refspec.RefSpecLike
 
-import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, Buffer}
 import scala.concurrent.Await
 import scala.language.postfixOps
+import akka.event.{LogSource, Logging}
+import com.typesafe.config.ConfigFactory
+
+object LeaderStopsTests {
+  val simultaneousTimeoutConfig = ConfigFactory.parseString("trex.leader-timeout-min=50\ntrex.leader-timeout-max=51\nakka.loglevel = \"DEBUG\"\nakka.log-dead-letters-during-shutdown=false")
+  val spacedTimeoutConfig = ConfigFactory.parseString("trex.leader-timeout-min=50\ntrex.leader-timeout-max=300\nakka.loglevel = \"DEBUG\"\nakka.log-dead-letters-during-shutdown=false")
+}
 
 class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
-  NoFailureTests.spacedTimeoutConfig)) with RefSpecLike with ImplicitSender with BeforeAndAfterAll with BeforeAndAfter with Matchers {
+  LeaderStopsTests.spacedTimeoutConfig)) with RefSpecLike with ImplicitSender with BeforeAndAfterAll with BeforeAndAfter with Matchers {
+
+  implicit val myLogSourceType: LogSource[LeaderStopsTests] = new LogSource[LeaderStopsTests] {
+    def genString(a: LeaderStopsTests) = "LeaderStopsTests"
+  }
 
   import scala.concurrent.duration._
+
+  val logger = Logging(system, this)
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
@@ -29,66 +41,76 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
 
   type Delivered = Map[Int, ArrayBuffer[Payload]]
 
-  val data = new Box[Byte](Option(1.toByte))
+  val responses = scala.collection.mutable.HashMap[Byte, Any]()
 
   def testLeaderDying(clusterSize: Int): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
 
-    // given a test cluster harness sized to x nodes
-    clusterHarness(TestActorRef(new ClusterHarness(clusterSize, NoFailureTests.spacedTimeoutConfig), "leaderCrash" + clusterSize))
+    logger.info(s"starting testLeaderDying for clusterSize ${clusterSize}")
 
-    def send: Unit = {
+    // given a test cluster harness sized to x nodes
+    clusterHarness(TestActorRef(new ClusterHarness(clusterSize, LeaderStopsTests.spacedTimeoutConfig), "leaderCrash" + clusterSize))
+
+    def send(b: Byte): Unit = {
+      val c = ClientCommandValue(b.toString, Array[Byte](b))
+
+      logger.info(s"injecting $c")
+
       // when we sent it the application value of 1.toByte
-      system.scheduler.scheduleOnce(200 millis, clusterHarness(), ClientCommandValue("0", Array[Byte](data())))
+      system.scheduler.scheduleOnce(100 millis, clusterHarness(), c)
 
       // it commits and sends by the response of -1.toByte
       expectMsgPF(2 second) {
-        case bytes: Array[Byte] if bytes(0) == -1 * data() => // okay
-        case nlle: LostLeadershipException => // okay
-        case x => fail(x.toString)
+        case bytes: Array[Byte] if bytes(0) == -1 * b =>
+          logger.info("got back successful echo response")
+          responses.put(b, bytes(0))
+        case lle: LostLeadershipException =>
+          logger.info("got back LostLeadershipException")
+          responses.put(b, lle)
+        case x =>
+          logger.error(s"got back unexpected $x")
+          fail(x.toString)
       }
-
-      data((1 + data()).toByte)
     }
 
-    // reset the client data counter
-    data(1.toByte)
+    // reset seen responses
+    responses.clear()
 
-    // we can commit a message
-    send
+    logger.info(s"sending first client message")
 
-    // then we kill a node
+    // get a response from a leader
+    send(1.toByte)
+
+    awaitCond(responses.size > 0, 20 seconds, 200 millisecond)
+
+    logger.info(s"responses: ${responses}")
+
+    logger.info(s"killing the leader")
+
+    // kill the leader
     clusterHarness() ! "KillLeader"
 
-    // we can still commit a message
-    send
+    logger.info(s"sending second client message")
+
+    // we can still get a response from a new leader
+    send(2.toByte)
+
+    awaitCond(responses.size > 1, 20 seconds, 200 millisecond)
+
+    logger.info(s"responses: ${responses}")
 
     import akka.pattern.ask
     implicit val timeout = Timeout(2 seconds)
-
-    awaitCond(check(clusterHarness().underlyingActor), 20 seconds, 200 millisecond)
 
     // shutdown the actor and have it tell us what was committed
     val future = clusterHarness().ask(ClusterHarness.Halt)
 
     val delivered = Await.result(future, 2 seconds).asInstanceOf[Map[Int, Buffer[Payload]]]
 
+    logger.info(s"checking the deliveries: ${delivered}")
+
     consistentDeliveries(delivered)
-  }
-
-  // counts the number of delivered client bytes matches 2x cluster size - 1
-  def check(cluster: ClusterHarness): Boolean = {
-
-    val delivered: Seq[mutable.Buffer[Payload]] = cluster.delivered().values.toSeq
-
-    val count = (0 until cluster.size).foldLeft(0){ (count, i) =>
-      val found = delivered(i) map {
-        case Payload(_, c: ClientCommandValue) => 1
-        case _ => 0
-      }
-      count + found.sum
-    }
-    count == 2 * cluster.size - 1
+    logger.info(s"all done")
   }
 
   def consistentDeliveries(delivered: Map[Int, Buffer[Payload]]): Unit = {
@@ -105,7 +127,10 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
 
     case class LastValueAndCollected(last: Option[Payload], deduplicated: Seq[Payload])
 
-    val noRepeats = delivered map {
+    // not sure that this deduplication is necessary with current tests.
+    // in the wild repeats are posible if the application callbacks and the journal are not managed by an external transation.
+    // in practice with these in-memory tests we are not going to see crash scenario which lead to repeats
+    val noRepeats: Map[Int, Seq[Payload]] = delivered map {
       case (node, values) =>
         val deduplicated = values.foldLeft(LastValueAndCollected(None, Seq())) {
           case (LastValueAndCollected(last, deduplicated), next@Payload(nextIndex, value)) => last match {
@@ -154,8 +179,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
       case (_, values) => values.map(_.bytes(0))
     }
 
-    all should contain (1.toByte)
-    all should contain (1.toByte)
+    all should contain(2.toByte)
   }
 
   object `A three node cluster` {
