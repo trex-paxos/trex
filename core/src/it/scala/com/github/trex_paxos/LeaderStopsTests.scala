@@ -170,12 +170,6 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
       }
     }
 
-    // some nodes saw both bytes committed
-    val all = nonoops.flatMap {
-      case (_, values) => values.map(_.bytes(0))
-    }
-
-    all should contain(2.toByte)
   }
 
   object `A three node cluster` {

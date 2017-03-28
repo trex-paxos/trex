@@ -2,9 +2,10 @@ package com.github.trex_paxos.library
 
 /**
   * A node in a paxos cluster
-  * @param nodeUniqueId The node unique ID used in the ballot numbers. Assumed to never be recycled.
-  * @param role The current role such as Follower or Leader
-  * @param data The current state of the node holding the paxos algorithm bookwork
+  *
+  * @param nodeUniqueId   The node unique ID used in the ballot numbers. Assumed to never be recycled.
+  * @param role           The current role such as Follower or Leader
+  * @param data           The current state of the node holding the paxos algorithm bookwork
   * @param quorumStrategy The current quorum strategy (which could be any FPaxos flexible paxos strategy)
   */
 case class PaxosAgent(nodeUniqueId: Int, role: PaxosRole, data: PaxosData, quorumStrategy: QuorumStrategy) {
@@ -13,6 +14,7 @@ case class PaxosAgent(nodeUniqueId: Int, role: PaxosRole, data: PaxosData, quoru
 
 /**
   * The latest event is an IO to read and write data (side effects), the paxos node, and a paxos message.
+  *
   * @param io
   * @param agent
   * @param message
@@ -25,7 +27,7 @@ case class PaxosEvent(io: PaxosIO, agent: PaxosAgent, message: PaxosMessage)
 trait PaxosIO {
 
   /** The durable story to hold the state on disk.
-   */
+    */
   def journal: Journal
 
   /**
@@ -35,7 +37,7 @@ trait PaxosIO {
 
   /**
     * Randomised timeouts.
-   */
+    */
   def randomTimeout: Long
 
   /**
@@ -45,6 +47,7 @@ trait PaxosIO {
 
   /**
     * The callback to the host application which can side effect.
+    *
     * @param payload The payload response to the client command value.
     * @return
     */
@@ -57,13 +60,15 @@ trait PaxosIO {
 
   /**
     * Associate a command value with a paxos identifier so that the result of the commit can be routed back to the sender of the command
+    *
     * @param value The command to asssociate with a message identifer.
-    * @param id The message identifier
+    * @param id    The message identifier
     */
   def associate(value: CommandValue, id: Identifier): Unit
 
   /**
     * Respond to clients.
+    *
     * @param results The results of a fast forward commit or None if leadership was lost such that the commit outcome is unknown.
     */
   def respond(results: Option[scala.collection.immutable.Map[Identifier, Any]]): Unit
@@ -74,16 +79,16 @@ object PaxosAlgorithm {
 }
 
 class PaxosAlgorithm extends PaxosLenses
-with CommitHandler
-with FollowerHandler
-with RetransmitHandler
-with PrepareHandler
-with AcceptHandler
-with PrepareResponseHandler
-with AcceptResponseHandler
-with ResendHandler
-with ReturnToFollowerHandler
-with ClientCommandHandler {
+  with CommitHandler
+  with FollowerHandler
+  with RetransmitHandler
+  with PrepareHandler
+  with AcceptHandler
+  with PrepareResponseHandler
+  with AcceptResponseHandler
+  with ResendHandler
+  with ReturnToFollowerHandler
+  with ClientCommandHandler {
 
   import PaxosAlgorithm._
 
@@ -94,7 +99,7 @@ with ClientCommandHandler {
     case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, _, _), _), CheckTimeout) if io.clock >= to =>
       handleFollowerTimeout(io, agent)
     case PaxosEvent(io, agent, vote: PrepareResponse) if agent.role == Follower =>
-      handelFollowerPrepareResponse(io, agent, vote)
+      handleFollowerPrepareResponse(io, agent, vote)
     // ignore an accept response which may be seen after we backdown to follower
     case PaxosEvent(_, agent@PaxosAgent(_, Follower, _, _), vote: AcceptResponse) =>
       agent
@@ -131,28 +136,29 @@ with ClientCommandHandler {
   }
 
   /**
-   * If no other logic has caught a timeout then do nothing.
-   */
-  val ignoreNotTimedOutCheck: PaxosFunction = {
+    * If no other logic has caught a timeout then do nothing.
+    */
+  val ignoreCheckTimeout: PaxosFunction = {
     case PaxosEvent(_, agent, CheckTimeout) =>
       agent
   }
 
-  val commonStateFunction: PaxosFunction =
-    retransmissionStateFunction orElse
+  val lastFunction: PaxosFunction =
+    acceptStateFunction orElse
       prepareStateFunction orElse
-      acceptStateFunction orElse
-      ignoreHeartbeatStateFunction orElse
-      ignoreNotTimedOutCheck orElse
+      retransmissionStateFunction orElse
+      ignoreCheckTimeout orElse
       unknown
 
-  val notLeaderFunction: PaxosFunction = {
+  val rejectCommandFunction: PaxosFunction = {
     case PaxosEvent(io, agent, v: CommandValue) =>
       io.send(NotLeader(agent.nodeUniqueId, v.msgUuid))
       agent
   }
 
-  val followerFunction: PaxosFunction = followingFunction orElse notLeaderFunction orElse commonStateFunction
+  val notLeaderFunction: PaxosFunction = ignoreHeartbeatStateFunction orElse rejectCommandFunction
+
+  val followerFunction: PaxosFunction = notLeaderFunction orElse followingFunction orElse lastFunction
 
   val takeoverFunction: PaxosFunction = {
     case PaxosEvent(io, agent, vote: PrepareResponse) =>
@@ -165,11 +171,11 @@ with ClientCommandHandler {
   }
 
   /**
-   * Here on a timeout we deal with either pending prepares or pending accepts putting a priority on prepare handling
-   * which backs down easily. Only if we have dealt with all timed out prepares do we handle timed out accepts which
-   * is more aggressive as it attempts to go-higher than any other node number.
-   */
-  val resendFunction: PaxosFunction = {
+    * Here on a timeout we deal with either pending prepares or pending accepts putting a priority on prepare handling
+    * which backs down easily. Only if we have dealt with all timed out prepares do we handle timed out accepts which
+    * is more aggressive as it attempts to go-higher than any other node number.
+    */
+  val resendPreparesAndAcceptsFunction: PaxosFunction = {
     // if we have timed-out on prepare messages
     case PaxosEvent(io, agent, CheckTimeout) if agent.data.prepareResponses.nonEmpty && io.clock > agent.data.timeout =>
       handleResendPrepares(io, agent, io.clock)
@@ -179,7 +185,7 @@ with ClientCommandHandler {
       handleResendAccepts(io, agent, io.clock)
   }
 
-  val leaderLikeFunction: PaxosFunction = {
+  val backDownOnHigherCommit: PaxosFunction = {
     case PaxosEvent(io, agent, c: Commit) =>
       handleReturnToFollowerOnHigherCommit(io, agent, c)
   }
@@ -187,14 +193,12 @@ with ClientCommandHandler {
   val recoveringFunction: PaxosFunction =
     takeoverFunction orElse
       acceptResponseFunction orElse
-      resendFunction orElse
-      leaderLikeFunction orElse
-      notLeaderFunction orElse
-      commonStateFunction
+      resendPreparesAndAcceptsFunction orElse
+      backDownOnHigherCommit
 
-  val recovererFunction: PaxosFunction = recoveringFunction orElse notLeaderFunction orElse commonStateFunction
+  val recovererFunction: PaxosFunction = notLeaderFunction orElse recoveringFunction orElse lastFunction
 
-  val leaderStateFunction: PaxosFunction = {
+  val leadingFunction: PaxosFunction = {
     // heartbeats the highest commit message
     case PaxosEvent(io, agent, HeartBeat) =>
       io.send(Commit(agent.data.progress.highestCommitted))
@@ -210,11 +214,11 @@ with ClientCommandHandler {
   }
 
   val leaderFunction: PaxosFunction =
-    leaderStateFunction orElse
+    leadingFunction orElse
       acceptResponseFunction orElse
-      resendFunction orElse
-      leaderLikeFunction orElse
-      commonStateFunction
+      resendPreparesAndAcceptsFunction orElse
+      backDownOnHigherCommit orElse
+      lastFunction
 
   def apply(e: PaxosEvent): PaxosAgent = e.agent.role match {
     case Follower => followerFunction(e)
