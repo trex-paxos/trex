@@ -43,7 +43,7 @@ sbt coverageReport
 
 - [x] crc32 message integrity 
 - [ ] Remove Akka dependence from core (keep in tests)
-- [ ] dynamic cluster membership
+- [ ] dynamic cluster membership with UPaxos 
 
 0.6 - enhanced 
 
