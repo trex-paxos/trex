@@ -129,7 +129,7 @@ object FollowerHandler {
    * @param highestAcceptedIndex Highest slot where a value has been accepted by this node.
    */
   def recoverPrepares(nodeUniqueId: Int, highest: BallotNumber, highestCommittedIndex: Long, highestAcceptedIndex: Long) = {
-    val BallotNumber(counter, _) = highest
+    val BallotNumber(counter, _, _) = highest
     val higherNumber = BallotNumber(counter + 1, nodeUniqueId)
     val prepares = (highestCommittedIndex + 1) to (highestAcceptedIndex + 1) map {
       slot => Prepare(Identifier(nodeUniqueId, higherNumber, slot))

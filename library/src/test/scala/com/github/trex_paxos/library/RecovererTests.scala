@@ -167,8 +167,6 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests with MockFactory
     }
   }
 
-
-
   def recovererNoResponsesInClusterOfSize(numberOfNodes: Int) = {
     val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++
       Seq((recoverHighPrepare.id -> Map(0 -> PrepareAck(recoverHighPrepare.id, 0, initialData.progress, 0, 0, None))))

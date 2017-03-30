@@ -48,20 +48,25 @@ case object NoOperationCommandValue extends CommandValue {
 case class Payload(id: Identifier, command: CommandValue)
 
 /**
- * The logical number used to discriminate messages as either higher or lower. Numbers must be unique to _both_ the node in the cluster *and* paxos prepare.  Physically it is 64bits with high 32bits an epoch number and low 32bits a node unique identifier. The number will be fixed for a stable leader so it also represents a leaders term.
+ * The logical number used to discriminate messages as either higher or lower. Numbers must be unique to _both_ the node in the cluster *and* paxos prepare.  The node identifier is fixed for each node and represents the least significant bits in the comparison logic. The counter is stable for a stable leader.  During any attempt to become the leader the counter is set to be just higher than any previously seen counter. The era is the most significant bits and is an optional feature which can be used to implement UPaxos cluster reconfigurations.
  * @param counter Used by candidate leaders to "go higher" than prior or competing leaders. No guarantees are made as to this number; there may be gaps between values issued by a node and there may be collisions between dueling leaders.
  * @param nodeIdentifier node unique number which must be unique to an agent within the cluster (e.g. set from unique configuration or parsed from DNS name ’node0’, ’node1'). This value is used to tie break between dueling leaders. Safety of the algorithm requires that this value must be unique per cluster.
+  * @param era optional cluster configuration "era" which can be used for UPaxos cluster reconfigurations see [[https://simbo1905.wordpress.com/2016/12/16/upaxos-unbounded-paxos-reconfigurations/]]
  */
-case class BallotNumber(counter: Int, nodeIdentifier: Int) {
-  def >(that: BallotNumber) = if (this == that) false else if (this.counter > that.counter) true else if (this.counter < that.counter) false else this.nodeIdentifier > that.nodeIdentifier
+case class BallotNumber(counter: Int, nodeIdentifier: Int, era: Int = 0) {
+  def >(that: BallotNumber) = if (this == that) false else if(this.era > that.era ) true else if (this.counter > that.counter) true else if (this.counter < that.counter) false else this.nodeIdentifier > that.nodeIdentifier
 
-  def >=(that: BallotNumber) = if (this == that) true else if (this.counter > that.counter) true else if (this.counter < that.counter) false else this.nodeIdentifier > that.nodeIdentifier
+  def >=(that: BallotNumber) = if (this == that) true else if(this.era > that.era ) true else if (this.counter > that.counter) true else if (this.counter < that.counter) false else this.nodeIdentifier > that.nodeIdentifier
 
-  def <(that: BallotNumber) = if (this == that) false else if (this.counter > that.counter) false else if (this.counter < that.counter) true else this.nodeIdentifier < that.nodeIdentifier
+  def <(that: BallotNumber) = if (this == that) false else if(this.era > that.era ) false else if (this.counter > that.counter) false else if (this.counter < that.counter) true else this.nodeIdentifier < that.nodeIdentifier
 
-  def <=(that: BallotNumber) = if (this == that) true else if (this.counter > that.counter) false else if (this.counter < that.counter) true else this.nodeIdentifier < that.nodeIdentifier
+  def <=(that: BallotNumber) = if (this == that) true  else if(this.era > that.era ) false else if (this.counter > that.counter) false else if (this.counter < that.counter) true else this.nodeIdentifier < that.nodeIdentifier
 
-  override def toString = f"N(c=${counter.toLong},n=$nodeIdentifier)"
+  override def toString = f"N(c=${counter.toLong},n=${nodeIdentifier},e=${era})"
+}
+
+object BallotNumber {
+  def apply(counter: Int, nodeIdentifier: Int) = new BallotNumber(counter, nodeIdentifier)
 }
 
 /**
