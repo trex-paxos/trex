@@ -91,7 +91,7 @@ class MapDBStoreSpec extends WordSpecLike with Matchers with BeforeAndAfter with
       assert(7 == found.length)
 
       val indexes = (found map {
-        case Accept(Identifier(1, BallotNumber(a, b), index), ClientCommandValue("0", bytes)) =>
+        case Accept(Identifier(1, BallotNumber(a, b, _), index), ClientCommandValue("0", bytes)) =>
           assert(java.util.Arrays.equals(bytes, expectedBytes))
           assert(a == b)
           assert(index == a)

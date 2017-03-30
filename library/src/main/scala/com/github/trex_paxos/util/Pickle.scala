@@ -260,10 +260,11 @@ object Pickle {
     pickleInt(id.from) ++
       pickleInt(id.number.counter) ++
       pickleInt(id.number.nodeIdentifier) ++
+      pickleInt(id.number.era) ++
       pickleLong(id.logIndex)
 
   def unpickleIdentifier(i: Iterator[Byte]): Identifier = {
-    Identifier(unpickleInt(i), BallotNumber(unpickleInt(i), unpickleInt(i)), unpickleLong(i))
+    Identifier(unpickleInt(i), BallotNumber(unpickleInt(i), unpickleInt(i), unpickleInt(i)), unpickleLong(i))
   }
 
   def pickleCommit(c: Commit): ByteChain = {
@@ -353,10 +354,10 @@ object Pickle {
   }
 
   def pickleProgress(p: Progress): ByteChain = pickleInt(p.highestPromised.counter) ++
-    pickleInt(p.highestPromised.nodeIdentifier) ++ pickleIdentifier(p.highestCommitted)
+    pickleInt(p.highestPromised.nodeIdentifier) ++  pickleInt(p.highestPromised.era) ++ pickleIdentifier(p.highestCommitted)
 
   def unpickleProgress(b: Iterator[Byte]): Progress = {
-    Progress(BallotNumber(unpickleInt(b), unpickleInt(b)), unpickleIdentifier(b))
+    Progress(BallotNumber(unpickleInt(b), unpickleInt(b), unpickleInt(b)), unpickleIdentifier(b))
   }
 
   def pickleAcceptAck(a: AcceptAck): ByteChain = pickleIdentifier(a.requestId) ++

@@ -26,8 +26,16 @@ class PickleTests extends WordSpecLike with Matchers {
       Pickle.unpack(Pickle.pack(n).iterator) should be(NotLeader(1, 2.toString))
     }
 
-    "roundrip Prepare" in {
+    "roundrip Prepare no ear" in {
       val p = Prepare(Identifier(1, BallotNumber(2, 3), 4L))
+      Pickle.unpack(Pickle.pack(p).iterator) match {
+        case `p` =>
+        case f => fail(f.toString)
+      }
+    }
+
+    "roundrip Prepare with ear" in {
+      val p = Prepare(Identifier(1, BallotNumber(2, 3, 9), 4L))
       Pickle.unpack(Pickle.pack(p).iterator) match {
         case `p` =>
         case f => fail(f.toString)
@@ -39,7 +47,7 @@ class PickleTests extends WordSpecLike with Matchers {
         val a = Accept(Identifier(1, BallotNumber(2, 3), 4L), ClientCommandValue("0", bytes1))
         val b = Pickle.pack(a).iterator
         Pickle.unpack(b) match {
-          case Accept(Identifier(1, BallotNumber(2, 3), 4L), ClientCommandValue("0", bout)) =>
+          case Accept(Identifier(1, BallotNumber(2, 3, _), 4L), ClientCommandValue("0", bout)) =>
             assert(bequals(Array[Byte](5, 6), bout))
           case f => fail(f.toString)
         }
@@ -52,22 +60,36 @@ class PickleTests extends WordSpecLike with Matchers {
         }
       }
     }
-    "roundtrip AcceptAck" in {
+    "roundtrip AcceptAck no era" in {
       val r = AcceptAck(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)))
       Pickle.unpack(Pickle.pack(r).iterator) match {
         case `r` =>
         case f => fail(f.toString)
       }
     }
-    "roundtrip AcceptNack" in {
+    "roundtrip AcceptAck with era" in {
+      val r = AcceptAck(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7, 99), Identifier(8, BallotNumber(9, 10, 100), 11L)))
+      Pickle.unpack(Pickle.pack(r).iterator) match {
+        case `r` =>
+        case f => fail(f.toString)
+      }
+    }
+    "roundtrip AcceptNack no era" in {
       val r = AcceptNack(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)))
       Pickle.unpack(Pickle.pack(r).iterator) match {
         case `r` =>
         case f => fail(f.toString)
       }
     }
+    "roundtrip AcceptNack with era" in {
+      val r = AcceptNack(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7, 99), Identifier(8, BallotNumber(9, 10, 100), 11L)))
+      Pickle.unpack(Pickle.pack(r).iterator) match {
+        case `r` =>
+        case f => fail(f.toString)
+      }
+    }
 
-    "roundtrip PrepareAck" in {
+    "roundtrip PrepareAck no era" in {
       {
         val p = PrepareAck(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), 12, 13, None)
         Pickle.unpack(Pickle.pack(p).iterator) match {
@@ -79,9 +101,9 @@ class PickleTests extends WordSpecLike with Matchers {
         val a = Accept(Identifier(1, BallotNumber(2, 3), 4L), ClientCommandValue("0", bytes1))
         val p = PrepareAck(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), 12, 13, Option(a))
         Pickle.unpack(Pickle.pack(p).iterator) match {
-          case PrepareAck(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), 12, 13, Some(a)) =>
+          case PrepareAck(Identifier(1, BallotNumber(2, 3, _), 4L), 5, Progress(BallotNumber(6, 7, _), Identifier(8, BallotNumber(9, 10, _), 11L)), 12, 13, Some(a)) =>
             a match {
-              case Accept(Identifier(1, BallotNumber(2, 3), 4L), ClientCommandValue("0", bout)) =>
+              case Accept(Identifier(1, BallotNumber(2, 3, _), 4L), ClientCommandValue("0", bout)) =>
                 assert(bequals(Array[Byte](5, 6), bout))
               case f => fail(f.toString)
             }
@@ -89,8 +111,37 @@ class PickleTests extends WordSpecLike with Matchers {
         }
       }
     }
-    "roundtrip PrepareNack" in {
+    "roundtrip PrepareAck with era" in {
+      {
+        val p = PrepareAck(Identifier(1, BallotNumber(2, 3, 98), 4L), 5, Progress(BallotNumber(6, 7, 99), Identifier(8, BallotNumber(9, 10, 100), 11L)), 12, 13, None)
+        Pickle.unpack(Pickle.pack(p).iterator) match {
+          case `p` =>
+          case f => fail(f.toString)
+        }
+      }
+      {
+        val a = Accept(Identifier(1, BallotNumber(2, 3, 97), 4L), ClientCommandValue("0", bytes1))
+        val p = PrepareAck(Identifier(1, BallotNumber(2, 3, 98), 4L), 5, Progress(BallotNumber(6, 7, 99), Identifier(8, BallotNumber(9, 10, 100), 11L)), 12, 13, Option(a))
+        Pickle.unpack(Pickle.pack(p).iterator) match {
+          case PrepareAck(Identifier(1, BallotNumber(2, 3, 98), 4L), 5, Progress(BallotNumber(6, 7, 99), Identifier(8, BallotNumber(9, 10, 100), 11L)), 12, 13, Some(a)) =>
+            a match {
+              case Accept(Identifier(1, BallotNumber(2, 3, 97), 4L), ClientCommandValue("0", bout)) =>
+                assert(bequals(Array[Byte](5, 6), bout))
+              case f => fail(f.toString)
+            }
+          case f => fail(f.toString)
+        }
+      }
+    }
+    "roundtrip PrepareNack no era" in {
       val p = PrepareNack(Identifier(1, BallotNumber(2, 3), 4L), 5, Progress(BallotNumber(6, 7), Identifier(8, BallotNumber(9, 10), 11L)), 12, 13)
+      Pickle.unpack(Pickle.pack(p).iterator) match {
+        case `p` =>
+        case f => fail(f.toString)
+      }
+    }
+    "roundtrip PrepareNack with era" in {
+      val p = PrepareNack(Identifier(1, BallotNumber(2, 3, 97), 4L), 5, Progress(BallotNumber(6, 7, 98), Identifier(8, BallotNumber(9, 10, 99), 11L)), 12, 13)
       Pickle.unpack(Pickle.pack(p).iterator) match {
         case `p` =>
         case f => fail(f.toString)
@@ -111,12 +162,12 @@ class PickleTests extends WordSpecLike with Matchers {
       Pickle.unpack(b) match {
         case RetransmitResponse(10, 11, Seq(a1), Seq(a2)) => {
           a1 match {
-            case Accept(Identifier(1, BallotNumber(2, 3), 4L), ClientCommandValue("0", bout)) =>
+            case Accept(Identifier(1, BallotNumber(2, 3, _), 4L), ClientCommandValue("0", bout)) =>
               assert(bequals(Array[Byte](5, 6), bout))
             case f => fail(f.toString)
           }
           a2 match {
-            case Accept(Identifier(5, BallotNumber(6, 7), 8L), ClientCommandValue("0", bout)) =>
+            case Accept(Identifier(5, BallotNumber(6, 7, _), 8L), ClientCommandValue("0", bout)) =>
               assert(bequals(Array[Byte](7, 8), bout))
             case f => fail(f.toString)
           }
@@ -174,10 +225,10 @@ class PickleTests extends WordSpecLike with Matchers {
       }
     }
     "roundtrip multiple values" in {
-      val a1 = Accept(Identifier(1, BallotNumber(1, 1), 1L), ClientCommandValue("0", Array[Byte](1, 1)))
-      val a2 = Accept(Identifier(2, BallotNumber(2, 2), 2L), ClientCommandValue("0", Array[Byte](2, 2)))
-      val a3 = Accept(Identifier(3, BallotNumber(3, 3), 3L), ClientCommandValue("0", Array[Byte](3, 3)))
-      val a4 = Accept(Identifier(4, BallotNumber(4, 4), 4L), ClientCommandValue("0", Array[Byte](4, 4)))
+      val a1 = Accept(Identifier(1, BallotNumber(1, 1, 99), 1L), ClientCommandValue("0", Array[Byte](1, 1)))
+      val a2 = Accept(Identifier(2, BallotNumber(2, 2, 98), 2L), ClientCommandValue("0", Array[Byte](2, 2)))
+      val a3 = Accept(Identifier(3, BallotNumber(3, 3, 97), 3L), ClientCommandValue("0", Array[Byte](3, 3)))
+      val a4 = Accept(Identifier(4, BallotNumber(4, 4, 96), 4L), ClientCommandValue("0", Array[Byte](4, 4)))
       val r = RetransmitResponse(10, 11, Seq(a1, a2), Seq(a3, a4))
       val b = Pickle.pack(r).iterator
       Pickle.unpack(b) match {
@@ -215,7 +266,7 @@ class PickleTests extends WordSpecLike with Matchers {
   }
   "Pickling with crc32" should {
     "should not fail CRC if not modified data" in {
-      val identifier11: Identifier = Identifier(1, BallotNumber(1, 1), 11L)
+      val identifier11: Identifier = Identifier(1, BallotNumber(1, 1, 1), 11L)
       val v1: CommandValue = ClientCommandValue("hello", Array[Byte](1.toByte))
       val a11 = Accept(identifier11, v1)
 
@@ -243,7 +294,7 @@ class PickleTests extends WordSpecLike with Matchers {
     // if we corrput the first 4 bytes we may think that the size is upto Int.Max so will blow up with out a CRC check failure
     (4 until 19) foreach { index =>
       val result = Try {
-        val identifier11: Identifier = Identifier(1, BallotNumber(1, 1), 11L)
+        val identifier11: Identifier = Identifier(1, BallotNumber(1, 1, 1), 11L)
         val v1: CommandValue = ClientCommandValue("hello", Array[Byte](1.toByte))
         val a11 = Accept(identifier11, v1)
 
