@@ -84,8 +84,8 @@ object PrepareResponseHandler {
       case Some((Identifier(_, _, highestKnownSlotToRecover), _)) =>
         val highestSlotToRecoverLatestResponse = votes.values.map(_.highestAcceptedIndex).max
         if (highestSlotToRecoverLatestResponse > highestKnownSlotToRecover) {
-          val prepares = (highestKnownSlotToRecover + 1) to highestSlotToRecoverLatestResponse map { id =>
-            Prepare(Identifier(agent.nodeUniqueId, agent.data.epoch.get, id))
+          val prepares = (highestKnownSlotToRecover + 1) to highestSlotToRecoverLatestResponse map { slot =>
+            Prepare(Identifier(agent.nodeUniqueId, agent.data.epoch.get, slot))
           }
           io.logger.info("Node {} Recoverer broadcasting {} new prepare messages for expanded slots {} to {}", agent.nodeUniqueId, prepares.size, (highestKnownSlotToRecover + 1), highestSlotToRecoverLatestResponse)
           prepares foreach { p =>

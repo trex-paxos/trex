@@ -9,7 +9,7 @@ package com.github.trex_paxos.library
   * @param quorumStrategy The current quorum strategy (which could be any FPaxos flexible paxos strategy)
   */
 case class PaxosAgent(nodeUniqueId: Int, role: PaxosRole, data: PaxosData, quorumStrategy: QuorumStrategy) {
-  def minPrepare: Prepare = Prepare(Identifier(nodeUniqueId, BallotNumber(0, 0), 0))
+  def minPrepare: Prepare = Prepare(Identifier(nodeUniqueId, BallotNumber(0, 0, 0), 0))
 }
 
 /**

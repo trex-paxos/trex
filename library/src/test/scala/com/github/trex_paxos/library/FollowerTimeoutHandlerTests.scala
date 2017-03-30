@@ -229,7 +229,7 @@ class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with Option
       }
       // when
       val handler = new Object with FollowerHandler
-      val PaxosAgent(_, _, newData, _) = handler.handleMajorityResponse(io, agent, votes)
+      val PaxosAgent(_, _, newData, _) = handler.handleMajorityLowPrepareResponse(io, agent, votes)
       // then
       newData.prepareResponses.isEmpty shouldBe true
       newData.leaderHeartbeat shouldBe 999

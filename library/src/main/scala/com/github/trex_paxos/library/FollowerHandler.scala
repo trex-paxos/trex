@@ -44,10 +44,18 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
     }
   }
 
+  /**
+    * Here a timed-out follower has issued a low prepare message so as not to disrupt a stable leader. If the follower
+    * learns from the nack responses that it has not commmitted the highest slot then it cannot attempt to be come the
+    * leader as it may not know the latest committed cluster membership so it will back down. Otherwise it tracks the
+    * responses until it has a quorum response. At which point it makes a decision as to whether it will issue a high
+    * prepare message and become a recoverer.
+    */
   def handleLowPrepareResponse(io: PaxosIO, agent: PaxosAgent, vote: PrepareResponse): PaxosAgent = {
     val selfHighestSlot = agent.data.progress.highestCommitted.logIndex
     val otherHighestSlot = vote.progress.highestCommitted.logIndex
     if (otherHighestSlot > selfHighestSlot) {
+      // this node cannot lead must process the value of the highest committed slot in case that changes the quorum
       io.logger.debug("Node {} node {} committed slot {} requesting retransmission", agent.nodeUniqueId, vote.from, otherHighestSlot)
       io.send(RetransmitRequest(agent.nodeUniqueId, vote.from, agent.data.progress.highestCommitted.logIndex))
       backdownAgent(io, agent)
@@ -60,7 +68,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
 
           if (haveMajorityResponse) {
 
-            handleMajorityResponse(io, agent, votes)
+            handleMajorityLowPrepareResponse(io, agent, votes)
 
           } else {
             // need to wait until we hear from a majority
@@ -73,7 +81,13 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
     }
   }
 
-  def handleMajorityResponse(io: PaxosIO, agent: PaxosAgent, votes: Map[Int, PrepareResponse]): PaxosAgent = {
+  /**
+    * A timed out follower issues a low prepare message so as not to disrupt a leader which is partially network
+    * partitioned. This method tracks the nack responses and looks for evidence that other nodes are seeing the stable
+    * leader. If it cannot see any such evidence it will issue a high prepare message and upgrade to be a recoverer which
+    * will track the responses to the high prepares as part of the leader takeover phase.
+    */
+  def handleMajorityLowPrepareResponse(io: PaxosIO, agent: PaxosAgent, votes: Map[Int, PrepareResponse]): PaxosAgent = {
     computeFailover(io.logger, agent.nodeUniqueId, agent.data, votes, agent.quorumStrategy) match {
       case FailoverResult(failover, _) if failover =>
         val highestNumber = Seq(agent.data.progress.highestPromised, agent.data.progress.highestCommitted.number).max

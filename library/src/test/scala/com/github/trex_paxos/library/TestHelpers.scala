@@ -95,7 +95,7 @@ case class TimeAndParameter(time: Long, parameter: Any)
 
 object TestHelpers extends PaxosLenses{
 
-  val minPrepare = Prepare(Identifier(0, BallotNumber(0, 0), 0  ))
+  val minPrepare = Prepare(Identifier(0, BallotNumber(0, 0, 0), 0  ))
 
   val undefinedIO = new UndefinedIO
 
