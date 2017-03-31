@@ -1,14 +1,13 @@
 
-package com.github.trex_paxos.internals
+package com.github.trex_paxos.core
 
 import java.io.{Closeable, File}
 
+import com.github.trex_paxos.Membership
 import org.mapdb.{DB, DBMaker}
 
 import scala.collection.JavaConversions
-import com.github.trex_paxos.TrexMembership
 import com.github.trex_paxos.library._
-
 
 /**
   * A MapDB storage engine. Note that you must call close on the file for a clean shutdown.
@@ -16,7 +15,7 @@ import com.github.trex_paxos.library._
   * @param journalFile File to journal into.
   * @param retained    Minimum number of committed slots to retain for retransmission
   */
-class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMembership with Closeable {
+class MapDBStore(journalFile: File, retained: Int) extends Journal with MemberStore with Closeable {
 
   import com.github.trex_paxos.util.{Pickle,ByteChain}
 
@@ -54,6 +53,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
   }
 
   def loadProgress(): Progress = {
+    // init() method means that this should never return null
     val bytes = bookworkMap.get("FileJournal")
     val checked = ByteChain(bytes).checkCrcData()
     Pickle.unpickleProgress(checked.iterator)
@@ -87,39 +87,37 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
     // TODO this needs tests
     val keysAscending = storeMap.navigableKeySet()
     if (storeMap.isEmpty())
-      PaxosActor.minJournalBounds
+      Journal.minJournalBounds
     else {
       JournalBounds(keysAscending.iterator().next(), keysAscending.descendingSet().iterator().next())
     }
   }
 
-  // stores the current cluster membership at a given slot
+  // stores the current cluster m at a given slot
   val memberMap: java.util.concurrent.ConcurrentNavigableMap[Long, Array[Byte]] =
     db.getTreeMap("MEMBERS")
 
   val UTF8 = "UTF8"
 
-  override def loadMembership(): Option[CommittedMembership] =
-  {
+  override def saveMembership(slot: Long, membership: Membership): Unit = {
+    import scala.collection.JavaConverters._
+    val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
+    lastSlotOption foreach {
+      case last if last < slot => // good
+      case last => throw new IllegalArgumentException(s"slot ${slot} is not higher than last ${last}")
+    }
+    val json = MemberPickle.toJson(membership)
+    memberMap.put(slot, json.getBytes(UTF8))
+    db.commit()
+  }
+
+  override def loadMembership(): Option[Membership] = {
     import scala.collection.JavaConverters._
     val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
     lastSlotOption map { (s: Long) =>
       val jsonBytesUtf8 = memberMap.get(s)
-      MemberPickle.fromJson(new String(jsonBytesUtf8, UTF8))
+      val js = new String(jsonBytesUtf8, UTF8)
+      MemberPickle.fromJson(js).getOrElse(throw new IllegalArgumentException(js))
     }
-  }
-
-  override def saveMembership(cm: CommittedMembership): Unit =
-  {
-    import scala.collection.JavaConverters._
-    val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
-    lastSlotOption foreach {
-      case last if last < cm.slot => // good
-      case last => throw new IllegalArgumentException(s"slot ${cm.slot} is not higher than last ${last}")
-    }
-    val json = MemberPickle.toJson(cm)
-    memberMap.put(cm.slot, json.getBytes(UTF8))
-    db.commit()
-    // TODO consider gc of old values
   }
 }

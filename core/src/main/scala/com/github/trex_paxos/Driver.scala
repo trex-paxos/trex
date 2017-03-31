@@ -17,7 +17,7 @@ object BaseDriver {
 
   def defaultSelectionUrlFactory(context: ActorContext, cluster: Cluster): Map[Int, String] = {
     val nodeAndUrl = cluster.nodes.map { node =>
-      (node.nodeUniqueId, s"akka.tcp://${cluster.name}@${node.host}:${node.clientPort}/user/PaxosActor")
+      (node.nodeIdentifier, s"akka.tcp://${cluster.name}@${node.leaderAddressHostname}:${node.leaderAddressPort}/user/PaxosActor")
     }
     (cluster.nodes.indices zip nodeAndUrl.map({ case (_, s) => s })).toMap
   }
@@ -230,86 +230,5 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
 
 }
 
-object DynamicClusterDriver {
-  case class Initialize(membership: Membership)
-  def apply(cluster: Cluster) = {
-    DynamicClusterDriver.Initialize(Membership(cluster.name, cluster.nodes.map { node =>
-      Member(node.nodeUniqueId, s"${node.host}:${node.nodePort}", s"${node.host}:${node.clientPort}", Accepting)
-    }))
-  }
-}
 
-/**
-  * A concrete driver which uses akka.tcp to send messages. FIXME Note akka documentation says that akka.tcp is not firewall friendly.
-  *
-  * @param timeout The client timeout. It is recommended that this is significantly longer than the cluster failover timeout.
-  * @param maxAttempts The number of retries before the driver fails. Should be set greater or equal to the max cluster size.
-  */
-class DynamicClusterDriver(timeout: Timeout, maxAttempts: Int) extends BaseDriver(timeout, maxAttempts) with ActorLogging {
 
-  import scala.concurrent.ExecutionContext.Implicits.global
-
-  // TODO inject these timings from config
-  context.system.scheduler.schedule(Duration(5, MILLISECONDS), Duration(1000, MILLISECONDS), self, CheckTimeout)
-
-  var membership: Option[CommittedMembership] = None // TODO do we warn if this is None and the actor is uninitialised
-
-  case object CheckMembership
-
-  // TODO inject these timings from config
-  context.system.scheduler.schedule(Duration(505, MILLISECONDS), Duration(1000, MILLISECONDS), self, CheckMembership)
-
-  def localReceive: Receive = {
-    case i: DynamicClusterDriver.Initialize =>
-      membership = Option(CommittedMembership(0, i.membership))
-      log.info("membership initialized to {}", membership)
-    case CheckMembership =>
-      // FIXME
-      // pick a random node and tell it about our latest knowledge of committed membership. if we are out of date it will reply
-      /*
-      membership foreach {
-        case c: CommittedMembership =>
-          resolveActorSelectorForIndex(((Math.random() * 1024) % clusterSize).toInt) foreach {
-            _ ! c
-          }
-      }*/
-    case work: Membership =>
-      // FIXME
-//      log.info("received membership change request {}", work)
-//      val commandValue = MembershipCommandValue(incrementAndGetRequestId(), work)
-//      val request = Request(Platform.currentTime + timeoutMillis, sender(), commandValue, 1)
-//      transmit(leaderCounter, request)
-    case m: CommittedMembership =>
-      // update our knowledge of the commitment membership of the cluster
-      membership = Option(m)
-      log.info(s"membership changed to ${m}")
-  }
-
-  override def receive: Receive = localReceive orElse super.receive
-
-  /**
-    * Returns the current cluster size.
-    */
-  override protected def clusterSize: Int = membership match {
-    case None => 1 // TODO zero here gives divide by zero. 1 here is handled else where in the stack.
-    case Some(m) => m.membership.members.size
-  }
-
-  /**
-    * Returns an ActorSelection mapped to the passed cluster membership index.
-    * This is abstract so that there can be a subclass which knows about cluster membership changes.
-    * Counter can be incremented to round-robin to find the new stable leader.
-    *
-    * @param memberIndex The index of the node in the cluster to resolve. Usually computed as counter%size
-    */
-  override protected def resolveActorSelectorForIndex(memberIndex: Int): Option[ActorSelection] = {
-
-    membership map { m =>
-      val urls = m.membership.members.map { node =>
-         s"akka.tcp://${m.membership.name}@${node.clientLocation}/user/PaxosActor"
-       }
-      val indexToUrl = (m.membership.members.indices zip urls).toMap
-      context.actorSelection(indexToUrl(memberIndex))
-    }
-  }
-}
