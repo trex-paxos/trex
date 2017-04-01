@@ -12,7 +12,7 @@ Checkout the [blog posts](https://simbo1905.wordpress.com/2016/01/09/trex-a-paxo
 
 [Trex 0.2](https://github.com/trex-paxos/trex/tree/0.2) is now released which allows for pluggable a `QuroumStrategy` which would allow for a more [flexible paxos](https://ssougou.blogspot.co.uk/2016/08/a-more-flexible-paxos.html?m=1) known as [FPaxos](https://arxiv.org/pdf/1608.06696v1.pdf)
 
-[Trex 0.1](https://github.com/trex-paxos/trex/tree/0.1) is now released to [Central](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22com.github.trex-paxos%22)! This release has what is believed to be a correct and [functional paxos library](http://search.maven.org/#artifactdetails%7Ccom.github.trex-paxos%7Ctrex-library_2.11%7C0.1%7Cjar). The other jars ( `core` server and `demo` module) are only enough to run simple demos. A key missing features is that `core` has no logic for dynamic cluster m. 
+[Trex 0.1](https://github.com/trex-paxos/trex/tree/0.1) is now released to [Central](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22com.github.trex-paxos%22)! This release has what is believed to be a correct and [functional paxos library](http://search.maven.org/#artifactdetails%7Ccom.github.trex-paxos%7Ctrex-library_2.11%7C0.1%7Cjar). The other jars ( `core` server and `demo` module) are only enough to run simple demos. A key missing features is that `core` has no logic for dynamic cluster membership. 
 
 ## Building
 
@@ -43,15 +43,15 @@ sbt coverageReport
 
 - [x] crc32 message integrity 
 - [ ] Remove Akka dependence from core (keep in tests)
-- [ ] dynamic cluster m
+- [ ] dynamic cluster membership with UPaxos 
 
 0.6 - enhanced 
 
-- [ ] unbounded paxos with learners
+- [ ] learners / scale-out multicast
 - [ ] timeline reads
 - [ ] noop heartbeats (less duels and partitioned leader detection)
 - [ ] snapshots and out of band retransmission
-- [ ] metrics
+- [ ] metrics/akka-tracing
 - [ ] binary tracing 
 - [ ] jumbo UDP packets
 - [ ] complete the TODOs

@@ -86,7 +86,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests with MockFactory
 
     def `should be defined for a CheckTimeout when accepts are timed out` {
       val agent = PaxosAgent(0, Recoverer, initialData.copy(acceptResponses = emptyAcceptResponses), initialQuorumStrategy)
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, CheckTimeout)))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, CheckTimeout)))
     }
 
     def `should deal with timed-out prepares before timed-out accepts` {
@@ -111,61 +111,63 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests with MockFactory
     def `should be defined for a commit at a higher log index` {
       val agent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, initialData.progress.highestPromised, Int.MaxValue))
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
     def `should be defined for a commit at a same log index with a higher number` {
       val agent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, BallotNumber(Int.MaxValue, Int.MaxValue), initialData.progress.highestCommitted.logIndex))
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
     def `should be defined for a low commit` {
       val agent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, BallotNumber(0, 0), Long.MinValue))
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
     def `should be defined for a client command message` {
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue("1"))))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue("1"))))
     }
 
     def `should be defined for a RetransmitRequest` {
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, RetransmitRequest(0, 1, 0L))))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, RetransmitRequest(0, 1, 0L))))
     }
 
     def `should be defined for a RetransmitResponse` {
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, RetransmitResponse(0, 1, Seq(), Seq()))))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, RetransmitResponse(0, 1, Seq(), Seq()))))
     }
 
     def `should be defined for a Prepare if the prepare is less than the promise` {
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(0, 0), 0)))))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(0, 0), 0)))))
     }
 
     def `should be defined for a Prepare if the prepare is higher than the promise` {
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(Int.MaxValue, Int.MaxValue), 0)))))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(Int.MaxValue, Int.MaxValue), 0)))))
     }
 
     def `should be defined for a Prepare if the prepare is equal to the promise` {
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, initialDataAgent.data.progress.highestPromised, 0)))))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, initialDataAgent.data.progress.highestPromised, 0)))))
     }
 
     def `should be defined for an Accept with a lower number` {
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Accept(Identifier(0, BallotNumber(0, 0), 0), NoOperationCommandValue))))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Accept(Identifier(0, BallotNumber(0, 0), 0), NoOperationCommandValue))))
     }
 
     def `should be defined for an Accept with a higher number for a committed slot` {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = TestHelpers.highestPromisedHighestCommittedLens.set(TestHelpers.initialData, (promise, Identifier(from = 0, number = promise, logIndex = 99L)))
       val higherCommittedAgent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(undefinedIO, higherCommittedAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, higherCommittedAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
     def `should be defined for a CheckTimeout when not timedout` {
       val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
-      assert(paxosAlgorithm.recoveringFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, CheckTimeout)))
+      assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, CheckTimeout)))
     }
   }
+
+
 
   def recovererNoResponsesInClusterOfSize(numberOfNodes: Int) = {
     val prepareSelfVotes = SortedMap.empty[Identifier, Map[Int, PrepareResponse]] ++

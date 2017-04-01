@@ -40,7 +40,7 @@ object TestServer {
     Node(2, Addresses(Address("localhost", 1220), Address("localhost",1221))),
       Node(3, Addresses(Address("localhost", 1330), Address("localhost",1331))))
 
-  val quorum = Quorum(2, nodes.map(_.nodeIdentifier).toSet)
+  val quorum: Quorum = ??? // Quorum(2, nodes.map(_.nodeIdentifier).toSet)
 
   def main(args: Array[String]): Unit = {
     val node = args.toSeq.headOption match {

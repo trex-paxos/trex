@@ -33,8 +33,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
     PaxosAgent(agent.nodeUniqueId, Follower, timeoutPrepareResponsesLens.set(agent.data, (io.scheduleRandomCheckTimeout, prepareSelfVotes)), agent.quorumStrategy)
   }
 
-  def handelFollowerPrepareResponse(io: PaxosIO, agent: PaxosAgent, vote: PrepareResponse): PaxosAgent = {
-
+  def handleFollowerPrepareResponse(io: PaxosIO, agent: PaxosAgent, vote: PrepareResponse): PaxosAgent = {
     agent.data.prepareResponses.nonEmpty match {
       case true =>
         // having broadcast a low prepare if we see insufficient evidence of a leader in a majority response promote to recoverer
