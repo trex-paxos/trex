@@ -97,7 +97,7 @@ with OptionValues {
       val deliveredWithTs: ArrayBuffer[(Long, CommandValue)] = ArrayBuffer()
       val handler = new TestRetransmitHandler {
         override def processRetransmitResponse(io: PaxosIO, agent: PaxosAgent, response: RetransmitResponse): Retransmission =
-          Retransmission(progress, accepts98thru100, accepts98thru100.map(a => a.id.logIndex -> a.value))
+          Retransmission(progress, accepts98thru100, accepts98thru100.map(a => a.id -> a.value))
       }
       // when it is passed a retransmit response
       handler.handleRetransmitResponse(new TestIO(new UndefinedJournal){
@@ -193,7 +193,7 @@ with OptionValues {
       // when
       val retransmission = handler.processRetransmitResponse(undefinedSilentIO, agent, retransmitResponse)
       // then
-      retransmission.committed.headOption.value shouldBe (98L, a98.value)
+      retransmission.committed.headOption.value shouldBe (a98.id, a98.value)
       retransmission.newProgress.highestCommitted shouldBe a98.id
     }
 

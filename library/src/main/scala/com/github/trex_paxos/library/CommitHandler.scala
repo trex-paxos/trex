@@ -24,7 +24,7 @@ trait CommitHandler extends PaxosLenses {
     committable.lastOption match {
       case Some(newHighestCommitted) =>
         val results = committable map { a =>
-          val p = Payload(a.id.logIndex, a.value)
+          val p = Payload(a.id, a.value)
           io.logger.debug("Node {} delivering {}", agent.nodeUniqueId, p)
           val bytes = io.deliver(p)
           (a.id, bytes)

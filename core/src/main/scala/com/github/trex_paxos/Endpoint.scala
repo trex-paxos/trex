@@ -40,24 +40,24 @@ class TypedActorPaxosEndpoint(
   }
 
   override val deliverClient: PartialFunction[Payload, AnyRef] = {
-    case Payload(logIndex, c: ClientCommandValue) =>
+    case Payload(id, c: ClientCommandValue) =>
       val mc@TypedActor.MethodCall(method, parameters) = deserialize(c.bytes)
-      log.debug("delivering slot {} value {}", logIndex, mc)
+      log.debug("delivering slot {} value {}", id.logIndex, mc)
       val result = Try {
         val response = Option(method.invoke(target, parameters: _*))
         log.debug(s"invoked ${method.getName} returned $response")
         response match {
           case Some(result) =>
             val bytes = serializerClient.toBinary(result)
-            ServerResponse(logIndex, c.msgUuid, Some(bytes))
+            ServerResponse(id.logIndex, c.msgUuid, Some(bytes))
           case None =>
-            ServerResponse(logIndex, c.msgUuid, None)
+            ServerResponse(id.logIndex, c.msgUuid, None)
         }
       } recover {
         case ex =>
           log.error(ex, s"call to $method with $parameters got exception $ex")
           val bytes = serializerClient.toBinary(ex)
-          ServerResponse(logIndex, c.msgUuid, Option(bytes))
+          ServerResponse(id.logIndex, c.msgUuid, Option(bytes))
       }
       result.get
   }

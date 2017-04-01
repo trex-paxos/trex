@@ -116,11 +116,11 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
     delivered.values foreach { values =>
       values.foldLeft(0L) {
         case (lastCommitted, Payload(nextCommitted, value)) =>
-          lastCommitted should be <= nextCommitted
-          if (nextCommitted > lastCommitted) {
-            (nextCommitted - lastCommitted) shouldBe 1
+          lastCommitted should be <= nextCommitted.logIndex
+          if (nextCommitted.logIndex > lastCommitted) {
+            (nextCommitted.logIndex - lastCommitted) shouldBe 1
           }
-          nextCommitted
+          nextCommitted.logIndex
       }
     }
 
