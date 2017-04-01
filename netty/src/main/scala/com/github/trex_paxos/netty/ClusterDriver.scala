@@ -25,7 +25,7 @@ object ClusterDriver {
   }
 }
 
-class ClusterDriver(val memberStore: MemberStore, deserialize: (Array[Byte]) => Try[Any]) {
+class ClusterDriver(val nodeIdentifier: Int, val memberStore: MemberStore, deserialize: (Array[Byte]) => Try[Any]) {
   val logger = LoggerFactory.getLogger(this.getClass)
 
   import ClusterDriver._
@@ -33,9 +33,11 @@ class ClusterDriver(val memberStore: MemberStore, deserialize: (Array[Byte]) => 
   protected var peers = peersFor(memberStore.loadMembership().getOrElse(throw new IllegalArgumentException("Uninitiated MemberStore")))
 
   def peersFor(m: Membership): Map[Int, Client] = {
-    (m.nodes map {
-      case n =>
-        n.nodeIdentifier -> new Client(n)
+    (m.nodes flatMap {
+      case n if n.nodeIdentifier != nodeIdentifier =>
+        Some(n.nodeIdentifier -> new Client(n))
+      case _ =>
+        None
     }).toMap
   }
 

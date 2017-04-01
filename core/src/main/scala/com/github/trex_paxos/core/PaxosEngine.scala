@@ -48,7 +48,6 @@ abstract class PaxosEngine(val paxosProperties: PaxosProperties,
 
   def receive(message: PaxosMessage): Future[Seq[PaxosMessage]] = Future {
     require(logger != null)
-    logger.info("receive: {}", message)
     outbound.clear()
     val oldData = agent.data
     val event = PaxosEvent(this, agent, message)
@@ -70,6 +69,7 @@ abstract class PaxosEngine(val paxosProperties: PaxosProperties,
 
   val paxosIdToSocketAndMsgUuid: scala.collection.concurrent.Map[Identifier, ContextAndSocketAndMsgUUid] =
     (new ConcurrentHashMap[Identifier, ContextAndSocketAndMsgUUid]()).asScala
+
   def associate(value: CommandValue, id: Identifier): Unit = {
     clientMsgUuidToSocket.get(value.msgUuid) match {
       case Some(ContextAndSocket(ctx, inetSocketAddress)) =>

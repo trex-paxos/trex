@@ -3,7 +3,7 @@ package com.github.trex_paxos.library
 case class JournalBounds(min: Long, max: Long)
 
 object Journal {
-  // timed-out nodes issue Prepare(BallotNumber(0, 0)) and so we start at one hiher
+  // timed-out nodes issue Prepare(BallotNumber(0, 0)) and so we start at one higher
   val minNumber = BallotNumber(1, 1)
   val minBookwork = Progress(minNumber, Identifier(0, minNumber,0))
   val minJournalBounds = JournalBounds(Long.MinValue, Long.MinValue)

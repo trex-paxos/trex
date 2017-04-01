@@ -2,10 +2,9 @@ package com.github.trex_paxos.library
 
 /**
   * A node in a paxos cluster
-  *
-  * @param nodeUniqueId   The node unique ID used in the ballot numbers. Assumed to never be recycled.
-  * @param role           The current role such as Follower or Leader
-  * @param data           The current state of the node holding the paxos algorithm bookwork
+  * @param nodeUniqueId The node unique ID used in the ballot numbers. Assumed to never be recycled.
+  * @param role The current role such as Follower or Leader
+  * @param data The current state of the node holding the paxos algorithm bookwork
   * @param quorumStrategy The current quorum strategy (which could be any FPaxos flexible paxos strategy)
   */
 case class PaxosAgent(nodeUniqueId: Int, role: PaxosRole, data: PaxosData, quorumStrategy: QuorumStrategy) {
@@ -14,7 +13,6 @@ case class PaxosAgent(nodeUniqueId: Int, role: PaxosRole, data: PaxosData, quoru
 
 /**
   * The latest event is an IO to read and write data (side effects), the paxos node, and a paxos message.
-  *
   * @param io
   * @param agent
   * @param message
@@ -22,11 +20,18 @@ case class PaxosAgent(nodeUniqueId: Int, role: PaxosRole, data: PaxosData, quoru
 case class PaxosEvent(io: PaxosIO, agent: PaxosAgent, message: PaxosMessage)
 
 /**
-  * Paxos has side effects (writes to the network and read+write to disk) which are isolated into this class to simplify testing.
+  * The result of processing an event.
+  * @param agent The new agent state
+  * @param messages The message to pass within the cluster
+  */
+case class PaxosResult(agent: PaxosAgent, messages: Seq[PaxosMessage])
+
+/**
+  * Paxos has side effects (writes to the network and read+write to disk) which are isolated into this trait to simplify testing.
   */
 trait PaxosIO {
 
-  /** The durable story to hold the state on disk.
+  /** The durable store to hold the state on disk.
     */
   def journal: Journal
 
@@ -42,13 +47,12 @@ trait PaxosIO {
   def scheduleRandomCheckTimeout: Long
 
   /**
-    * The current time (so that we can test timeout permutations and behaviours).
+    * The current time (we use a def so that we can override when testing).
     */
   def clock: Long
 
   /**
     * The callback to the host application which can side effect.
-    *
     * @param payload The payload response to the client command value.
     * @return
     */
@@ -61,15 +65,13 @@ trait PaxosIO {
 
   /**
     * Associate a command value with a paxos identifier so that the result of the commit can be routed back to the sender of the command
-    *
     * @param value The command to asssociate with a message identifer.
-    * @param id    The message identifier
+    * @param id The message identifier
     */
   def associate(value: CommandValue, id: Identifier): Unit
 
   /**
     * Respond to clients.
-    *
     * @param results The results of a fast forward commit or None if leadership was lost such that the commit outcome is unknown.
     */
   def respond(results: Option[scala.collection.immutable.Map[Identifier, Any]]): Unit
