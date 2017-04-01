@@ -116,16 +116,20 @@ object MemberPickle {
     }).mkString("[", ",", "]")
   }
 
-
-  def toJson(m: Membership): String = {
-    //Membership(effectiveSlot: Long, quorumForPromises: Quorum, quorumForAccepts: Quorum, nodes: Set[Node])
-    "{" + s("slot") + ":" + m.effectiveSlot + "," + s("qI") + ":" + quorumTo(m.quorumForPromises) + ", " + s("qII") + ":" + quorumTo(m.quorumForAccepts) + ", " + s("nodes") + ":" + nodesTo(m.nodes) + "}"
+  def toJson(e: Era): String = {
+    val m = e.membership
+    val slot = m.effectiveSlot match {
+      case None => -1
+      case Some(i) => i
+    }
+    "{" + s("era") + ":" + e.era + "," + s("slot") + ":" + slot + "," + s("qI") + ":" + quorumTo(m.quorumForPromises) + ", " + s("qII") + ":" + quorumTo(m.quorumForAccepts) + ", " + s("nodes") + ":" + nodesTo(m.nodes) + "}"
    }
 
-  def fromJson(js: String): Option[Membership] = {
+  def fromJson(js: String): Option[Era] = {
     val json: Option[Any] = JSON.parseFull(js)
     for {
       Some(M(map)) <- Option(json)
+      D(era) = map("era")
       D(slot) = map("slot")
       M(qI) = map("qI")
       D(countQI) = qI("count")
@@ -175,7 +179,13 @@ object MemberPickle {
         }
         ).toSet
 
-      Membership(slot.toInt, Quorum(countQI.toInt, setOfQI), Quorum(countQII.toInt, setOfQII), nds)
+      val slotLong = slot.toLong
+      val slotOption = slotLong match {
+        case i if i >= 0 => Some(i)
+        case _ => None
+      }
+
+      Era(era.toInt, Membership(Quorum(countQI.toInt, setOfQI), Quorum(countQII.toInt, setOfQII), nds, slotOption))
     }
   }
 

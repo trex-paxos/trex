@@ -16,30 +16,30 @@ object InteractionSpec {
   val config = _root_.com.typesafe.config.ConfigFactory.parseString("trex.leader-timeout-min=1\ntrex.leader-timeout-max=10\nakka.loglevel = \"DEBUG\"")
 }
 
+class TestJournal extends Journal {
+  val _progress = Box(Journal.minBookwork.copy())
+  val _map = Box(SortedMap[Long, Accept]())
+
+  def saveProgress(progress: Progress): Unit = _progress(progress)
+
+  def loadProgress(): Progress = _progress()
+
+  def accept(accepted: Accept*): Unit = accepted foreach { a =>
+    _map(_map() + (a.id.logIndex -> a))
+  }
+
+  def accepted(logIndex: Long): Option[Accept] = _map().get(logIndex)
+
+  def bounds: JournalBounds = {
+    val keys = _map().keys
+    if (keys.isEmpty) JournalBounds(0L, 0L) else JournalBounds(keys.head, keys.last)
+  }
+}
+
 class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
   InteractionSpec.config)) with RefSpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
 
   import Ordering._
-
-  class TestJournal extends Journal {
-    val _progress = Box(Journal.minBookwork.copy())
-    val _map = Box(SortedMap[Long, Accept]())
-
-    def saveProgress(progress: Progress): Unit = _progress(progress)
-
-    def loadProgress(): Progress = _progress()
-
-    def accept(accepted: Accept*): Unit = accepted foreach { a =>
-      _map(_map() + (a.id.logIndex -> a))
-    }
-
-    def accepted(logIndex: Long): Option[Accept] = _map().get(logIndex)
-
-    def bounds: JournalBounds = {
-      val keys = _map().keys
-      if (keys.isEmpty) JournalBounds(0L, 0L) else JournalBounds(keys.head, keys.last)
-    }
-  }
 
   override def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)

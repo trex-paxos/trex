@@ -11,15 +11,12 @@ class TestAkkaPaxosActorNoTimeout(config: PaxosProperties, clusterSizeF: () => I
 
   // does nothing but makes this class concrete for testing
   val deliverClient: PartialFunction[Payload, Array[Byte]] = {
-    case x => NoOperationCommandValue.bytes
-  }
-
-  override def deliver(payload: Payload): Array[Byte] = {
-    delivered.append(payload.command)
-    payload.command match {
-      case ClientCommandValue(_, bytes) => if (bytes.length > 0) Array[Byte]((-bytes(0)).toByte) else bytes
-      case noop@NoOperationCommandValue => noop.bytes
-    }
+    case Payload(_, c@ClientCommandValue(_, bytes)) =>
+      delivered.append(c)
+      if (bytes.length > 0) Array[Byte]((-bytes(0)).toByte) else bytes
+    case Payload(_, noop@NoOperationCommandValue) =>
+      delivered.append(noop)
+      noop.bytes
   }
 
   def setAgent(role: PaxosRole, data: PaxosData) = this.paxosAgent = this.paxosAgent.copy(role = role, data = data)

@@ -1,6 +1,6 @@
 package com.github.trex_paxos.core
 
-import com.github.trex_paxos.{PaxosProperties, TestJournal}
+import com.github.trex_paxos.{PaxosProperties}
 import com.github.trex_paxos.library._
 import org.scalatest.{AsyncWordSpec, Matchers, OptionValues}
 

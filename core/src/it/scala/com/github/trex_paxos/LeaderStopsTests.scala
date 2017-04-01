@@ -25,9 +25,9 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
     def genString(a: LeaderStopsTests) = "LeaderStopsTests"
   }
 
-  import scala.concurrent.duration._
-
   val logger = Logging(system, this)
+
+  import scala.concurrent.duration._
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)

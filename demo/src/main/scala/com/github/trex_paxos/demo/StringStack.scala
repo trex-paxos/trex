@@ -14,12 +14,12 @@ import scala.concurrent.duration.FiniteDuration
 
 object StringStackShared {
   val quorum = Quorum(2, Set(Weight(2552,1), Weight(2562,1), Weight(2572,1)))
-  val membership = Membership(0, quorum, quorum, Set(
-    Node(2552, Addresses(Address("localhost", 2552), Address("localhost", 2553)) )
-    , Node(2562, Addresses(Address("localhost", 2562), Address("localhost", 2563)) )
-    , Node(2572, Addresses(Address("localhost", 2572), Address("localhost", 2573)) )
+  val membership = Membership(quorum, quorum, Set(
+      Node(2552, Addresses(Address("localhost", 2552), Address("localhost", 2553)) )
+      , Node(2562, Addresses(Address("localhost", 2562), Address("localhost", 2563)) )
+      , Node(2572, Addresses(Address("localhost", 2572), Address("localhost", 2573)) )
 
-  ))
+    ), Some(0))
 
   val LocationsRegex = """([^:]*):([0-9]*)\|([^:]*):([0-9]*)""".r
   val UTF8 = "UTF8"

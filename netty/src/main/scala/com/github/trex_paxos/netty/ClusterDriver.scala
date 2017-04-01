@@ -2,7 +2,7 @@ package com.github.trex_paxos.netty
 
 import java.util.Base64
 
-import com.github.trex_paxos.Membership
+import com.github.trex_paxos.{Era, Membership}
 import com.github.trex_paxos.core.MemberStore
 import com.github.trex_paxos.library._
 import org.slf4j.LoggerFactory
@@ -32,8 +32,8 @@ class ClusterDriver(val nodeIdentifier: Int, val memberStore: MemberStore, deser
 
   protected var peers = peersFor(memberStore.loadMembership().getOrElse(throw new IllegalArgumentException("Uninitiated MemberStore")))
 
-  def peersFor(m: Membership): Map[Int, Client] = {
-    (m.nodes flatMap {
+  def peersFor(e: Era): Map[Int, Client] = {
+    (e.membership.nodes flatMap {
       case n if n.nodeIdentifier != nodeIdentifier =>
         Some(n.nodeIdentifier -> new Client(n))
       case _ =>
@@ -59,8 +59,14 @@ class ClusterDriver(val nodeIdentifier: Int, val memberStore: MemberStore, deser
       deserialize(bytes) match {
         case Success(m: Membership) =>
           logger.info("received for slot {} with m {}", logIndex: Any, m: Any)
-          memberStore.saveMembership(logIndex, m)
-          peers = peersFor(m)
+          memberStore.loadMembership() match {
+            case None => logger.error("uninitialised member store")
+            case Some(era) =>
+              val nextEra = Era(era.era + 1, era.membership)
+              memberStore.saveMembership(nextEra)
+              peers = peersFor(nextEra)
+
+          }
         case Success(x) =>
           logger.error("unable to deserialize bytes to get a Membership got a {} from {}", x: Any, Base64.getEncoder.encodeToString(bytes): Any)
           throw new IllegalArgumentException(s"not a Membership: ${x}")

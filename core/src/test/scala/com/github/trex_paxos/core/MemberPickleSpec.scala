@@ -16,7 +16,9 @@ class MemberPickleSpec extends WordSpecLike with Matchers {
 
   val nodes = Set(node1, node2, node3)
 
-  val membership = Membership(99L, quorum1, Quorum(4, Set(Weight(101, 2), Weight(102, 2), Weight(103, 2))), nodes)
+  val membership = Membership(quorum1, Quorum(4, Set(Weight(101, 2), Weight(102, 2), Weight(103, 2))), nodes, Some(99L))
+
+  val era = Era(1024, membership)
 
   "MemberPickle" should {
     "roundtrip node" in {
@@ -34,9 +36,18 @@ class MemberPickleSpec extends WordSpecLike with Matchers {
       }
     }
     "roundtrip membership" in {
-      val js = MemberPickle.toJson(membership)
+      val js = MemberPickle.toJson(era)
       MemberPickle.fromJson(js) match {
-        case Some(`membership`) => // good
+        case Some(`era`) => // good
+        case f => fail(f.toString)
+      }
+    }
+    "roundtrip membership no slot" in {
+      val membershipNoSlot = membership.copy(effectiveSlot = None)
+      val era = Era(2048, membershipNoSlot)
+      val js = MemberPickle.toJson(era)
+      MemberPickle.fromJson(js) match {
+        case Some(`era`) => // good
         case f => fail(f.toString)
       }
     }

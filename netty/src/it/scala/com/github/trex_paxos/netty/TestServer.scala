@@ -29,9 +29,9 @@ object TestServer {
 
     if( journal.loadMembership().isEmpty ) {
       val quorum = Quorum(2, Set(Weight(1,1), Weight(2,1), Weight(3,1)))
-      val membership = Membership(0L, quorum, quorum, nodes.toSet)
+      val membership = Membership(quorum, quorum, nodes.toSet, Some(0L))
 
-      journal.saveMembership(0, membership)
+      journal.saveMembership(Era(0, membership))
     }
 
     val initialProgress = journal.loadProgress()

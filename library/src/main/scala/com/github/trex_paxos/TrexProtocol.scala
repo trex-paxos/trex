@@ -3,8 +3,9 @@ package com.github.trex_paxos
 /**
   * The UPaxos [[http://tessanddave.com/paxos-reconf-902f8b7.pdf]] voting weights. A weight of zero defined a learner.
   * See discussion at [[https://simbo1905.wordpress.com/2017/03/16/paxos-voting-weights/]]
+  *
   * @param nodeIdentifier The node identifier.
-  * @param weight The voting weight.
+  * @param weight         The voting weight.
   */
 case class Weight(nodeIdentifier: Int, weight: Int)
 
@@ -44,20 +45,23 @@ case class Addresses(leaderAddress: Address, peerAddress: Address)
   */
 case class Node(nodeIdentifier: Int, addresses: Addresses) {
   def peerAddressHostname = addresses.peerAddress.hostname
+
   def peerAddressPort = addresses.peerAddress.port
+
   def leaderAddressHostname = addresses.leaderAddress.hostname
+
   def leaderAddressPort = addresses.leaderAddress.port
 }
 
 /**
   * A cluster membership.
   *
-  * @param effectiveSlot     The slot at which the membership comes into effect.
   * @param quorumForPromises The quorum for promises.
   * @param quorumForAccepts  The quorum for accepts.
   * @param nodes             The nodes in the cluster
+  * @param effectiveSlot     The slot at which the membership comes into effect. Only set when the membership has been committed to a slot.
   */
-case class Membership(effectiveSlot: Long, quorumForPromises: Quorum, quorumForAccepts: Quorum, nodes: Set[Node]) {
+case class Membership(quorumForPromises: Quorum, quorumForAccepts: Quorum, nodes: Set[Node], effectiveSlot: Option[Long]) {
   require(quorumForAccepts.of.intersect(quorumForPromises.of).nonEmpty,
     s"The quorum for promises must overlap with the quorum for accepts - quorumForPromises: ${quorumForPromises}, quorumForAccepts: ${quorumForAccepts}")
 
@@ -68,3 +72,11 @@ case class Membership(effectiveSlot: Long, quorumForPromises: Quorum, quorumForA
   require(allQuorumNodes.intersect(allLocated) == allQuorumNodes,
     s"The unique nodes within the combined quorums don't match the nodes for which we have network addresses - quorumForPromises: ${quorumForPromises}, quorumForAccepts: ${quorumForAccepts}, nodes: ${nodes}, allQuorumNodes: ${allQuorumNodes}, allLocated: ${allLocated}")
 }
+
+/**
+  * The UPaxos era
+  *
+  * @param era        The era number. Should be sequential
+  * @param membership The membership at the given era
+  */
+case class Era(era: Int, membership: Membership)

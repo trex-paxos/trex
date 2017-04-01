@@ -14,7 +14,7 @@ trait ClientCommandHandler extends PaxosLenses {
       case _: AcceptAck => io.journal.accept(accept)
       case _ => // do nothing
     }
-    // let the outside world know the id associated with this value so that it can handle the committed value if needed
+    // let the outside world know the id associated with this value so that additional steps can happen when the id is known to be fixed
     io.associate(value, accept.id)
     // forward the accept to the cluster
     io.send(accept)

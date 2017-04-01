@@ -1,8 +1,12 @@
 package com.github.trex_paxos.core
 
-import com.github.trex_paxos.Membership
+import com.github.trex_paxos.{Era, Membership}
 
 trait MemberStore {
-  def saveMembership(slot: Long, membership: Membership): Unit
-  def loadMembership(): Option[Membership]
+  def saveMembership(era: Era): Unit
+
+  /**
+    * @return The latest cluster membership
+    */
+  def loadMembership(): Option[Era]
 }

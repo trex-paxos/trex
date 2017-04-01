@@ -23,7 +23,8 @@ import scala.util.Try
 abstract class AkkaPaxosActorNoTimeout(config: PaxosProperties, val nodeUniqueId: Int, val journal: Journal) extends Actor
 with PaxosIO
 with ActorLogging
-with AkkaLoggingAdapter {
+with AkkaLoggingAdapter
+with UPaxos {
   log.info("timeout min {}, timeout max {}", config.leaderTimeoutMin, config.leaderTimeoutMax)
 
   def clusterSize: Int
@@ -32,7 +33,7 @@ with AkkaLoggingAdapter {
 
   val logger = this
 
-  private val paxosAlgorithm = new PaxosAlgorithm
+  protected val paxosAlgorithm = new PaxosAlgorithm
 
   protected val actorRefWeakMap = new mutable.WeakHashMap[Identifier,(ActorRef, CommandValue)]
 
@@ -140,8 +141,7 @@ with AkkaLoggingAdapter {
   def deliver(payload: Payload): Any = (deliverClient orElse deliverMembership)(payload)
 
   /**
-   * The cluster m finite state machine. The new m has been chosen but will come into effect
-   * only for the next message for which we generate an accept message.
+   * Implements the cluster membership finite state machine.
    */
   val deliverMembership: PartialFunction[Payload, Any] = {
     case Payload(_, _) =>

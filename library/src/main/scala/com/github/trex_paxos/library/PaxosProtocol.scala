@@ -34,7 +34,6 @@ case class ReadOnlyClientCommandValue(msgUuid: String, val bytes: Array[Byte]) e
   */
 case class ClusterCommandValue(msgUuid: String, val bytes: Array[Byte]) extends CommandValue
 
-
 case object NoOperationCommandValue extends CommandValue {
   def bytes = emptyArray
 
