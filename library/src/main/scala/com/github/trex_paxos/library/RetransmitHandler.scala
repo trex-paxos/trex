@@ -1,6 +1,6 @@
 package com.github.trex_paxos.library
 
-case class Retransmission(newProgress: Progress, accepts: Seq[Accept], committed: Seq[(Long,CommandValue)])
+case class Retransmission(newProgress: Progress, accepts: Seq[Accept], committed: Seq[(Identifier,CommandValue)])
 
 trait RetransmitHandler extends PaxosLenses {
 
@@ -12,8 +12,8 @@ trait RetransmitHandler extends PaxosLenses {
 
     // crash safety relies upon the following side effects happening in the correct order
     retransmission.committed.foreach {
-      case (slot, value) =>
-        val p = Payload(slot, value)
+      case (id, value) =>
+        val p = Payload(id, value)
         io.logger.debug("Node {} delivering retransmitted {}", agent.nodeUniqueId, p)
         io.deliver(p)
     }
@@ -54,7 +54,7 @@ trait RetransmitHandler extends PaxosLenses {
     io.logger.info("Node " + agent.nodeUniqueId + " RetransmitResponse committed {} of {} and accepted {} of {}", committedCount, aboveCommitted.size, acceptState.acceptable.size, response.uncommitted.size)
 
     // return new progress, the accepts that we should journal so that we may retransmit on request, and the committed values
-    Retransmission(newProgress, (aboveCommitted ++ acceptState.acceptable).distinct, commitState.committed.map(a => a.id.logIndex -> a.value))
+    Retransmission(newProgress, (aboveCommitted ++ acceptState.acceptable).distinct, commitState.committed.map(a => a.id -> a.value))
   }
 
   def handleRetransmitRequest(io: PaxosIO, agent: PaxosAgent, request: RetransmitRequest): PaxosAgent = {

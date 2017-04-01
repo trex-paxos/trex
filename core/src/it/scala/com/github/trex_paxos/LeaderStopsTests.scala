@@ -119,7 +119,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
     // note that we will see gaps due to chosen Noops during leader takeovers which are not delivered.
     delivered.values foreach { values =>
       values.foldLeft(0L) {
-        case (lastCommitted, Payload(nextCommitted, value)) =>
+        case (lastCommitted, Payload(Identifier(_, _, nextCommitted), value)) =>
           lastCommitted should be <= nextCommitted
           nextCommitted
       }

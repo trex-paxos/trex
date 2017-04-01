@@ -54,7 +54,7 @@ class ClusterDriver(val nodeIdentifier: Int, val memberStore: MemberStore, deser
   }
 
   val deliverMembership: PartialFunction[Payload, Any] = {
-    case p@Payload(logIndex, ClusterCommandValue(msgUuid, bytes)) =>
+    case p@Payload(Identifier(_, _, logIndex), ClusterCommandValue(msgUuid, bytes)) =>
       logger.debug("received ClusterCommandValue {}", p)
       deserialize(bytes) match {
         case Success(m: Membership) =>

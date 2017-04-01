@@ -41,13 +41,12 @@ case object NoOperationCommandValue extends CommandValue {
   val msgUuid = ""
 }
 
-
 /**
   * Once consensus has been reached we deliver CommandValues in consensus order with the possibility of repeats during crash recovery.
-  * @param logIndex The Paxos slow under which the command value is committed. My be used to deduplicate repeated deliveries due to crashes.
+  * @param id The identifier of the accept message which is processing the command.
   * @param command The value which has been chosen by the consensus protocol.
   */
-case class Payload(logIndex: Long, command: CommandValue)
+case class Payload(id: Identifier, command: CommandValue)
 
 /**
  * The logical number used to discriminate messages as either higher or lower. Numbers must be unique to _both_ the node in the cluster *and* paxos prepare.  Physically it is 64bits with high 32bits an epoch number and low 32bits a node unique identifier. The number will be fixed for a stable leader so it also represents a leaders term.
@@ -68,7 +67,7 @@ case class BallotNumber(counter: Int, nodeIdentifier: Int) {
 
 /**
  * Identifies a unique leader epoch and log index “slot” into which a value may be proposed. Each leader must only propose a single value into any given slot and must change the [[BallotNumber]] to propose a different value at the same slot. The identifier used for a given slot will be shared across prepare, accept and commit messages during a leader take-over. The ordering of identifiers is defined by their log index order which is used to commit accepted values in order.
- * TODO how can from differ from number.nodeIdentifier?
+ * TODO how can "from" differ from "number.nodeIdentifier"?
  * @param from The node sending the message.
  * @param number The paxos proposal number used for comparing messages, or values, as higher or lower than each other. This value will be fixed for a stable leadership.
  * @param logIndex The contiguous log stream position, or “slot”, into which values are proposed and committed in order.
