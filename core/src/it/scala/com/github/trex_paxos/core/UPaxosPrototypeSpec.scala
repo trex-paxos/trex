@@ -4,14 +4,12 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.event.{LogSource, Logging}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import com.github.trex_paxos._
-import com.github.trex_paxos.library.TestHelpers.{initialData, recoverHighPrepare}
 import com.github.trex_paxos.library._
 import org.scalatest.{BeforeAndAfterAll, Matchers}
 import org.scalatest.refspec.RefSpecLike
 
 import scala.collection.immutable
-import scala.collection.immutable.SortedMap
-import scala.collection.immutable.Set
+import scala.collection.immutable.{Set, SortedMap, TreeMap}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.collection.mutable.ArrayBuffer
@@ -361,6 +359,17 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
         case f => fail(f.toString)
       }
     }
+
+    import Ordering._
+
+    val lowValue = 1
+
+    val initialData = PaxosData(progress = Progress(
+      highestPromised = BallotNumber(lowValue, lowValue),
+      highestCommitted = Identifier(from = 0, number = BallotNumber(lowValue, lowValue), logIndex = 0)
+    ), leaderHeartbeat = 0, timeout = 0, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap() )
+
+    val recoverHighPrepare = Prepare(Identifier(0, BallotNumber(lowValue + 1, 0), 1L))
 
     def `should compute outcome one negative votes`: Unit = {
 
