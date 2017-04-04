@@ -8,7 +8,6 @@ import com.github.trex_paxos.library._
 import org.scalatest.{BeforeAndAfterAll, Matchers}
 import org.scalatest.refspec.RefSpecLike
 
-import scala.collection.immutable
 import scala.collection.immutable.{Set, SortedMap, TreeMap}
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -92,14 +91,24 @@ class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniq
   override def receive: Receive = {
     case m: PaxosMessage =>
 
-      def normalMessageWork() = {
+      def notNewEraPrepareWork() = {
         val event = new PaxosEvent(this, paxosAgent, m)
         val agent = paxosAlgorithm(event)
         trace(event, sender().toString(), sent)
         val outMessages = this.sent flatMap {
           case m: PaxosMessage => Routing.route(nodeUniqueId, m, currentBroadcastNodes(m))
         }
-        outMessages.foreach(send(sender(), _))
+        outMessages foreach {
+          case o@OutboundMessage(_, a: Accept) =>
+            newEraOverlap match {
+              case Some(overlap) =>
+                send(sender(), o.copy(targets = overlap.acceptNodes.toSet))
+              case _ =>
+                send(sender(), o)
+            }
+          case o =>
+            send(sender(), o)
+        }
         this.sent = collection.immutable.Seq()
         clearLeaderOverlapWorkIfLostLeadership(paxosAgent.role, agent.role)
         paxosAgent = agent
@@ -107,7 +116,7 @@ class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniq
 
       newEraPrepare match {
         case None =>
-          normalMessageWork()
+          notNewEraPrepareWork()
         case Some(prepare) =>
           m match {
             case ackOrNack: PrepareResponse =>
@@ -136,17 +145,20 @@ class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniq
                     }
                   case None =>
                     // TODO this is an invalid state merge the two options into one!
-                    normalMessageWork()
+                    notNewEraPrepareWork()
                 }
               } else {
-                normalMessageWork()
+                notNewEraPrepareWork()
               }
             case _ =>
-              normalMessageWork()
+              notNewEraPrepareWork()
           }
       }
 
-    case f => logger.error("Received unknown messages type {}", f)
+    case f =>
+      val err = s"Node ${nodeUniqueId} received unknown messages type ${f.getClass.getCanonicalName} : ${f}"
+      logger.error(err)
+      throw new IllegalArgumentException(err)
   }
 
 }
@@ -202,14 +214,17 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       }
       phigh.id.logIndex should be(1)
       phigh.id.number.nodeIdentifier should be(0)
+
       // when we send that high prepare to node one
       actor1 ! phigh
+
       // it should ack
       val pack1 = expectMsgPF(50 millisecond) {
         case OutboundMessage(set, p: PrepareAck) if set == Set(0) => p
         case f => fail(f.toString)
       }
       pack1.requestId should be(phigh.id)
+
       // send it to node two it should also ack
       actor2 ! phigh
       // it should ack
@@ -367,7 +382,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
     val initialData = PaxosData(progress = Progress(
       highestPromised = BallotNumber(lowValue, lowValue),
       highestCommitted = Identifier(from = 0, number = BallotNumber(lowValue, lowValue), logIndex = 0)
-    ), leaderHeartbeat = 0, timeout = 0, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap() )
+    ), leaderHeartbeat = 0, timeout = 0, prepareResponses = TreeMap(), epoch = None, acceptResponses = TreeMap())
 
     val recoverHighPrepare = Prepare(Identifier(0, BallotNumber(lowValue + 1, 0), 1L))
 
@@ -471,7 +486,46 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
         case f => fail(f.getClass.getCanonicalName + " " + f.toString)
       }
 
-      // when we send the prepare to the follower which was in the prepare partition
+      // if we send another client value
+      leader ! hw
+
+      // it will send an accept only to follower2 in the accept partition using the old era
+      val oldEraAccept = expectMsgPF(50 millisecond) {
+        case OutboundMessage(set, a: Accept) if set == Set(2) && a.id.number.era == prepareNewEra.id.number.era - 1 =>
+         a
+        case f =>
+          fail(f.toString)
+      }
+
+      // that will be accepted by follower2
+      follower2 ! oldEraAccept
+
+      val oldEraAcceptAck = expectMsgPF(50 millisecond) {
+        case OutboundMessage(set, a: AcceptAck) if set == Set(0) && a.from == 2 =>
+          a
+        case f =>
+          fail(f.toString)
+      }
+
+      // when the leader sees the old era ack
+      leader ! oldEraAcceptAck
+
+      // the leader will deliver back to the client
+      expectMsgPF(50 millisecond) {
+        case b: Array[Byte] => // good
+        case f =>
+          fail(f.toString)
+      }
+
+      // and commit that message to all nodes
+      // TODO this would cause Follower1 to ask for a retransmission of what it missed should speculatively send values
+      expectMsgPF(50 millisecond) {
+        case OutboundMessage(set, c: Commit) if set == Set(1, 2) && c.identifier == oldEraAccept.id => // good
+        case f =>
+          fail(f.toString)
+      }
+
+      // when we send the new era prepare to follower1 in the prepare partition using the new era
       follower1 ! prepareNewEra
 
       val newEraPrepareAck = expectMsgPF(50 millisecond) {

@@ -4,9 +4,6 @@ import com.github.trex_paxos.{PaxosProperties}
 import com.github.trex_paxos.library._
 import org.scalatest.{AsyncWordSpec, Matchers, OptionValues}
 
-import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.Future
-
 class PaxosEngineSpec extends AsyncWordSpec with Matchers with OptionValues {
 
   val nodeUniqueId: Int = 0
@@ -15,17 +12,17 @@ class PaxosEngineSpec extends AsyncWordSpec with Matchers with OptionValues {
     highestPromised = BallotNumber(0, nodeUniqueId),
     highestCommitted = Identifier(from = 0, number = BallotNumber(0, 0), logIndex = 0)
   )
-
-  def testEngine: TestPaxosEngine = {
-    val testJournal = new TestJournal
-    new TestPaxosEngine(PaxosProperties(0L, 100L), testJournal, PaxosEngine.initialAgent(nodeUniqueId, zeroProgress, () => 3)) {
-      override def deliver(payload: Payload): Any = {}
-
-      override def associate(value: CommandValue, id: Identifier): Unit = {}
-
-      override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
-    }
-  }
+//
+//  def testEngine: TestPaxosEngine = {
+//    val testJournal = new TestJournal
+//    new TestPaxosEngine(PaxosProperties(0L, 100L), testJournal, PaxosEngine.initialAgent(nodeUniqueId, zeroProgress, () => 3)) {
+//      override def deliver(payload: Payload): Any = {}
+//
+//      override def associate(value: CommandValue, id: Identifier): Unit = {}
+//
+//      override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
+//    }
+//  }
 
   "PaxosEngine" should {
 //    "should respond with a nack for a low prepare" in {
