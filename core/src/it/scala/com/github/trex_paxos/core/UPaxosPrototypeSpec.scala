@@ -173,6 +173,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
 
     val hw = ClientCommandValue("0", Array[Byte](1))
 
+    // TODO strip this out as all of this is tested in other classes
     def threeNodesSteadyState(actor0: TestActorRef[TestUPaxosActor], actor1: TestActorRef[TestUPaxosActor], actor2: TestActorRef[TestUPaxosActor]) = {
       expectNoMsg(25 millisecond)
       // when node zero times-out
@@ -322,8 +323,8 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
 
       actor1 ! commit
       actor2 ! commit
-
     }
+
 
     val node0 = Node(0, Addresses(Address("localhost", 1), Address("localhost", 2)))
     val node1 = Node(1, Addresses(Address("localhost", 2), Address("localhost", 3)))
@@ -344,14 +345,14 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
     val newMembership = Membership(quorumForPromises = newQuorum, quorumForAccepts = newQuorum, nodes = nodes, effectiveSlot = None)
 
     def `should compute overlap unweighted membership`: Unit = {
-      val Overlap(prepares, accepts) = UPaxos.computeLeaderOverlap(0, originalMembership)
+      val LeaderOverlap(prepares, accepts) = UPaxos.computeLeaderOverlap(0, originalMembership)
 
       prepares.toSet shouldBe Set(1)
       accepts.toSet shouldBe Set(2)
     }
 
     def `should compute overlap double weighted membership`: Unit = {
-      val Overlap(prepares, accepts) = UPaxos.computeLeaderOverlap(0, newMembership)
+      val LeaderOverlap(prepares, accepts) = UPaxos.computeLeaderOverlap(0, newMembership)
 
       prepares.toSet shouldBe Set(1)
       accepts.toSet shouldBe Set(2)
