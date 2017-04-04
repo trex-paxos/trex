@@ -64,16 +64,13 @@ class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniq
               number match {
                 case `ballotNumber` =>
                   // perform UPaxos upgrade of ballot number to the latest era
-                  val p = UPaxos.upgradeBallotNumberToNewEra(nodeUniqueId, ballotNumber, paxosAgent.data.progress)
-                  newEraPrepare = Option(p)
-                  newEraOverlap = Option(UPaxos.computeLeaderOverlap(nodeUniqueId, committedMembership))
-                  newEraOverlap foreach {
-                    case Overlap(prepareNodes, _) =>
-                      val outMessages = Routing.route(nodeUniqueId, p, prepareNodes)
-                      logger.info("overlap prepare messages are {}", outMessages)
-                      outMessages.foreach(send(sender(), _))
-                  }
-                  Option(p.id.number.era)
+                  val newEraPrepare = UPaxos.upgradeBallotNumberToNewEra(nodeUniqueId, ballotNumber, paxosAgent.data.progress)
+                  val newEraOverlap = UPaxos.computeLeaderOverlap(nodeUniqueId, committedMembership)
+                  uPaxosContext = Option(UPaxosContext(newEraPrepare, newEraOverlap))
+                  val outMessages = Routing.route(nodeUniqueId, newEraPrepare, newEraOverlap.prepareNodes)
+                  logger.info("overlap prepare messages are {}", outMessages)
+                  outMessages.foreach(send(sender(), _))
+                  Option(newEraPrepare.id.number.era)
               }
             case None => logger.error("should be unreachable")
               None
@@ -100,8 +97,8 @@ class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniq
         }
         outMessages foreach {
           case o@OutboundMessage(_, a: Accept) =>
-            newEraOverlap match {
-              case Some(overlap) =>
+            uPaxosContext match {
+              case Some(UPaxosContext(_, overlap, _)) =>
                 send(sender(), o.copy(targets = overlap.acceptNodes.toSet))
               case _ =>
                 send(sender(), o)
@@ -114,38 +111,32 @@ class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniq
         paxosAgent = agent
       }
 
-      newEraPrepare match {
+      uPaxosContext match {
         case None =>
           notNewEraPrepareWork()
-        case Some(prepare) =>
+        case Some(UPaxosContext(prepare, overlap, _)) =>
           m match {
             case ackOrNack: PrepareResponse =>
               if (ackOrNack.requestId == prepare.id) {
-                newEraOverlap match {
-                  case Some(overlap) =>
-                    handleEraPrepareResponse(nodeUniqueId, overlap.prepareNodes, currentMembership.membership, ackOrNack) match {
-                      case None => // no outcome yet so nothing to do
-                      case Some(true) => // outcome success
-                        // process our own prepare message to upgrade our own promise and progress
-                        if (prepare.id.number > paxosAgent.data.progress.highestPromised) {
-                          val data = progressLens.set(paxosAgent.data, Progress.highestPromisedLens.set(paxosAgent.data.progress, prepare.id.number))
-                          // journal promise
-                          journal.saveProgress(data.progress)
-                          // upgrade our epoch to our promise so that our new accept message go out with the higher number
-                          paxosAgent = paxosAgent.copy(data = epochLens.set(data, Option(data.progress.highestPromised)))
-                          // tell the accept nodes about the new prepare. this isnt needed for safety only the aesthetics of symmetry of state between nodes
-                          send(sender(), OutboundMessage(overlap.acceptNodes.toSet, prepare))
-                          logger.info("succeed in upgrading to new era ballot number {}", paxosAgent.data.progress.highestPromised)
-                        }
-                        reset()
-                      case Some(false) =>
-                        logger.warning("failed to upgrade to new era ballot number clearing overlap state")
-                        reset()
-
+                handleEraPrepareResponse(nodeUniqueId, overlap.prepareNodes, currentMembership.membership, ackOrNack) match {
+                  case None => // no outcome yet so nothing to do
+                  case Some(true) => // outcome success
+                    // process our own prepare message to upgrade our own promise and progress
+                    if (prepare.id.number > paxosAgent.data.progress.highestPromised) {
+                      val data = progressLens.set(paxosAgent.data, Progress.highestPromisedLens.set(paxosAgent.data.progress, prepare.id.number))
+                      // journal promise
+                      journal.saveProgress(data.progress)
+                      // upgrade our epoch to our promise so that our new accept message go out with the higher number
+                      paxosAgent = paxosAgent.copy(data = epochLens.set(data, Option(data.progress.highestPromised)))
+                      // tell the accept nodes about the new prepare. this isnt needed for safety only the aesthetics of symmetry of state between nodes
+                      send(sender(), OutboundMessage(overlap.acceptNodes.toSet, prepare))
+                      logger.info("succeed in upgrading to new era ballot number {}", paxosAgent.data.progress.highestPromised)
                     }
-                  case None =>
-                    // TODO this is an invalid state merge the two options into one!
-                    notNewEraPrepareWork()
+                    reset()
+                  case Some(false) =>
+                    logger.warning("failed to upgrade to new era ballot number clearing overlap state")
+                    reset()
+
                 }
               } else {
                 notNewEraPrepareWork()
@@ -492,7 +483,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       // it will send an accept only to follower2 in the accept partition using the old era
       val oldEraAccept = expectMsgPF(50 millisecond) {
         case OutboundMessage(set, a: Accept) if set == Set(2) && a.id.number.era == prepareNewEra.id.number.era - 1 =>
-         a
+          a
         case f =>
           fail(f.toString)
       }
@@ -536,8 +527,6 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
         case f => fail(f.toString)
       }
 
-      expectNoMsg(50 millisecond)
-
       // when we send that ack to the leader
       leader ! newEraPrepareAck
 
@@ -566,8 +555,6 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
         case f =>
           fail(f.toString)
       }
-
-      //fail("needs to send out accepts to the other majority")
 
     }
   }

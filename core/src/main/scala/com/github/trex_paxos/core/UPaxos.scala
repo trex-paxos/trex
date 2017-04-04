@@ -72,24 +72,15 @@ object UPaxos {
 
 case class Overlap(prepareNodes: Iterable[Int], acceptNodes: Iterable[Int])
 
+// TODO add a Vector of further Memberships
+case class UPaxosContext(newEraPrepare: Prepare, newEraOverlap: Overlap, newEraPrepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]] = PaxosData.emptyPrepares)
+
 trait UPaxos {
   self: PaxosIO =>
 
-  var newEraPrepare: Option[Prepare] = None
+  var uPaxosContext: Option[UPaxosContext] = None
 
-  var newEraOverlap: Option[Overlap] = None
-
-  var newEraPrepareResponses: SortedMap[Identifier, Map[Int, PrepareResponse]] = PaxosData.emptyPrepares
-
-  def reset() = {
-    newEraPrepare match {
-      case None => // nothing to do
-      case _ =>
-        newEraOverlap = None
-        newEraPrepare = None
-        newEraPrepareResponses = PaxosData.emptyPrepares
-    }
-  }
+  def reset() = uPaxosContext = None
 
   def clearLeaderOverlapWorkIfLostLeadership(oldRole: PaxosRole, newRole: PaxosRole) = {
     if (oldRole == Leader && newRole != Leader) {
@@ -99,16 +90,12 @@ trait UPaxos {
   }
 
   def handleEraPrepareResponse(nodeUniqueId: Int, prepareNodes: Iterable[Int], membership: Membership, ackOrNack: PrepareResponse) = {
-
-    def update(p: PrepareResponse) = {
-      val votes = newEraPrepareResponses.getOrElse((p.requestId), Map())
-      newEraPrepareResponses = newEraPrepareResponses + (p.requestId -> (votes + (p.from -> p)))
-    }
-
-    newEraPrepare match {
-      case Some(eraPrepare) if eraPrepare.id == ackOrNack.requestId =>
-        update(ackOrNack)
-        UPaxos.computeNewEraPrepareOutcome(nodeUniqueId, prepareNodes, membership.quorumForPromises, newEraPrepareResponses(ackOrNack.requestId))
+    uPaxosContext match {
+      case Some(context@UPaxosContext(eraPrepare, _, responses)) if eraPrepare.id == ackOrNack.requestId =>
+        val votes = responses.getOrElse((eraPrepare.id), Map())
+        val newResponses = responses + (eraPrepare.id -> (votes + (ackOrNack.from -> ackOrNack)))
+        uPaxosContext = Option(context.copy(newEraPrepareResponses = newResponses))
+        UPaxos.computeNewEraPrepareOutcome(nodeUniqueId, prepareNodes, membership.quorumForPromises, newResponses(ackOrNack.requestId))
       case None => // should be unreachable
         None
     }
