@@ -138,14 +138,10 @@ with UPaxos {
    * @param payload The selected value and a delivery id that can be used to deduplicate deliveries during crash recovery.
    * @return The response to the value command that has been delivered. May be an empty array.
    */
-  def deliver(payload: Payload): Any = (deliverClient orElse deliverMembership)(payload)
-
-  /**
-   * Implements the cluster membership finite state machine.
-   */
-  val deliverMembership: PartialFunction[Payload, Any] = {
-    case Payload(_, _) =>
-      throw new AssertionError("not yet implemented") // FIXME
+  def deliver(payload: Payload): Array[Byte] = payload match {
+    case Payload(_, c: ClientCommandValue) => deliverClient(payload)
+    case Payload(_, c: ClusterCommandValue) => deliverMembership(payload)
+    case Payload(_, NoOperationCommandValue) => Array[Byte]()
   }
 
   /**
@@ -160,10 +156,15 @@ with UPaxos {
   }
 
   /**
+    * Implements the cluster membership finite state machine.
+    */
+  def deliverMembership(payload: Payload): Array[Byte]
+
+  /**
    * The host application finite state machine invocation.
    * This method is abstract as the implementation is specific to the host application.
    */
-  val deliverClient: PartialFunction[Payload, AnyRef]
+  def deliverClient(payload: Payload): Array[Byte]
 
 }
 

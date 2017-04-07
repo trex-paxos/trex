@@ -23,9 +23,10 @@ class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniq
   val memberStore = new MemberStore {
     var eras: SortedMap[Int, Era] = SortedMap()
 
-    override def saveMembership(era: Era): Unit = {
+    override def saveMembership(era: Era): Era = {
       if (eras.keySet.size > 0) require(era.era == eras.keySet.last + 1)
       eras = eras + (era.era -> era)
+      era
     }
 
     override def loadMembership(): Option[Era] = {
@@ -45,21 +46,20 @@ class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniq
     }
   }
 
-  override val deliverMembership: PartialFunction[Payload, Any] = {
-    case Payload(Identifier(_, number, slot), ClusterCommandValue(_, bytes)) =>
+  override def deliverMembership(payload: Payload): Array[Byte] = payload match {
+    case p@Payload(Identifier(_, number, slot), ClusterCommandValue(_, bytes)) =>
       val json = new String(bytes, "UTF8")
       val era: Option[Era] = MemberPickle.fromJson(json)
       logger.info("deliverMembership: {}", era)
       era match {
-        case None => throw new IllegalArgumentException(json)
         case Some(Era(e, membership)) =>
           // set the slot as it is now committed
           val committedMembership = membership.copy(effectiveSlot = Some(slot))
           // persist the committed membership
-          setMembership(committedMembership)
+          val newEra = setMembership(committedMembership)
           logger.info("new committed membership at era {} and slot {} is {}", era, slot, membership)
-          // check if this current node is the leader that send the membership which has been comitted
-          val optionEra = paxosAgent.data.epoch match {
+          // check if this current node is the leader that send the membership which has been committed
+          paxosAgent.data.epoch match {
             case Some(ballotNumber) =>
               number match {
                 case `ballotNumber` =>
@@ -70,13 +70,16 @@ class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniq
                   val outMessages = Routing.route(nodeUniqueId, newEraPrepare, newEraOverlap.prepareNodes)
                   logger.info("overlap prepare messages are {}", outMessages)
                   outMessages.foreach(send(sender(), _))
-                  Option(newEraPrepare.id.number.era)
               }
-            case None => logger.error("should be unreachable")
-              None
+            case _ =>
+              // ignore?
           }
-          optionEra map { e => MemberPickle.toJson(Era(e, committedMembership)).getBytes("UTF8") }
+          MemberPickle.toJson(newEra).getBytes("UTF8")
+        case _ =>
+          throw new IllegalArgumentException(json)
       }
+    case _ =>
+      throw new IllegalArgumentException(payload.toString)
   }
 
   def currentMembership = memberStore.loadMembership().getOrElse(throw new IllegalArgumentException("uninitialised memberstore"))
@@ -96,7 +99,7 @@ class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniq
           case m: PaxosMessage => Routing.route(nodeUniqueId, m, currentBroadcastNodes(m))
         }
         outMessages foreach {
-          case o@OutboundMessage(_, a: Accept) =>
+          case o@OutboundClusterMessage(_, a: Accept) =>
             uPaxosContext match {
               case Some(UPaxosContext(_, overlap, _)) =>
                 send(sender(), o.copy(targets = overlap.acceptNodes.toSet))
@@ -129,14 +132,14 @@ class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniq
                       // upgrade our epoch to our promise so that our new accept message go out with the higher number
                       paxosAgent = paxosAgent.copy(data = epochLens.set(data, Option(data.progress.highestPromised)))
                       // tell the accept nodes about the new prepare. this isnt needed for safety only the aesthetics of symmetry of state between nodes
-                      send(sender(), OutboundMessage(overlap.acceptNodes.toSet, prepare))
+                      send(sender(), OutboundClusterMessage(overlap.acceptNodes.toSet, prepare))
                       logger.info("succeed in upgrading to new era ballot number {}", paxosAgent.data.progress.highestPromised)
                     }
                     reset()
                   case Some(false) =>
                     logger.warning("failed to upgrade to new era ballot number clearing overlap state")
+                    // TODO should possibly retry with a higher number or abdicate?
                     reset()
-
                 }
               } else {
                 notNewEraPrepareWork()
@@ -151,7 +154,6 @@ class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniq
       logger.error(err)
       throw new IllegalArgumentException(err)
   }
-
 }
 
 class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
@@ -179,11 +181,11 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       // when node zero times-out
       actor0 ! CheckTimeout
       // it issues a low prepare
-      expectMsg(50 millisecond, OutboundMessage(Set(1, 2), minPrepare))
+      expectMsg(50 millisecond, OutboundClusterMessage(Set(1, 2), minPrepare))
       // and node one will nack the load prepare
       actor1 ! minPrepare
       val nack1: PrepareNack = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, p: PrepareNack) if set == Set(0) =>
+        case OutboundClusterMessage(set, p: PrepareNack) if set == Set(0) =>
           p
         case f => fail(f.toString)
       }
@@ -191,7 +193,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       // and node two will nack the load prepare
       actor2 ! minPrepare
       val nack2: PrepareNack = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, p: PrepareNack) if set == Set(0) =>
+        case OutboundClusterMessage(set, p: PrepareNack) if set == Set(0) =>
           p
         case f => fail(f.toString)
       }
@@ -201,7 +203,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       actor0 ! nack1
       // it issues a higher prepare
       val phigh: Prepare = expectMsgPF(50 milliseconds) {
-        case OutboundMessage(set, hprepare: Prepare) if set == Set(1, 2) => hprepare
+        case OutboundClusterMessage(set, hprepare: Prepare) if set == Set(1, 2) => hprepare
         case f => fail(f.toString)
       }
       phigh.id.logIndex should be(1)
@@ -212,7 +214,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
 
       // it should ack
       val pack1 = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, p: PrepareAck) if set == Set(0) => p
+        case OutboundClusterMessage(set, p: PrepareAck) if set == Set(0) => p
         case f => fail(f.toString)
       }
       pack1.requestId should be(phigh.id)
@@ -221,7 +223,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       actor2 ! phigh
       // it should ack
       val pack2 = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, p: PrepareAck) if set == Set(0) => p
+        case OutboundClusterMessage(set, p: PrepareAck) if set == Set(0) => p
         case f => fail(f.toString)
       }
       pack2.requestId should be(phigh.id)
@@ -231,7 +233,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
 
       // it will issue a noop accept
       val accept: Accept = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, a: Accept) if set == Set(1, 2) => a
+        case OutboundClusterMessage(set, a: Accept) if set == Set(1, 2) => a
         case f => fail(f.toString)
       }
 
@@ -256,7 +258,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
 
       // it will ack
       val aack1_1: AcceptAck = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, a: AcceptAck) if set == Set(0) => a
+        case OutboundClusterMessage(set, a: AcceptAck) if set == Set(0) => a
         case f => fail(f.toString)
       }
       aack1_1.requestId should be(accept.id)
@@ -266,7 +268,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
 
       // it will ack
       val aack1_2: AcceptAck = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, a: AcceptAck) if set == Set(0) => a
+        case OutboundClusterMessage(set, a: AcceptAck) if set == Set(0) => a
         case f => fail(f.toString)
       }
       aack1_2.requestId should be(accept.id)
@@ -275,7 +277,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       actor0 ! aack1_1
       // it commits the noop
       expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, c: Commit) if set == Set(1, 2) => // good
+        case OutboundClusterMessage(set, c: Commit) if set == Set(1, 2) => // good
         case f => fail(f.toString)
       }
       // then send it some data
@@ -283,7 +285,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       actor0 ! hw
       // it will send out an accept
       val accept2 = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, a: Accept) if set == Set(1, 2) => a
+        case OutboundClusterMessage(set, a: Accept) if set == Set(1, 2) => a
         case f => fail(f.toString)
       }
       accept2.id.logIndex should be(2)
@@ -293,7 +295,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       actor1 ! accept2
       // it will ack
       val aack2_1 = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, a: AcceptAck) if set == Set(0) => a
+        case OutboundClusterMessage(set, a: AcceptAck) if set == Set(0) => a
         case f => fail(f.toString)
       }
       aack2_1.requestId should be(accept2.id)
@@ -302,7 +304,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       actor2 ! accept2
       // it will ack
       val aack2_2 = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, a: AcceptAck) if set == Set(0) => a
+        case OutboundClusterMessage(set, a: AcceptAck) if set == Set(0) => a
         case f => fail(f.toString)
       }
       aack2_2.requestId should be(accept2.id)
@@ -316,7 +318,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       }
       // it will send out a commit
       val commit: Commit = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, c: Commit) if set == Set(1, 2) => c
+        case OutboundClusterMessage(set, c: Commit) if set == Set(1, 2) => c
         case f => fail(f.toString)
       }
       // send that to node one and two for them to delivery the value
@@ -430,21 +432,21 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
 
       // it will send out an accept
       val accept1 = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, a: Accept) if set == Set(1, 2) => a
+        case OutboundClusterMessage(set, a: Accept) if set == Set(1, 2) => a
         case f => fail(f.toString)
       }
 
       follower1 ! accept1
       // it will ack
       val aack1_1 = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, a: AcceptAck) if set == Set(0) => a
+        case OutboundClusterMessage(set, a: AcceptAck) if set == Set(0) => a
         case f => fail(f.toString)
       }
 
       follower2 ! accept1
       // it will ack
       expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, a: AcceptAck) if set == Set(0) => a
+        case OutboundClusterMessage(set, a: AcceptAck) if set == Set(0) => a
         case f => fail(f.toString)
       }
 
@@ -453,7 +455,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
 
       // leader will issue the overlap prepare for new era
       val prepareNewEra = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, p: Prepare) if set == Set(1) => p
+        case OutboundClusterMessage(set, p: Prepare) if set == Set(1) => p
         case f => fail(f.toString)
       }
 
@@ -463,18 +465,18 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
 
       // leader should return the committed membership with the new era to the client
       val newEra = expectMsgPF(50 millisecond) {
-        case Some(byte: Array[Byte]) => MemberPickle.fromJson(new String(byte, "UTF8"))
+        case byte: Array[Byte] => MemberPickle.fromJson(new String(byte, "UTF8"))
         case f => fail(f.toString)
       }
 
       newEra match {
-        case Some(era: Era) => era.era shouldBe 1
+        case Some(era: Era) => era.era shouldBe 2
         case f => fail(f.toString)
       }
 
       // leader should notify followers of the commit
       val c1 = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, c: Commit) if set == Set(1, 2) => c
+        case OutboundClusterMessage(set, c: Commit) if set == Set(1, 2) => c
         case f => fail(f.getClass.getCanonicalName + " " + f.toString)
       }
 
@@ -483,7 +485,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
 
       // it will send an accept only to follower2 in the accept partition using the old era
       val oldEraAccept = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, a: Accept) if set == Set(2) && a.id.number.era == prepareNewEra.id.number.era - 1 =>
+        case OutboundClusterMessage(set, a: Accept) if set == Set(2) && a.id.number.era == prepareNewEra.id.number.era - 1 =>
           a
         case f =>
           fail(f.toString)
@@ -493,7 +495,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       follower2 ! oldEraAccept
 
       val oldEraAcceptAck = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, a: AcceptAck) if set == Set(0) && a.from == 2 =>
+        case OutboundClusterMessage(set, a: AcceptAck) if set == Set(0) && a.from == 2 =>
           a
         case f =>
           fail(f.toString)
@@ -512,7 +514,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       // and commit that message to all nodes
       // TODO this would cause Follower1 to ask for a retransmission of what it missed should speculatively send values
       expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, c: Commit) if set == Set(1, 2) && c.identifier == oldEraAccept.id => // good
+        case OutboundClusterMessage(set, c: Commit) if set == Set(1, 2) && c.identifier == oldEraAccept.id => // good
         case f =>
           fail(f.toString)
       }
@@ -521,7 +523,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       follower1 ! prepareNewEra
 
       val newEraPrepareAck = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, p: PrepareAck) if set == Set(0) =>
+        case OutboundClusterMessage(set, p: PrepareAck) if set == Set(0) =>
           p.from shouldBe 1
           p.requestId shouldBe prepareNewEra.id
           p
@@ -533,14 +535,14 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
 
       // leader will bring the other node into consistency (only to make the state symmetric within the cluster)
       val newEraPrepare2 = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, p: Prepare) if set == Set(2) && p.id == prepareNewEra.id => p
+        case OutboundClusterMessage(set, p: Prepare) if set == Set(2) && p.id == prepareNewEra.id => p
         case f => fail(f.toString)
       }
 
       follower2 ! newEraPrepare2
 
       expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, p: PrepareAck) if set == Set(0) =>
+        case OutboundClusterMessage(set, p: PrepareAck) if set == Set(0) =>
           p.from shouldBe 2
           p.requestId shouldBe prepareNewEra.id
           p
@@ -552,12 +554,10 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
 
       // it will send an accept to all nodes using the higher number
       val newEraAccept = expectMsgPF(50 millisecond) {
-        case OutboundMessage(set, a: Accept) if set == Set(1, 2) && a.id.number == prepareNewEra.id.number => // good
+        case OutboundClusterMessage(set, a: Accept) if set == Set(1, 2) && a.id.number == prepareNewEra.id.number => // good
         case f =>
           fail(f.toString)
       }
-
     }
   }
-
 }

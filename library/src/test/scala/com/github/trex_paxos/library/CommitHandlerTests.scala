@@ -186,7 +186,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
 
         override def send(msg: PaxosMessage) = sentMessages += msg
 
-        override def deliver(payload: Payload): Any = {}
+        override def deliver(payload: Payload): Array[Byte] = Array[Byte]()
       }
       // when
       val PaxosAgent(_, _, data, _) = handler.handleFollowerCommit(io, agent, Commit(id3))
@@ -225,7 +225,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
 
         override def send(msg: PaxosMessage) = sentMessages += msg
 
-        override def deliver(payload: Payload): Any = {}
+        override def deliver(payload: Payload): Array[Byte] = Array[Byte]()
       }
       // when we commit up to slot 3
       val PaxosAgent(_, _, data, _) = handler.handleFollowerCommit(io, agent, Commit(id3))
@@ -261,7 +261,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val agent = PaxosAgent(0, Follower, initialData.copy(progress = oldProgress), initialQuorumStrategy)
       // and a configured IO
       val io = new TestIO(stubJournal) {
-        override def deliver(payload: Payload): Any = payload.command.bytes
+        override def deliver(payload: Payload): Array[Byte] = payload.command.bytes
       }
       // when we commit to a14
       val PaxosAgent(_, _, data, _) = handler.handleFollowerCommit(io, agent, Commit(a12.id, initialData.leaderHeartbeat))
@@ -285,7 +285,7 @@ class CommitHandlerTests extends WordSpecLike with Matchers with MockFactory wit
       val agent = PaxosAgent(0, Follower, initialData.copy(progress = oldProgress), initialQuorumStrategy)
       // and a configured IO
       val io = new TestIO(stubJournal) {
-        override def deliver(payload: Payload): Any = payload.command.bytes
+        override def deliver(payload: Payload): Array[Byte] = payload.command.bytes
       }
       // when we commit to a14
       val PaxosAgent(_, _, data, _) = handler.handleFollowerCommit(io, agent, Commit(a14.id, initialData.leaderHeartbeat))

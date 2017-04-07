@@ -109,7 +109,10 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
 
       override def journal: Journal = stubJournal
 
-      override def deliver(payload: Payload): Any = delivered += value
+      override def deliver(payload: Payload): Array[Byte] = {
+        delivered += value
+        Array[Byte]()
+      }
 
       override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
     }

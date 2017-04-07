@@ -99,7 +99,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with MemberSt
 
   val UTF8 = "UTF8"
 
-  override def saveMembership(era: Era): Unit = {
+  override def saveMembership(era: Era): Era = {
     import scala.collection.JavaConverters._
 
     era.membership.effectiveSlot match {
@@ -117,6 +117,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with MemberSt
     val json = MemberPickle.toJson(era)
     eraMap.put(era.era, json.getBytes(UTF8))
     db.commit()
+    era
   }
 
   override def loadMembership(): Option[Era] = {

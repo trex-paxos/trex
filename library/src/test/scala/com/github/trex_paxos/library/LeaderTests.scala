@@ -255,9 +255,9 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests with MockFactory {
           sent += msg
         }
 
-        override def deliver(payload: Payload): Any = {
+        override def deliver(payload: Payload): Array[Byte] = {
           lastDelivered.set(payload.command)
-          value
+          Array[Byte]()
         }
 
         override def associate(value: CommandValue, id: Identifier): Unit = {}
@@ -316,9 +316,9 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests with MockFactory {
           sent += msg
         }
 
-        override def deliver(payload: Payload): Any = {
+        override def deliver(payload: Payload): Array[Byte] = {
           delivered += payload.command
-          value
+          Array[Byte]()
         }
 
         override def associate(value: CommandValue, id: Identifier): Unit = {}

@@ -6,16 +6,21 @@ import _root_.com.github.trex_paxos.PaxosProperties
 
 import scala.collection.mutable.ArrayBuffer
 
+// TODO can this be rationalised with TestAkkaPaxosActor
 class TestAkkaPaxosActorNoTimeout(config: PaxosProperties, clusterSizeF: () => Int, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, val delivered: ArrayBuffer[CommandValue], tracer: Option[AkkaPaxosActor.Tracer])
   extends AkkaPaxosActorNoTimeout(config, nodeUniqueId, journal) {
 
-  // does nothing but makes this class concrete for testing
-  val deliverClient: PartialFunction[Payload, Array[Byte]] = {
+  override def deliverMembership(payload: Payload): Array[Byte] = ???
+
+  // echos the input back so that its easy to verify responses seen during testing
+  override def deliverClient(payload: Payload): Array[Byte] = payload match {
     case Payload(_, c@ClientCommandValue(_, bytes)) =>
+      log.debug(s"Node ${nodeUniqueId} delivered ${bytes}")
       delivered.append(c)
       if (bytes.length > 0) Array[Byte]((-bytes(0)).toByte) else bytes
     case Payload(_, noop@NoOperationCommandValue) =>
       delivered.append(noop)
+      log.debug(s"Node ${nodeUniqueId} delivered NoOperationCommandValue")
       noop.bytes
   }
 

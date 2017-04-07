@@ -3,7 +3,7 @@ package com.github.trex_paxos.core
 import java.io.{ByteArrayOutputStream, ObjectOutputStream}
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListMap}
 
-import com.github.trex_paxos.library.{ClientCommandValue, CommandValue, PaxosLogging, ServerResponse}
+import com.github.trex_paxos.library.{ClientCommandValue, CommandValue, PaxosLogging}
 import com.github.trex_paxos.util.Pickle
 import io.netty.buffer.ByteBuf
 

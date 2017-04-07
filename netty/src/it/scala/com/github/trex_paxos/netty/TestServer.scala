@@ -40,11 +40,10 @@ object TestServer {
     val initialAgent = PaxosAgent(nodeIdentifier, Follower, PaxosData(initialProgress, 50, 3000), new DefaultQuorumStrategy(() => 3))
 
     // echo the response back
-    val deliverClient: PartialFunction[Payload, AnyRef] = {
+    val deliverClient: PartialFunction[Payload, Array[Byte]] = {
       case Payload(_, ClientCommandValue(msgUuid, bytes)) =>
-        val echo= new String(bytes)
-        logger.info("deliver client {} got {}", msgUuid: Any, echo)
-        echo
+        logger.info("deliver client {} got {}", msgUuid: Any, new String(bytes))
+        bytes
     }
 
     val clusterDriver = new ClusterDriver(nodeIdentifier, journal, ByteArraySerializer.deserialize _)

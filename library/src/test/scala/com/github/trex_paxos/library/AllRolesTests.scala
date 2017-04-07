@@ -79,7 +79,7 @@ class AllRolesTests extends RefSpec with PaxosLenses with Matchers with OptionVa
     val io = new UndefinedIO {
       override def send(msg: PaxosMessage): Unit = sent += msg
 
-      override def deliver(payload: Payload): Any = {}
+      override def deliver(payload: Payload): Array[Byte] = Array[Byte]()
     }
     val event = new PaxosEvent(io, agent, DummyCommandValue("1"))
     val paxosAlgorithm = new PaxosAlgorithm

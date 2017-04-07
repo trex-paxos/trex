@@ -101,8 +101,9 @@ with OptionValues {
       }
       // when it is passed a retransmit response
       handler.handleRetransmitResponse(new TestIO(new UndefinedJournal){
-        override def deliver(payload: Payload): Any = {
+        override def deliver(payload: Payload): Array[Byte] = {
           deliveredWithTs += (System.nanoTime() -> payload.command)
+          Array[Byte]()
         }
 
         override def journal: Journal = stubJournal

@@ -49,9 +49,9 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
     // given a test cluster harness sized to three nodes
     val ref = TestActorRef(new ClusterHarness(clusterSize, cfg),name)
 
-    // when we sent it the application value of 1.toByte after 0.4s for the cluster to stabilize
+    // when we sent it the application value of 1.toByte after 0.3s for the cluster to stabilize
     val expectedMsgId = 123456789L.toString
-    system.scheduler.scheduleOnce(200 millis, ref, ClientCommandValue(expectedMsgId, Array[Byte](1)))
+    system.scheduler.scheduleOnce(300 millis, ref, ClientCommandValue(expectedMsgId, Array[Byte](1)))
 
     // it commits and sends by the response of -1.toByte else replies that it has lost the leadership
     expectMsgPF(12 second) {

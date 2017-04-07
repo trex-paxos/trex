@@ -474,7 +474,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests with MockFactory
           sent += msg
         }
 
-        override def deliver(payload: Payload): Any = {}
+        override def deliver(payload: Payload): Array[Byte] = Array[Byte]()
 
         override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
           case None => fail("None")
@@ -532,9 +532,9 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests with MockFactory
           sent += msg
         }
 
-        override def deliver(payload: Payload): Any = {
+        override def deliver(payload: Payload): Array[Byte] = {
           lastDelivered(payload.command)
-          value
+          Array[Byte]()
         }
 
         override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
@@ -598,7 +598,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests with MockFactory
           sent += msg
         }
 
-        override def deliver(payload: Payload): Any = {}
+        override def deliver(payload: Payload): Array[Byte] = Array[Byte]()
 
         override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
           case f@None => fail(f.toString)
@@ -661,9 +661,9 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests with MockFactory
           sent += msg
         }
 
-        override def deliver(payload: Payload): Any = {
+        override def deliver(payload: Payload): Array[Byte] = {
           lastDelivered(payload.command)
-          value
+          Array[Byte]()
         }
 
         override def respond(results: Option[Map[Identifier, Any]]): Unit = {}

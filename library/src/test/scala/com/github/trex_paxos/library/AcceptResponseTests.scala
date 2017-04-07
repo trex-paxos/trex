@@ -169,7 +169,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
 
         override def send(msg: PaxosMessage): Unit = sent += msg
 
-        override def deliver(payload: Payload): Any = {}
+        override def deliver(payload: Payload): Array[Byte] = Array[Byte]()
 
         override def respond(results: Option[Map[Identifier, Any]]): Unit = {}
       }
@@ -232,7 +232,7 @@ class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory wi
 
         override def send(msg: PaxosMessage): Unit = {}
 
-        override def deliver(payload: Payload): Any = {}
+        override def deliver(payload: Payload): Array[Byte] = Array[Byte]()
 
         override def respond(results: Option[Map[Identifier, Any]]): Unit = results match {
           case f@None => fail(f.toString)

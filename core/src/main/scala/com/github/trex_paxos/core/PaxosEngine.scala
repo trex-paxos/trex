@@ -20,8 +20,8 @@ import scala.util.{Failure, Random, Success, Try}
 abstract class PaxosEngine(val paxosProperties: PaxosProperties,
                            val journal: Journal,
                            val initialAgent: PaxosAgent,
-                           val deliverMembership: PartialFunction[Payload, Any],
-                           val deliverClient: PartialFunction[Payload, AnyRef],
+                           val deliverMembership: PartialFunction[Payload, Array[Byte]],
+                           val deliverClient: PartialFunction[Payload, Array[Byte]],
                            val serialize: (Any) => Try[Array[Byte]],
                            val transmitMessages: Seq[PaxosMessage] => Unit
                           )
@@ -38,7 +38,7 @@ abstract class PaxosEngine(val paxosProperties: PaxosProperties,
     * @param payload The selected value and a delivery id that can be used to deduplicate deliveries during crash recovery.
     * @return The response to the value command that has been delivered. May be an empty array.
     */
-  def deliver(payload: Payload): Any = (deliverClient orElse deliverMembership) (payload)
+  def deliver(payload: Payload): Array[Byte] = (deliverClient orElse deliverMembership) (payload)
 
   private[this] val singleThread = ExecutionContext.fromExecutor(java.util.concurrent.Executors.newFixedThreadPool(1))
 

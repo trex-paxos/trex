@@ -4,7 +4,7 @@ import java.io.FileWriter
 import java.util.concurrent.CopyOnWriteArrayList
 
 import akka.actor._
-import com.github.trex_paxos.core.AkkaPaxosActor
+import com.github.trex_paxos.core.{AkkaPaxosActor, OutboundMessage}
 import com.github.trex_paxos.core.AkkaPaxosActor.TraceData
 import com.github.trex_paxos.library._
 import com.typesafe.config.Config
@@ -15,25 +15,22 @@ import scala.collection.mutable
 import scala.language.postfixOps
 import scala.util.Try
 
+// TODO can this be rationalised with TestAkkaPaxosActorNoTimeout
 class TestAkkaPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, delivered: mutable.Buffer[Payload], tracer: Option[AkkaPaxosActor.Tracer])
   extends AkkaPaxosActor(config, nodeUniqueId, journal) {
 
   override def broadcast(msg: PaxosMessage): Unit = send(broadcastRef, msg)
 
-  // does nothing but makes this class concrete for testing
-  val deliverClient: PartialFunction[Payload, AnyRef] = {
-    case Payload(_, ClientCommandValue(_, bytes)) => bytes
-    case x => throw new IllegalArgumentException(x.toString)
-  }
+  override def deliverMembership(payload: Payload): Array[Byte] = ???
 
-  override def deliver(payload: Payload): Array[Byte] = {
+  // echos the input back so that its easy to verify responses seen during testing
+  override def deliverClient(payload: Payload): Array[Byte] = {
     delivered.append(payload)
-    payload.command match {
-      case ClientCommandValue(_, bytes) =>
+    payload match {
+      case Payload(_, ClientCommandValue(_, bytes)) =>
         log.debug(s"Node ${nodeUniqueId} delivered ${bytes}")
         if (bytes.length > 0) Array[Byte]((-bytes(0)).toByte) else bytes
-      case noop@NoOperationCommandValue =>
-        // FIXME is this actually reachable?
+      case Payload(_, noop@NoOperationCommandValue) =>
         log.debug(s"Node ${nodeUniqueId} delivered NoOperationCommandValue")
         noop.bytes
     }
@@ -45,7 +42,6 @@ class TestAkkaPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeU
   override def trace(event: PaxosEvent, sender: String, sent: Seq[PaxosMessage]): Unit = tracer.foreach(t => t(TraceData(System.nanoTime(), nodeUniqueId, event.agent.role, event.agent.data, sender, event.message, sent)))
 
   override def clusterSize: Int = clusterSizeF()
-
 }
 
 object ClusterHarness {

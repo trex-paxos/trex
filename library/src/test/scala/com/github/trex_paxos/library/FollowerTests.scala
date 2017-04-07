@@ -413,9 +413,12 @@ class FollowerTests extends AllRolesTests with MockFactory {
 
         override def scheduleRandomCheckTimeout: Long = 987654L
 
-        override def deliver(payload: Payload): Any = payload match {
-          case Payload(_, c: DummyCommandValue) => delivered += c
-          case _ =>
+        override def deliver(payload: Payload): Array[Byte] = {
+          payload match {
+            case Payload(_, c: DummyCommandValue) => delivered += c
+            case _ =>
+          }
+          Array[Byte]()
         }
 
         override def journal: Journal = tempJournal
@@ -489,9 +492,12 @@ class FollowerTests extends AllRolesTests with MockFactory {
 
         override def clock: Long = Int.MaxValue
 
-        override def deliver(payload: Payload): Any = payload match {
-          case Payload(_, c: DummyCommandValue) => delivered += c
-          case _ =>
+        override def deliver(payload: Payload): Array[Byte] = {
+          payload match {
+            case Payload(_, c: DummyCommandValue) => delivered += c
+            case _ =>
+          }
+          Array[Byte]()
         }
 
         override def journal: Journal = tempJournal

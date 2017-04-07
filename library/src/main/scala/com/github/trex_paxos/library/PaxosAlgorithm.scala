@@ -53,10 +53,10 @@ trait PaxosIO {
 
   /**
     * The callback to the host application which can side effect.
-    * @param payload The payload response to the client command value.
-    * @return
+    * @param payload The fixed payload containing the byte array encoded client command value.
+    * @return A byte array encoding of the host applications return value
     */
-  def deliver(payload: Payload): Any
+  def deliver(payload: Payload): Array[Byte]
 
   /**
     * Send a paxos algorithm message within the cluster. May be deferred.

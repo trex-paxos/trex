@@ -137,7 +137,7 @@ case class Prepare(id: Identifier) extends PaxosMessage
 /**
   * Base type for a response to a prepare message. It provides additional information beyond that prescribed by the core Paxos algorithm which is used during the leader takeover protocol and to prevent unnecessary leader failover attempts.
   */
-trait PrepareResponse extends PaxosMessage {
+trait PrepareResponse extends PaxosMessage with ResponseMessage {
   /**
     * @return The identifier of the [[Prepare]] message being acknowledged.
     */
@@ -205,7 +205,7 @@ case class Accept(id: Identifier, value: CommandValue) extends PaxosMessage {
 /**
   * Base type for a response to an accept message.
   */
-trait AcceptResponse extends PaxosMessage {
+trait AcceptResponse extends PaxosMessage with ResponseMessage {
   /**
     * @return The request being negatively acknowledged
     */
@@ -268,13 +268,23 @@ object Commit {
 }
 
 /**
+  * Marker interface for message which are sent as responses back to a particular node.
+  */
+sealed trait ResponseMessage {
+  /**
+    * @return The recipient nodeIdentifier
+    */
+  def to: Int
+}
+
+/**
   * Requests retransmission of accept messages higher than a given log message
   *
   * @param from     The node unique id which is sending the request
   * @param to       The node unique id to which the request is to be routed
   * @param logIndex The log index last committed by the requester
   */
-case class RetransmitRequest(from: Int, to: Int, logIndex: Long) extends PaxosMessage
+case class RetransmitRequest(from: Int, to: Int, logIndex: Long) extends PaxosMessage with ResponseMessage
 
 /**
   * Response to a retransmit request
@@ -284,7 +294,7 @@ case class RetransmitRequest(from: Int, to: Int, logIndex: Long) extends PaxosMe
   * @param committed   A contiguous sequence of committed accept messages in ascending order
   * @param uncommitted A contiguous sequence of proposed but uncommitted accept messages in ascending order
   */
-case class RetransmitResponse(from: Int, to: Int, val committed: Seq[Accept], uncommitted: Seq[Accept]) extends PaxosMessage
+case class RetransmitResponse(from: Int, to: Int, val committed: Seq[Accept], uncommitted: Seq[Accept]) extends PaxosMessage  with ResponseMessage
 
 /**
   * Scheduled message used to trigger timeout work.
@@ -331,14 +341,6 @@ case class NotFollower(val nodeId: Int, val msgId: String) extends PaxosMessage
 case class LostLeadershipException(val nodeId: Int, val msgId: String) extends RuntimeException with PaxosMessage {
   override def toString() = s"LostLeadershipException($nodeId,$msgId)"
 }
-
-/**
-  *
-  * @param logIndex    The paxos slot at which the command was chosen.
-  * @param clientMsgId The id of the ClientCommandValue being responded to.
-  * @param response    The result of running the comand value.
-  */
-case class ServerResponse(logIndex: Long, clientMsgId: String, val response: Option[Array[Byte]])
 
 /** Paxos process roles */
 sealed trait PaxosRole

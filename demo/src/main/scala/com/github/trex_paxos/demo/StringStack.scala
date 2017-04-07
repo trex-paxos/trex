@@ -65,10 +65,12 @@ object StringStackServer {
     val journal: MapDBStore = new MapDBStore(new java.io.File(folder, "journal"), Int.MaxValue)
     val progress = journal.loadProgress()
     val initialAgent = PaxosAgent(nodeUniqueId, Follower, PaxosData(progress, 50, 3000), new DefaultQuorumStrategy(() => 3))
-    val deliverMembership: PartialFunction[Payload, Any] = {
-      case p => System.err.println("not implimented")
+    val deliverMembership: PartialFunction[Payload, Array[Byte]] = {
+      case p =>
+        System.err.println("not implimented")
+        Array[Byte]()
     }
-    val deliverClient: PartialFunction[Payload, AnyRef] = {
+    val deliverClient: PartialFunction[Payload, Array[Byte]] = {
       case Payload(index, command) => command match {
         case ClientCommandValue(msgUuid, bytes) =>
           val string = new String(bytes, UTF8)
