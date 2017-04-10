@@ -27,11 +27,11 @@ object TestServer {
 
     val journal: MapDBStore = tempFolderJournal(node.nodeIdentifier)
 
-    if( journal.loadMembership().isEmpty ) {
+    if( journal.loadForHighestEra().isEmpty ) {
       val quorum = Quorum(2, Set(Weight(1,1), Weight(2,1), Weight(3,1)))
-      val membership = Membership(quorum, quorum, nodes.toSet, Some(0L))
+      val membership = ClusterConfiguration(quorum, quorum, nodes.toSet, Some(0L))
 
-      journal.saveMembership(Era(0, membership))
+      journal.saveAndAssignEra(membership)
     }
 
     val initialProgress = journal.loadProgress()

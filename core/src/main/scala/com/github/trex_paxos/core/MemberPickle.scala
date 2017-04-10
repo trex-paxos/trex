@@ -116,16 +116,19 @@ object MemberPickle {
     }).mkString("[", ",", "]")
   }
 
-  def toJson(e: Era): String = {
-    val m = e.membership
-    val slot = m.effectiveSlot match {
+  def toJson(e: ClusterConfiguration): String = {
+    val slot = e.effectiveSlot match {
       case None => -1
-      case Some(i) => i
+      case Some(s) => s
     }
-    "{" + s("era") + ":" + e.era + "," + s("slot") + ":" + slot + "," + s("qI") + ":" + quorumTo(m.quorumForPromises) + ", " + s("qII") + ":" + quorumTo(m.quorumForAccepts) + ", " + s("nodes") + ":" + nodesTo(m.nodes) + "}"
+    val era = e.era match {
+      case None => -1
+      case Some(e) => e
+    }
+    "{" + s("era") + ":" + era + "," + s("slot") + ":" + slot + "," + s("qI") + ":" + quorumTo(e.quorumForPromises) + ", " + s("qII") + ":" + quorumTo(e.quorumForAccepts) + ", " + s("nodes") + ":" + nodesTo(e.nodes) + "}"
    }
 
-  def fromJson(js: String): Option[Era] = {
+  def fromJson(js: String): Option[ClusterConfiguration] = {
     val json: Option[Any] = JSON.parseFull(js)
     for {
       Some(M(map)) <- Option(json)
@@ -179,13 +182,17 @@ object MemberPickle {
         }
         ).toSet
 
-      val slotLong = slot.toLong
-      val slotOption = slotLong match {
+      val slotOption = slot.toLong match {
         case i if i >= 0 => Some(i)
         case _ => None
       }
 
-      Era(era.toInt, Membership(Quorum(countQI.toInt, setOfQI), Quorum(countQII.toInt, setOfQII), nds, slotOption))
+      val eraOpt = era.toInt match {
+        case -1 => None
+        case e => Option(e)
+      }
+
+      ClusterConfiguration(Quorum(countQI.toInt, setOfQI), Quorum(countQII.toInt, setOfQII), nds, slotOption, eraOpt)
     }
   }
 

@@ -60,8 +60,9 @@ case class Node(nodeIdentifier: Int, addresses: Addresses) {
   * @param quorumForAccepts  The quorum for accepts.
   * @param nodes             The nodes in the cluster
   * @param effectiveSlot     The slot at which the membership comes into effect. Only set when the membership has been committed to a slot.
+  * @param era        The configuration era that configuration became fixed at. Should be made contiguous over the history of all configurations.
   */
-case class Membership(quorumForPromises: Quorum, quorumForAccepts: Quorum, nodes: Set[Node], effectiveSlot: Option[Long]) {
+case class ClusterConfiguration(quorumForPromises: Quorum, quorumForAccepts: Quorum, nodes: Set[Node], effectiveSlot: Option[Long], era: Option[Int] = None) {
   require(quorumForAccepts.of.intersect(quorumForPromises.of).nonEmpty,
     s"The quorum for promises must overlap with the quorum for accepts - quorumForPromises: ${quorumForPromises}, quorumForAccepts: ${quorumForAccepts}")
 
@@ -72,11 +73,3 @@ case class Membership(quorumForPromises: Quorum, quorumForAccepts: Quorum, nodes
   require(allQuorumNodes.intersect(allLocated) == allQuorumNodes,
     s"The unique nodes within the combined quorums don't match the nodes for which we have network addresses - quorumForPromises: ${quorumForPromises}, quorumForAccepts: ${quorumForAccepts}, nodes: ${nodes}, allQuorumNodes: ${allQuorumNodes}, allLocated: ${allLocated}")
 }
-
-/**
-  * The UPaxos era
-  *
-  * @param era        The era number. Should be sequential
-  * @param membership The membership at the given era
-  */
-case class Era(era: Int, membership: Membership)

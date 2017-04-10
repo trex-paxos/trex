@@ -20,44 +20,45 @@ object UPaxosPrototypeSpec {
 class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniqueId: Int, broadcastRef: ActorRef, journal: Journal, override val delivered: ArrayBuffer[CommandValue], tracer: Option[AkkaPaxosActor.Tracer])
   extends TestAkkaPaxosActorNoTimeout(config, clusterSizeF, nodeUniqueId, broadcastRef, journal, delivered, tracer) with PaxosLenses {
 
-  val memberStore = new MemberStore {
-    var eras: SortedMap[Int, Era] = SortedMap()
+  val memberStore = new ClusterConfigurationStore {
+    var eras: SortedMap[Int, ClusterConfiguration] = SortedMap()
 
-    override def saveMembership(era: Era): Era = {
-      if (eras.keySet.size > 0) require(era.era == eras.keySet.last + 1)
-      eras = eras + (era.era -> era)
-      era
+    override def saveAndAssignEra(c: ClusterConfiguration): ClusterConfiguration = {
+      val nextKey = if( eras.isEmpty ) 0 else eras.lastKey + 1
+      val configWithEra = c.copy(era = Option(nextKey))
+      eras = eras + (nextKey -> configWithEra)
+      configWithEra
     }
 
-    override def loadMembership(): Option[Era] = {
+    override def loadForHighestEra(): Option[ClusterConfiguration] = {
       eras.lastOption.map(_._2)
     }
   }
 
-  def setMembership(membership: Membership) = {
+  def setMembership(membership: ClusterConfiguration) = {
     membership.effectiveSlot match {
       case None => throw new IllegalArgumentException(membership.toString)
       case Some(slot) =>
-        val lastEra = memberStore.loadMembership match {
+        val lastEra = memberStore.loadForHighestEra match {
           case None => 0
           case Some(era) => era.era
         }
-        memberStore.saveMembership(Era(lastEra + 1, membership))
+        memberStore.saveAndAssignEra(membership)
     }
   }
 
   override def deliverMembership(payload: Payload): Array[Byte] = payload match {
     case p@Payload(Identifier(_, number, slot), ClusterCommandValue(_, bytes)) =>
       val json = new String(bytes, "UTF8")
-      val era: Option[Era] = MemberPickle.fromJson(json)
+      val era: Option[ClusterConfiguration] = MemberPickle.fromJson(json)
       logger.info("deliverMembership: {}", era)
       era match {
-        case Some(Era(e, membership)) =>
+        case Some(c@ClusterConfiguration(_, _, _, _, _)) =>
           // set the slot as it is now committed
-          val committedMembership = membership.copy(effectiveSlot = Some(slot))
+          val committedMembership = c.copy(effectiveSlot = Some(slot))
           // persist the committed membership
           val newEra = setMembership(committedMembership)
-          logger.info("new committed membership at era {} and slot {} is {}", era, slot, membership)
+          logger.info("new committed membership at era {} and slot {} is {}", era, slot, c)
           // check if this current node is the leader that send the membership which has been committed
           paxosAgent.data.epoch match {
             case Some(ballotNumber) =>
@@ -82,10 +83,10 @@ class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniq
       throw new IllegalArgumentException(payload.toString)
   }
 
-  def currentMembership = memberStore.loadMembership().getOrElse(throw new IllegalArgumentException("uninitialised memberstore"))
+  def currentMembership = memberStore.loadForHighestEra().getOrElse(throw new IllegalArgumentException("uninitialised memberstore"))
 
   def currentBroadcastNodes(paxosMessage: PaxosMessage): Iterable[Int] = {
-    currentMembership.membership.nodes.map(_.nodeIdentifier)
+    currentMembership.nodes.map(_.nodeIdentifier)
   }
 
   override def receive: Receive = {
@@ -121,7 +122,7 @@ class TestUPaxosActor(config: PaxosProperties, clusterSizeF: () => Int, nodeUniq
           m match {
             case ackOrNack: PrepareResponse =>
               if (ackOrNack.requestId == prepare.id) {
-                handleEraPrepareResponse(nodeUniqueId, overlap.prepareNodes, currentMembership.membership, ackOrNack) match {
+                handleEraPrepareResponse(nodeUniqueId, overlap.prepareNodes, currentMembership, ackOrNack) match {
                   case None => // no outcome yet so nothing to do
                   case Some(true) => // outcome success
                     // process our own prepare message to upgrade our own promise and progress
@@ -182,7 +183,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       actor0 ! CheckTimeout
       // it issues a low prepare
       expectMsg(50 millisecond, OutboundClusterMessage(Set(1, 2), minPrepare))
-      // and node one will nack the load prepare
+      // and node one will nack the loadForHighestEra prepare
       actor1 ! minPrepare
       val nack1: PrepareNack = expectMsgPF(50 millisecond) {
         case OutboundClusterMessage(set, p: PrepareNack) if set == Set(0) =>
@@ -190,7 +191,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
         case f => fail(f.toString)
       }
       nack1.requestId.from should be(0)
-      // and node two will nack the load prepare
+      // and node two will nack the loadForHighestEra prepare
       actor2 ! minPrepare
       val nack2: PrepareNack = expectMsgPF(50 millisecond) {
         case OutboundClusterMessage(set, p: PrepareNack) if set == Set(0) =>
@@ -338,13 +339,13 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
     val originalQuorum = Quorum(2, Set(Weight(0, 1), Weight(1, 1), Weight(2, 1)))
 
     // original membership is in effect from the zeroth slow
-    val originalMembership = Membership(quorumForPromises = originalQuorum, quorumForAccepts = originalQuorum, nodes = nodes, effectiveSlot = Some(0))
+    val originalMembership = ClusterConfiguration(quorumForPromises = originalQuorum, quorumForAccepts = originalQuorum, nodes = nodes, effectiveSlot = Some(0))
 
     // doubled weights which is the first step in swapping out a single node
     val newQuorum = Quorum(4, Set(Weight(0, 2), Weight(1, 2), Weight(2, 2)))
 
     // the numer membership is the same set of nodes but with doubled weights
-    val newMembership = Membership(quorumForPromises = newQuorum, quorumForAccepts = newQuorum, nodes = nodes, effectiveSlot = None)
+    val newMembership = ClusterConfiguration(quorumForPromises = newQuorum, quorumForAccepts = newQuorum, nodes = nodes, effectiveSlot = None)
 
     def `should compute overlap unweighted membership`: Unit = {
       val LeaderOverlap(prepares, accepts) = UPaxos.computeLeaderOverlap(0, originalMembership)
@@ -428,7 +429,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       follower1.underlyingActor.paxosAgent.role shouldBe (Follower)
       follower2.underlyingActor.paxosAgent.role shouldBe (Follower)
 
-      leader ! ClusterCommandValue("reconfig", MemberPickle.toJson(Era(-1, newMembership)).getBytes("UTF8"))
+      leader ! ClusterCommandValue("reconfig", MemberPickle.toJson(newMembership).getBytes("UTF8"))
 
       // it will send out an accept
       val accept1 = expectMsgPF(50 millisecond) {
@@ -470,7 +471,7 @@ class UPaxosPrototypeSpec extends TestKit(ActorSystem("UPaxosPrototypeSpec",
       }
 
       newEra match {
-        case Some(era: Era) => era.era shouldBe 2
+        case Some(era: ClusterConfiguration) => era.era shouldBe Option(1)
         case f => fail(f.toString)
       }
 

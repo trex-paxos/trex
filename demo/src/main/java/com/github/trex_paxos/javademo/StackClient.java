@@ -9,8 +9,8 @@ public class StackClient {
 
 
     static StringStack clusteredStack(final String configName, final String hostname) {
-//        Config systemConfig = ConfigFactory.load(configName).withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(hostname));
-//        Config config = ConfigFactory.load(configName);
+//        Config systemConfig = ConfigFactory.loadForHighestEra(configName).withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(hostname));
+//        Config config = ConfigFactory.loadForHighestEra(configName);
 //        Cluster cluster = Cluster.parseConfig(config);
 //        ActorSystem system = ActorSystem.create("trex-java-demo", systemConfig);
 //        ActorRef driver = system.actorOf(Props.create(DynamicClusterDriver.class, akka.util.Timeout.apply(100), 20));

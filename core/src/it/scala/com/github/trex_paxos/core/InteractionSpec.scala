@@ -61,7 +61,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       actor0 ! CheckTimeout
       // it issues a low prepare
       expectMsg(50 millisecond, minPrepare)
-      // and node one will nack the load prepare
+      // and node one will nack the loadForHighestEra prepare
       actor1 ! minPrepare
       val nack: PrepareNack = expectMsgPF(50 millisecond) {
         case p: PrepareNack => p
@@ -302,7 +302,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       actor0 ! CheckTimeout
       // it issues a low prepare
       expectMsg(50 millisecond, minPrepare)
-      // and node one will nack the load prepare
+      // and node one will nack the loadForHighestEra prepare
       actor1 ! minPrepare
       val nack: PrepareNack = expectMsgPF(50 millisecond) {
         case p: PrepareNack => p

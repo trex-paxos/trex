@@ -14,7 +14,7 @@ import scala.concurrent.duration.FiniteDuration
 
 object StringStackShared {
   val quorum = Quorum(2, Set(Weight(2552,1), Weight(2562,1), Weight(2572,1)))
-  val membership = Membership(quorum, quorum, Set(
+  val membership = ClusterConfiguration(quorum, quorum, Set(
       Node(2552, Addresses(Address("localhost", 2552), Address("localhost", 2553)) )
       , Node(2562, Addresses(Address("localhost", 2562), Address("localhost", 2563)) )
       , Node(2572, Addresses(Address("localhost", 2572), Address("localhost", 2573)) )

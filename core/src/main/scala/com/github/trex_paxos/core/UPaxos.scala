@@ -1,6 +1,6 @@
 package com.github.trex_paxos.core
 
-import com.github.trex_paxos.{Membership, Quorum}
+import com.github.trex_paxos.{ClusterConfiguration, Quorum}
 import com.github.trex_paxos.library._
 
 import scala.collection.immutable.SortedMap
@@ -26,7 +26,7 @@ object UPaxos {
     * @param membership   The current cluster membership
     * @return The two cluster groups.
     */
-  def computeLeaderOverlap(nodeUniqueId: Int, membership: Membership): LeaderOverlap = {
+  def computeLeaderOverlap(nodeUniqueId: Int, membership: ClusterConfiguration): LeaderOverlap = {
     val ordered = membership.nodes.map(_.nodeIdentifier).toList.sortWith({
       _.compareTo(_) < 0
     })
@@ -146,7 +146,7 @@ trait UPaxos {
     * @param ackOrNack    The next response to the new era prepare to handle.
     * @return None if more votes needed. Some(true) for success and Some(false) for failure (too many negative votes).
     */
-  def handleEraPrepareResponse(nodeUniqueId: Int, prepareNodes: Iterable[Int], membership: Membership, ackOrNack: PrepareResponse): Option[Boolean] = {
+  def handleEraPrepareResponse(nodeUniqueId: Int, prepareNodes: Iterable[Int], membership: ClusterConfiguration, ackOrNack: PrepareResponse): Option[Boolean] = {
     uPaxosContext match {
       case Some(context@UPaxosContext(eraPrepare, _, responses)) if eraPrepare.id == ackOrNack.requestId =>
         val votes = responses.getOrElse((eraPrepare.id), Map())

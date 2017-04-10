@@ -21,7 +21,7 @@ public class StackClusterNode {
 
         final StringStack stack = new StringStackImpl(new File(System.getProperty("java.io.tmpdir")+"/stack"+nodeId.toString()));
 
-//        Config config = ConfigFactory.load(configName);
+//        Config config = ConfigFactory.loadForHighestEra(configName);
 //        Cluster cluster = Cluster.parseConfig(config);
 //
 //        Node node = cluster.nodeMap().get(nodeId).get();
@@ -31,7 +31,7 @@ public class StackClusterNode {
 //            System.exit(-1);
 //        }
 //        MapDBStore journal = new MapDBStore(new File(folder, "journal"), cluster.retained());
-//        Config systemConfig = ConfigFactory.load(configName)
+//        Config systemConfig = ConfigFactory.loadForHighestEra(configName)
 //                .withValue("akka.remote.netty.tcp.port", ConfigValueFactory.fromAnyRef(node.clientPort()))
 //                .withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(node.host()));
 //

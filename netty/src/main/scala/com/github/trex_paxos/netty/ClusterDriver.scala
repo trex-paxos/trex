@@ -2,8 +2,8 @@ package com.github.trex_paxos.netty
 
 import java.util.Base64
 
-import com.github.trex_paxos.{Era, Membership}
-import com.github.trex_paxos.core.{MemberPickle, MemberStore}
+import com.github.trex_paxos.ClusterConfiguration
+import com.github.trex_paxos.core.{MemberPickle, ClusterConfigurationStore}
 import com.github.trex_paxos.library._
 import org.slf4j.LoggerFactory
 
@@ -25,15 +25,15 @@ object ClusterDriver {
   }
 }
 
-class ClusterDriver(val nodeIdentifier: Int, val memberStore: MemberStore, deserialize: (Array[Byte]) => Try[Any]) {
+class ClusterDriver(val nodeIdentifier: Int, val memberStore: ClusterConfigurationStore, deserialize: (Array[Byte]) => Try[Any]) {
   val logger = LoggerFactory.getLogger(this.getClass)
 
   import ClusterDriver._
 
-  protected var peers = peersFor(memberStore.loadMembership().getOrElse(throw new IllegalArgumentException("Uninitiated MemberStore")))
+  protected var peers = peersFor(memberStore.loadForHighestEra().getOrElse(throw new IllegalArgumentException("Uninitiated ClusterConfigurationStore")))
 
-  def peersFor(e: Era): Map[Int, Client] = {
-    (e.membership.nodes flatMap {
+  def peersFor(e: ClusterConfiguration): Map[Int, Client] = {
+    (e.nodes flatMap {
       case n if n.nodeIdentifier != nodeIdentifier =>
         Some(n.nodeIdentifier -> new Client(n))
       case _ =>
@@ -57,22 +57,21 @@ class ClusterDriver(val nodeIdentifier: Int, val memberStore: MemberStore, deser
     case p@Payload(Identifier(_, _, logIndex), ClusterCommandValue(msgUuid, bytes)) =>
       logger.debug("received ClusterCommandValue {}", p)
       deserialize(bytes) match {
-        case Success(m: Membership) =>
+        case Success(m: ClusterConfiguration) =>
           logger.info("received for slot {} with m {}", logIndex: Any, m: Any)
-          memberStore.loadMembership() match {
+          memberStore.loadForHighestEra() match {
             case None =>
               val msg = "uninitialised member store"
               logger.error(msg)
               throw new IllegalArgumentException()
-            case Some(era) =>
-              val nextEra = Era(era.era + 1, era.membership)
-              memberStore.saveMembership(nextEra)
+            case Some(_) =>
+              val nextEra = memberStore.saveAndAssignEra(m)
               peers = peersFor(nextEra)
               MemberPickle.toJson(nextEra).getBytes("UTF8")
           }
         case Success(x) =>
-          logger.error("unable to deserialize bytes to get a Membership got a {} from {}", x: Any, Base64.getEncoder.encodeToString(bytes): Any)
-          throw new IllegalArgumentException(s"not a Membership: ${x}")
+          logger.error("unable to deserialize bytes to get a ClusterConfiguration got a {} from {}", x: Any, Base64.getEncoder.encodeToString(bytes): Any)
+          throw new IllegalArgumentException(s"not a ClusterConfiguration: ${x}")
         case Failure(ex) =>
           throw ex
       }

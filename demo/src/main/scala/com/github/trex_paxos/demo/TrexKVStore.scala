@@ -28,11 +28,11 @@ import scala.language.postfixOps
 //    args.foreach(println(_))
 //
 //    val configName = args(0)
-//    val config = ConfigFactory.load(configName)
+//    val config = ConfigFactory.loadForHighestEra(configName)
 //    val cluster = Cluster.parseConfig(config)
 //    val hostname = argMap.getOrElse(1, "127.0.0.1")
 //
-//    val systemConfig = ConfigFactory.load(configName).withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(hostname))
+//    val systemConfig = ConfigFactory.loadForHighestEra(configName).withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(hostname))
 //
 //    println(systemConfig)
 //
@@ -110,7 +110,7 @@ import scala.language.postfixOps
 //    args.foreach(println(_))
 //    val configName = args(0)
 //    val nodeId = args(1).toInt
-//    val config = ConfigFactory.load(configName)
+//    val config = ConfigFactory.loadForHighestEra(configName)
 //    val cluster = Cluster.parseConfig(config)
 //    val node = cluster.nodeMap.getOrElse(nodeId, throw new IllegalArgumentException(s"No node $nodeId in $cluster"))
 //
@@ -133,7 +133,7 @@ import scala.language.postfixOps
 //        val logFile = new java.io.File(folder.getCanonicalPath + "/paxos")
 //        println(s"paxos data log is ${logFile.getCanonicalPath}")
 //        val journal = new MapDBStore(logFile, cluster.retained)
-//        val systemConfig = ConfigFactory.load(configName)
+//        val systemConfig = ConfigFactory.loadForHighestEra(configName)
 //          .withValue("akka.remote.netty.tcp.port", ConfigValueFactory.fromAnyRef(node.clientPort))
 //          .withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(node.host))
 //        println(systemConfig.toString)

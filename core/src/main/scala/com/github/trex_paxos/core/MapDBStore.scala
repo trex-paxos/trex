@@ -3,11 +3,11 @@ package com.github.trex_paxos.core
 
 import java.io.{Closeable, File}
 
-import com.github.trex_paxos.{Era, Membership}
+import com.github.trex_paxos.ClusterConfiguration
+import com.github.trex_paxos.library._
 import org.mapdb.{DB, DBMaker}
 
 import scala.collection.JavaConversions
-import com.github.trex_paxos.library._
 
 /**
   * A MapDB storage engine. Note that you must call close on the file for a clean shutdown.
@@ -15,9 +15,9 @@ import com.github.trex_paxos.library._
   * @param journalFile File to journal into.
   * @param retained    Minimum number of committed slots to retain for retransmission
   */
-class MapDBStore(journalFile: File, retained: Int) extends Journal with MemberStore with Closeable {
+class MapDBStore(journalFile: File, retained: Int) extends Journal with ClusterConfigurationStore with Closeable {
 
-  import com.github.trex_paxos.util.{Pickle, ByteChain}
+  import com.github.trex_paxos.util.{ByteChain, Pickle}
 
   // whether store needs initializing
   val emptyStoreFile = journalFile.length == 0
@@ -94,37 +94,51 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with MemberSt
   }
 
   // Stores the sequential cluster memberships keyed by the era number.
-  val eraMap: java.util.concurrent.ConcurrentNavigableMap[Int, Array[Byte]] =
-    db.getTreeMap("MEMBERS")
+  val clusterConfigByEraMap: java.util.concurrent.ConcurrentNavigableMap[Int, Array[Byte]] =
+    db.getTreeMap("CLUSTER_CONFIG")
 
   val UTF8 = "UTF8"
 
-  override def saveMembership(era: Era): Era = {
+  override def saveAndAssignEra(clusterConfiguration: ClusterConfiguration): ClusterConfiguration = {
     import scala.collection.JavaConverters._
 
-    era.membership.effectiveSlot match {
-      case None => throw new IllegalArgumentException(s"effective slot of membership must not be None as membership must have been committed at a particular slot ${era}")
-      case _ => // okay
+    // check that the new effectiveSlot is set
+    if( clusterConfiguration.effectiveSlot.isEmpty )
+      throw new IllegalArgumentException(s"effective slot of membership must not be None as membership must have been committed at a particular slot: ${clusterConfiguration}")
+
+    val lastEraOpt = clusterConfigByEraMap.descendingKeySet().iterator().asScala.toStream.headOption
+
+    // check that initialisation of the store is from effective slot of 0
+    lastEraOpt match {
+      case None => if( clusterConfiguration.effectiveSlot == Some(0))
+        throw new IllegalArgumentException(s"initalisation of memberstore must be from effective slot 0: ${clusterConfiguration}")
+      case _ =>
     }
 
-    val lastSlotOption: Option[Int] = eraMap.descendingKeySet().iterator().asScala.toStream.headOption
-    lastSlotOption foreach {
-      case last if last == era.era + 1 => // good
-      case last => throw new IllegalArgumentException(s"new era number ${era} is not +1 the last era number: ${last}")
+    // check that the new effective slot is not lower than the last known to be committed
+    val latestEra: Int = clusterConfigByEraMap.descendingKeySet().iterator().asScala.toStream.headOption match {
+      case Some(era) =>
+        MemberPickle.fromJson(new String(clusterConfigByEraMap.get(era), "UTF8")) foreach {
+          c => if( c.effectiveSlot.getOrElse(-1L) <  clusterConfiguration.effectiveSlot.getOrElse(-1L) ) // note code above forces "not None" so these checks never see -1
+            throw new IllegalArgumentException(s"new effective slot must be higher than last. new: ${clusterConfiguration}, old: ${c}")
+        }
+        era
+      case _ => -1
     }
 
-    if (lastSlotOption.isEmpty) require(era.era == 0, s"if the store is empty must persist era number 0: ${era}")
-    val json = MemberPickle.toJson(era)
-    eraMap.put(era.era, json.getBytes(UTF8))
+    val clusterConfigurationWithEra = clusterConfiguration.copy(era = Option(latestEra + 1))
+
+    val json = MemberPickle.toJson(clusterConfigurationWithEra)
+    clusterConfigByEraMap.put(clusterConfiguration.era.getOrElse(throw new IllegalArgumentException(s"no era ${clusterConfiguration}")), json.getBytes(UTF8))
     db.commit()
-    era
+    clusterConfigurationWithEra
   }
 
-  override def loadMembership(): Option[Era] = {
+  override def loadForHighestEra(): Option[ClusterConfiguration] = {
     import scala.collection.JavaConverters._
-    val lastSlotOption = eraMap.descendingKeySet().iterator().asScala.toStream.headOption
+    val lastSlotOption = clusterConfigByEraMap.descendingKeySet().iterator().asScala.toStream.headOption
     lastSlotOption map { (e: Int) =>
-      val jsonBytesUtf8 = eraMap.get(e)
+      val jsonBytesUtf8 = clusterConfigByEraMap.get(e)
       val js = new String(jsonBytesUtf8, UTF8)
       MemberPickle.fromJson(js).getOrElse(throw new IllegalArgumentException(js))
     }

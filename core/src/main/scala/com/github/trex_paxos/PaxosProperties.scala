@@ -12,7 +12,7 @@ object PaxosProperties {
 
   def apply(config: Config) = {
     /**
-      * To ensure cluster stability you *must* test your max GC under extended peak load and set this as some multiple
+      * To ensure cluster stability you *must* test your max GC under extended peak loadForHighestEra and set this as some multiple
       * of observed GC pause.
       */
     val leaderTimeoutMin = Try {
