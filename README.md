@@ -16,6 +16,8 @@ Checkout the [blog posts](https://simbo1905.wordpress.com/2016/01/09/trex-a-paxo
 
 ## Building
 
+[![Join the chat at https://gitter.im/trex-paxos/trex](https://badges.gitter.im/trex-paxos/trex.svg)](https://gitter.im/trex-paxos/trex?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 ```
 # Kick the tires
 sbt clean coverage test it:test
