@@ -139,13 +139,14 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
         node -> deduplicated.deduplicated
     }
 
-    // nodes must not see inconsistent commits but they may see less commits if they have been offline
+    // nodes must not see inconsistent committed values but they may see less commits if they have been offline
+    // note the identifiers of the commits may change if interleaving recovers are propagating the same values
     val nodes = noRepeats.keys
     (nodes.min until nodes.max) foreach { nodeId =>
       val previousNodeValues = noRepeats(nodeId)
       val nextNodeValues = noRepeats(nodeId + 1)
       val minSize = Seq(previousNodeValues.size, nextNodeValues.size).min
-      previousNodeValues.take(minSize) shouldBe nextNodeValues.take(minSize)
+      previousNodeValues.take(minSize).map(_.command) shouldBe nextNodeValues.take(minSize).map(_.command)
     }
 
     val nonoops = delivered map {
