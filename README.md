@@ -22,6 +22,8 @@ sbt clean coverage test it:test
 sbt coverageReport
 ```
 
+See the `.travis.yml` for supported jdk and scala versions. 
+
 ## Status /  Work Plan
 
 0.1 - library (released)

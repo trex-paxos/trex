@@ -1,12 +1,14 @@
 package com.github.trex_paxos.demo
 
-import org.mapdb.{HTreeMap, DB, Serializer}
+import org.mapdb.{HTreeMap, Serializer}
+
+//import org.mapdb.{HTreeMap, DB, Serializer}
 
 /**
  * This class is not threadsafe so wrap with an actor else externally synchronize.
  * @param db The MapDB to store data within.
  */
-class MapDBConsistentKVStore(db: DB) extends ConsistentKVStore {
+class MapDBConsistentKVStore(db: org.mapdb.DB) extends ConsistentKVStore {
 
   require(db != null)
 

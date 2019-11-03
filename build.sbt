@@ -3,7 +3,7 @@
 val mapdbVersion = "1.0.9"
 val scalatestVersion = "3.0.8"
 val scalamockVersion = "3.6.0"
-val akkaVersion = "2.5.14"
+val akkaVersion = "2.5.26"
 val logbackVersion = "1.2.3"
 val argonautVersion = "6.2.2"
 
@@ -58,6 +58,7 @@ lazy val demo = project.dependsOn(core).
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-remote" % akkaVersion,
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
+      "com.typesafe.akka" %% "akka-actor-typed" %akkaVersion,
       "org.mapdb" % "mapdb" % mapdbVersion,
       "org.scalatest" % "scalatest_2.12" % scalatestVersion % "test",
       "org.scalamock" %% "scalamock-scalatest-support" % scalamockVersion % "test"
