@@ -19,7 +19,8 @@ public class StackClient {
         ActorSystem system = ActorSystem.create("trex-java-demo", systemConfig);
         Config config = ConfigFactory.load(configName);
         Cluster cluster = Cluster.parseConfig(config);
-        ActorRef driver = system.actorOf(Props.create(DynamicClusterDriver.class, akka.util.Timeout.apply(100), 20));
+        ActorRef driver = system.actorOf(Props.create(DynamicClusterDriver.class,
+                akka.util.Timeout.apply(scala.concurrent.duration.FiniteDuration.apply(100, "ms")), 20));
         DynamicClusterDriver.Initialize init = DynamicClusterDriver$.MODULE$.apply(cluster);
         driver.tell(init, null);
         StringStack stack = TypedActor.get(system).typedActorOf(new TypedProps<StringStackImpl>(StringStack.class, StringStackImpl.class), driver);

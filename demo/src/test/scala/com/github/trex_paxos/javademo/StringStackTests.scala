@@ -2,9 +2,10 @@ package com.github.trex_paxos.javademo
 
 import java.io.File
 
-import org.scalatest.{Matchers, Spec}
+import org.scalatest.refspec.RefSpec
+import org.scalatest.{Matchers}
 
-class StringStackTests extends Spec with Matchers {
+class StringStackTests extends RefSpec with Matchers {
 
   object `A StringStack` {
 

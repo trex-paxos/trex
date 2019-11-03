@@ -1,9 +1,10 @@
 package com.github.trex_paxos.library
 
-import java.util.concurrent.atomic.{AtomicLong, AtomicReference, AtomicBoolean}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong, AtomicReference}
 
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{OptionValues, Matchers, Spec}
+import org.scalatest.refspec.RefSpec
+import org.scalatest.{Matchers, OptionValues}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -68,7 +69,7 @@ class TestAcceptMapJournal extends Journal {
   def saveProgress(p: Progress): Unit = progress(p)
 }
 
-class AllRolesTests extends Spec with PaxosLenses with Matchers with OptionValues with MockFactory {
+class AllRolesTests extends RefSpec with PaxosLenses with Matchers with OptionValues with MockFactory {
 
   import TestHelpers._
 

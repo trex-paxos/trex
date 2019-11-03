@@ -1,31 +1,41 @@
 package com.github.trex_paxos.internals
 
-object MemberStatus {
-  def resolve(id: Int) = id match {
-    case 0 => Learning
-    case 1 => Accepting
-  }
+import com.github.trex_paxos.internals.MemberStatus.MemberStatus
+
+object MemberStatus extends Enumeration {
+  type MemberStatus = Value
+  val Learning = Value("Learning")
+  val Accepting = Value("Accepting")
 }
 
-sealed trait MemberStatus {
-  def id: Int
-}
-
-/**
-  * The node is not a part of any quorums so does not respond to prepare or accept messages from a leader.
-  * It isn't eligible to become a leader.
-  */
-case object Learning extends MemberStatus {
-  val id: Int = 0
-}
-
-/**
-  * The node is part of any quorums and so responds to prepare or accept messages from a leader.
-  * The node is eligible to become a leader.
-  */
-case object Accepting extends MemberStatus {
-  val id: Int = 1
-}
+//object MemberStatus {
+//  def resolve(id: Int) = id match {
+//    case 0 => Learning
+//    case 1 => Accepting
+//  }
+//  def apply(id: Int) = resolve(id)
+//  def unapply(ms: MemberStatus): Int = ms.id
+//}
+//
+//sealed trait MemberStatus {
+//  def id: Int
+//}
+//
+///**
+//  * The node is not a part of any quorums so does not respond to prepare or accept messages from a leader.
+//  * It isn't eligible to become a leader.
+//  */
+//case object Learning extends MemberStatus {
+//  val id: Int = 0
+//}
+//
+///**
+//  * The node is part of any quorums and so responds to prepare or accept messages from a leader.
+//  * The node is eligible to become a leader.
+//  */
+//case object Accepting extends MemberStatus {
+//  val id: Int = 1
+//}
 
 object Member {
   val pattern = "(.+):([0-9]+)".r
@@ -49,9 +59,6 @@ private[trex_paxos] case class Member(nodeUniqueId: Int, location: String, clien
   */
 private[trex_paxos] case class Membership(name: String, members: Seq[Member])
 
-object Membership {
-  def apply(): Membership = new Membership("default", Seq())
-}
 
 /**
   * A membership becomes committed at a slot index and a client can state the slot it last knew the membership. A

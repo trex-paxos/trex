@@ -3,6 +3,7 @@ package com.github.trex_paxos.internals
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import _root_.com.github.trex_paxos.library._
+import org.scalatest.refspec.RefSpecLike
 import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
 
 import scala.collection.immutable.SortedMap
@@ -15,7 +16,7 @@ object InteractionSpec {
 }
 
 class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
-  InteractionSpec.config)) with SpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
+  InteractionSpec.config)) with RefSpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
 
   import Ordering._
 
@@ -48,7 +49,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
   object `A three node cluster` {
 
     def `should work when two nodes are up` {
-      expectNoMsg(25 millisecond)
+      expectNoMessage(25 millisecond)
       // given node zero
       val node0 = new TestJournal
       val actor0 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 0, self, node0, ArrayBuffer.empty, None))
@@ -198,7 +199,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
           case f => fail(f.toString)
         }
         // nothing is set back to us
-        expectNoMsg(25 millisecond)
+        expectNoMessage(25 millisecond)
         // and response went back to the probe
         client.expectMsgPF(50 millis) {
           case bytes: Array[Byte] =>
@@ -265,7 +266,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       actor0 ! nack2
 
       // nothing is set back to us
-      expectNoMsg(25 millisecond)
+      expectNoMessage(25 millisecond)
 
       // and it told the client it had lost leadership
       client.expectMsgPF(100 millis) {
@@ -275,7 +276,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
     }
 
     def `should widen the recovery slot range if discovers other nodes have seen higher slots`: Unit = {
-      expectNoMsg(25 millisecond)
+      expectNoMessage(25 millisecond)
       // given node zero
       val journal0 = new TestJournal
       val actor0 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 0, self, journal0, ArrayBuffer.empty, None))

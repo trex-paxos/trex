@@ -5,7 +5,7 @@ import java.io.{Closeable, File}
 
 import org.mapdb.{DB, DBMaker}
 
-import scala.collection.JavaConversions
+import scala.collection.{JavaConverters}
 import com.github.trex_paxos.TrexMembership
 import com.github.trex_paxos.library._
 
@@ -47,7 +47,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
     db.commit() // eager commit
     // lazy gc of some old values as dont commit until next update
     val Progress(_, Identifier(_, _, logIndex)) = progress
-    JavaConversions.asScalaSet(storeMap.navigableKeySet).takeWhile(_ < logIndex - retained).foreach { i =>
+    JavaConverters.asScalaSet(storeMap.navigableKeySet).takeWhile(_ < logIndex - retained).foreach { i =>
       if (storeMap.containsKey(i))
         storeMap.remove(i)
     }
@@ -105,7 +105,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
     val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
     lastSlotOption map { (s: Long) =>
       val jsonBytesUtf8 = memberMap.get(s)
-      MemberPickle.fromJson(new String(jsonBytesUtf8, UTF8))
+      MemberPickle.fromJson(new String(jsonBytesUtf8, UTF8)).get
     }
   }
 

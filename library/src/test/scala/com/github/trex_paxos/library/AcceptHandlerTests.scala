@@ -3,11 +3,12 @@ package com.github.trex_paxos.library
 import java.util.concurrent.atomic.AtomicLong
 
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{OptionValues, Spec, Matchers}
+import org.scalatest.refspec.RefSpec
+import org.scalatest.{Matchers, OptionValues}
 
 class TestAcceptHandler extends AcceptHandler
 
-class AcceptHandlerTests extends Spec with Matchers with MockFactory with OptionValues with PaxosLenses {
+class AcceptHandlerTests extends RefSpec with Matchers with MockFactory with OptionValues with PaxosLenses {
 
   object `A HighAcceptHandler` {
     def `should require accept number at least as high as promise` {

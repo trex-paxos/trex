@@ -1,61 +1,41 @@
 package com.github.trex_paxos.internals
 
-import scala.util.parsing.json._
+import argonaut._
+import Argonaut._
 
 object MemberPickle {
 
-  def s(a: Any) = "\"" + a + "\""
+  implicit def MemberStatusCodecJson: CodecJson[MemberStatus.MemberStatus] = CodecJson({
+    case MemberStatus.Accepting => "Accepting".asJson
+    case MemberStatus.Learning => "Learning".asJson
+  }, c => c.focus.string match {
+    case Some("Accepting") => DecodeResult.ok(MemberStatus.Accepting)
+    case Some("Learning") => DecodeResult.ok(MemberStatus.Learning)
+    case _ => DecodeResult.fail("Could not decode MemberStatus", c.history)
+  })
 
-  val statusFromString = Map(Learning.toString -> Learning, Accepting.toString -> Accepting)
 
-  def toJson(membership: CommittedMembership): String = {
-    val members: Seq[String] = membership.membership.members map {
-      case Member(nodeUniqueId, location, clientLocation, memberStatus) =>
-        "{" + s("n") + ":" + nodeUniqueId + ", " + s("l") + ":" + s(location) + "," + s("c") + ":" + s(clientLocation) + "," + s("s") + ":" + s(memberStatus.toString) + "}"
-    }
-    val ms = members.mkString("[", ",", "]")
-    "{" + s("name") + ":" + s(membership.membership.name) + "," + s("slot") + ":" + membership.slot + "," + s("members") + ":" + ms + "}"
+  implicit def VectorDecodeJson[A](implicit e: DecodeJson[A]): DecodeJson[Seq[A]] = CanBuildFromDecodeJson[A, Seq]
+
+  implicit def VectorEncodeJson[A](implicit e: EncodeJson[List[A]]): EncodeJson[Seq[A]] =
+    EncodeJson(a => e(a.toList))
+
+  implicit lazy val CodeMember: CodecJson[Member] =
+    casecodec4(Member.apply, Member.unapply)("nodeUniqueId", "location", "clientLocation", "status")
+
+  implicit lazy val CodeMembership: CodecJson[Membership] =
+    casecodec2(Membership.apply, Membership.unapply)("name", "members")
+
+  implicit lazy val CodecCommittedMembership: CodecJson[CommittedMembership] =
+    casecodec2(CommittedMembership.apply, CommittedMembership.unapply)("name", "membership")
+
+  def fromJson(jstring: String): Option[CommittedMembership] = {
+    jstring.decodeOption[CommittedMembership]
   }
 
-
-  // http://stackoverflow.com/a/4186090/329496
-  class CC[T] {
-    def unapply(a: Any): Option[T] = Some(a.asInstanceOf[T])
-  }
-
-  object M extends CC[Map[String, Any]]
-
-  object L extends CC[List[Any]]
-
-  object S extends CC[String]
-
-  object D extends CC[Double]
-
-  object B extends CC[Boolean]
-
-  def fromJson(jsonString: String): CommittedMembership = {
-    val json = JSON.parseFull(jsonString)
-
-    val Some((name, slot)) = for {
-      Some(M(map)) <- Option(json)
-      S(name) = map("name")
-      D(slot) = map("slot")
-    } yield {
-      (name, slot.toLong)
-    }
-
-    val ms = for {
-      Some(M(map)) <- List(json)
-      L(members) = map("members")
-      M(member) <- members
-      D(nodeUniqueId) = member("n")
-      S(location) = member("l")
-      S(clientLocation) = member("c")
-      S(status) = member("s")
-    } yield {
-      Member(nodeUniqueId.toInt, location, clientLocation, statusFromString(status))
-    }
-
-    CommittedMembership(slot, Membership(name, ms))
+  def toJson(cm: CommittedMembership): String = {
+    cm.asJson.toString()
   }
 }
+
+

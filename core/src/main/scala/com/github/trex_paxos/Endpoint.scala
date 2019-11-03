@@ -73,7 +73,7 @@ class TypedActorPaxosEndpoint(
     }.toMap
   }
 
-  def notNoneMembership = membershipStore.loadMembership().getOrElse(CommittedMembership(Long.MinValue, Membership()))
+  def notNoneMembership = membershipStore.loadMembership().getOrElse(CommittedMembership(Long.MinValue, new Membership("default",  Seq())))
 
   // FIXME this could IOError so we should move it to an Init method or the actor will stop.
   var committedMembership = notNoneMembership

@@ -2,12 +2,12 @@ package com.github.trex_paxos.internals
 
 import _root_.com.github.trex_paxos._
 import _root_.com.github.trex_paxos.library._
-
 import java.util.concurrent.TimeoutException
 
 import akka.actor._
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import akka.util.Timeout
+import org.scalatest.refspec.RefSpecLike
 import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
 
 import scala.compat.Platform
@@ -18,7 +18,7 @@ object DriverSpec {
 }
 
 class DriverSpec extends TestKit(ActorSystem("DriverSpec",
-  DriverSpec.conf)) with SpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
+  DriverSpec.conf)) with RefSpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
@@ -152,8 +152,8 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
         case x => fail(x.toString)
       }
 
-      testProbe1.expectNoMsg(25 millisecond)
-      testProbe3.expectNoMsg(25 millisecond)
+      testProbe1.expectNoMessage(25 millisecond)
+      testProbe3.expectNoMessage(25 millisecond)
     }
 
     object `will return the response if it comes from the second node after a NotLeader message` {
@@ -195,8 +195,8 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
         case x => fail(x.toString)
       }
 
-      testProbe1.expectNoMsg(25 millisecond)
-      testProbe3.expectNoMsg(25 millisecond)
+      testProbe1.expectNoMessage(25 millisecond)
+      testProbe3.expectNoMessage(25 millisecond)
 
     }
 
@@ -205,18 +205,18 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
       implicit val ref = bd
 
       clientProbe.send(ref, "hello world")
-      clientProbe.expectNoMsg(25 millisecond)
+      clientProbe.expectNoMessage(25 millisecond)
 
       ref ! CheckTimeout
-      clientProbe.expectNoMsg(25 millisecond)
+      clientProbe.expectNoMessage(25 millisecond)
       ref ! CheckTimeout
-      clientProbe.expectNoMsg(25 millisecond)
+      clientProbe.expectNoMessage(25 millisecond)
       ref ! CheckTimeout
-      clientProbe.expectNoMsg(25 millisecond)
+      clientProbe.expectNoMessage(25 millisecond)
       ref ! CheckTimeout
-      clientProbe.expectNoMsg(25 millisecond)
+      clientProbe.expectNoMessage(25 millisecond)
       ref ! CheckTimeout
-      clientProbe.expectNoMsg(25 millisecond)
+      clientProbe.expectNoMessage(25 millisecond)
       ref ! CheckTimeout
 
       clientProbe.expectMsgPF(1 seconds) {

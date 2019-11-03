@@ -126,7 +126,7 @@ class MapDBStoreSpec extends WordSpecLike with Matchers with BeforeAndAfter with
       store.loadMembership() shouldBe None
     }
     "should throw an exception for an overwrite" in {
-      val m = Membership("default", Seq(Member(1, "one", "xxx", Learning), Member(2, "two", "yyy", Accepting)))
+      val m = Membership("default", Seq(Member(1, "one", "xxx", MemberStatus.Learning), Member(2, "two", "yyy", MemberStatus.Accepting)))
       val store = new MapDBStore(storeFile, 2)
       store.saveMembership(CommittedMembership(0L, m))
       try {

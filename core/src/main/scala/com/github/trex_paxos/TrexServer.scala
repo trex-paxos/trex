@@ -44,7 +44,7 @@ object TrexServer {
       case None =>
         println(s"initializing cluster membership from config")
         val members: Seq[Member] = cluster.nodes map {
-          case Node(nodeUniqueId, host, cport, nport) => Member(nodeUniqueId, s"${host}:${nport}", s"${host}:${cport}", Accepting)
+          case Node(nodeUniqueId, host, cport, nport) => Member(nodeUniqueId, s"${host}:${nport}", s"${host}:${cport}", MemberStatus.Accepting)
         }
         val m = Membership(cluster.name, members)
         println(s"saving membership ${m} at logIndex Long.MinValue")

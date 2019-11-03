@@ -4,6 +4,7 @@ import akka.actor._
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import com.github.trex_paxos.library.{ClientCommandValue, CommandValue, LostLeadershipException, Payload}
 import com.typesafe.config.{Config, ConfigFactory}
+import org.scalatest.refspec.RefSpecLike
 import org.scalatest.{BeforeAndAfterAll, _}
 
 import scala.collection.mutable
@@ -16,7 +17,7 @@ object NoFailureTests {
 }
 
 class NoFailureTests extends TestKit(ActorSystem("NoFailure",
-  NoFailureTests.spacedTimeoutConfig)) with SpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
+  NoFailureTests.spacedTimeoutConfig)) with RefSpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
 
   import scala.concurrent.duration._
 

@@ -9,16 +9,16 @@ class MemberPickleSpec extends WordSpecLike with Matchers {
       val cm = CommittedMembership(0L, Membership("", Seq()))
       val js = MemberPickle.toJson(cm)
       val cm2 = MemberPickle.fromJson(js)
-      cm2 shouldBe cm
+      cm2 shouldBe Some(cm)
     }
     "roundtrip some CommittedMembership" in {
       val cm = CommittedMembership(99L, Membership("some", Seq(
-        Member(1, "one", "two", Learning),
-        Member(2, "one2", "two2", Accepting)
+        Member(1, "one", "two", MemberStatus.Learning),
+        Member(2, "one2", "two2", MemberStatus.Accepting)
       )))
       val js = MemberPickle.toJson(cm)
       val cm2 = MemberPickle.fromJson(js)
-      cm2 shouldBe cm
+      cm2 shouldBe Some(cm)
     }
 
   }

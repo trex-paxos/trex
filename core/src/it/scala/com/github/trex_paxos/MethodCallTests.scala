@@ -5,9 +5,10 @@ import akka.actor.{Actor, ActorLogging, ActorSystem, Props, TypedActor, TypedPro
 import akka.serialization.SerializationExtension
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.ConfigFactory
+import org.scalatest.refspec.RefSpecLike
 import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
 
-import scala.util.{Try, Success, Failure}
+import scala.util.{Failure, Success, Try}
 
 trait MethodCallTestTrait {
   def testMethod(testInput: String): String
@@ -55,7 +56,7 @@ class MethodCallInvokingActor(target: Any) extends Actor with ActorLogging {
 }
 
 class MethodCallTests extends TestKit(ActorSystem("MethodCallTests"))
-with SpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
+with RefSpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
 
   def `method call should serialize`: Unit = {
 

@@ -1,14 +1,16 @@
+//enablePlugins(ScalaNativePlugin)
 
 val mapdbVersion = "1.0.9"
-val scalatestVersion = "2.2.5"
-val scalmockVersion = "3.2.2"
-val akkaVersion = "2.3.15"
-val logbackVersion = "1.1.7"
+val scalatestVersion = "3.0.8"
+val scalamockVersion = "3.6.0"
+val akkaVersion = "2.5.14"
+val logbackVersion = "1.2.3"
+val argonautVersion = "6.2.2"
 
 lazy val commonSettings = Seq(
-  scalaVersion := "2.11.8",
+  scalaVersion := "2.12.10",
   organization := "com.github.trex-paxos",
-  version := "0.3",
+  version := "0.4",
   scalacOptions := Seq("-feature", "-deprecation", "-Xfatal-warnings")
 )
 
@@ -20,9 +22,11 @@ lazy val library = project.settings(commonSettings: _*).
   settings( name := "trex-library").
   settings(
     libraryDependencies ++= Seq(
-      "org.scalatest" % "scalatest_2.11" % scalatestVersion % "test",
-      "org.scalamock" %% "scalamock-scalatest-support" % scalmockVersion % "test"
+      "org.scalatest" % "scalatest_2.12" % scalatestVersion % "test",
+      "org.scalamock" %% "scalamock-scalatest-support" % scalamockVersion % "test"
     )
+//    ,
+//    nativeLinkStubs := true
   )
 
 lazy val core = project.dependsOn(library).
@@ -36,9 +40,9 @@ lazy val core = project.dependsOn(library).
 		  "com.typesafe.akka" %% "akka-actor" % akkaVersion,
 		  "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
 		  "org.mapdb" % "mapdb" % mapdbVersion,
-      "org.scala-lang.modules" % "scala-parser-combinators_2.11" % "1.0.4",
-      "org.scalatest" % "scalatest_2.11" % scalatestVersion % "test,it",
-		  "org.scalamock" %% "scalamock-scalatest-support" % scalmockVersion % "test,it",
+      "io.argonaut" %% "argonaut" % argonautVersion,
+      "org.scalatest" % "scalatest_2.12" % scalatestVersion % "test,it",
+		  "org.scalamock" %% "scalamock-scalatest-support" % scalamockVersion % "test,it",
       "com.typesafe.akka" %% "akka-remote" % akkaVersion
 		  )
   )
@@ -49,13 +53,13 @@ lazy val demo = project.dependsOn(core).
   settings(
     libraryDependencies ++= Seq(
       "org.scala-lang" % "scala-compiler" % scalaVersion.value,
-      "com.typesafe.akka" % "akka-slf4j_2.11" % akkaVersion,
+      "com.typesafe.akka" % "akka-slf4j_2.12" % akkaVersion,
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-remote" % akkaVersion,
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       "org.mapdb" % "mapdb" % mapdbVersion,
-      "org.scalatest" % "scalatest_2.11" % scalatestVersion % "test",
-      "org.scalamock" %% "scalamock-scalatest-support" % scalmockVersion % "test"
+      "org.scalatest" % "scalatest_2.12" % scalatestVersion % "test",
+      "org.scalamock" %% "scalamock-scalatest-support" % scalamockVersion % "test"
     )
   )

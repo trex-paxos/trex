@@ -234,7 +234,7 @@ object DynamicClusterDriver {
   case class Initialize(membership: Membership)
   def apply(cluster: Cluster) = {
     DynamicClusterDriver.Initialize(Membership(cluster.name, cluster.nodes.map { node =>
-      Member(node.nodeUniqueId, s"${node.host}:${node.nodePort}", s"${node.host}:${node.clientPort}", Accepting)
+      Member(node.nodeUniqueId, s"${node.host}:${node.nodePort}", s"${node.host}:${node.clientPort}", MemberStatus.Accepting)
     }))
   }
 }

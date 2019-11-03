@@ -2,11 +2,12 @@ package com.github.simbo1905.trexdemo
 
 import akka.actor._
 import akka.testkit.{DefaultTimeout, ImplicitSender, TestKit}
-import com.github.trex_paxos.demo.{MapDBConsistentKVStore, ConsistentKVStore}
-import com.github.trex_paxos.library.{Journal, JournalBounds, Accept, Progress}
+import com.github.trex_paxos.demo.{ConsistentKVStore, MapDBConsistentKVStore}
+import com.github.trex_paxos.library.{Accept, Journal, JournalBounds, Progress}
 import com.typesafe.config.ConfigFactory
 import org.mapdb.{DB, DBMaker}
 import org.scalatest._
+import org.scalatest.refspec.RefSpecLike
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 
@@ -35,7 +36,7 @@ class InMemoryJournal extends Journal {
 }
 
 class MapDBConsistentStoreTests extends TestKit(ActorSystem("LeaderSpec", MapDBConsistentStoreTests.config))
-with DefaultTimeout with ImplicitSender with SpecLike with Matchers with BeforeAndAfter with BeforeAndAfterAll with OptionValues {
+with DefaultTimeout with ImplicitSender with RefSpecLike with Matchers with BeforeAndAfter with BeforeAndAfterAll with OptionValues {
 
   var db: DB = DBMaker.newMemoryDB().make()
 

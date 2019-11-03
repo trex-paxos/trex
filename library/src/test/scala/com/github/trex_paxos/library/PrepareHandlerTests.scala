@@ -2,16 +2,16 @@ package com.github.trex_paxos.library
 
 import TestHelpers._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{OptionValues, Spec}
+import org.scalatest.{OptionValues}
 
 import scala.collection.immutable.TreeMap
 import scala.compat.Platform
-
 import Ordering._
+import org.scalatest.refspec.RefSpec
 
 class TestPrepareHandler extends PrepareHandler
 
-class PrepareHandlerTests extends Spec with MockFactory with OptionValues {
+class PrepareHandlerTests extends RefSpec with MockFactory with OptionValues {
   val agentPromise10 = PaxosAgent(0, Follower, initialData.copy(progress = initialData.progress.copy(highestPromised = BallotNumber(10, 10))), initialQuorumStrategy)
 
   object `A PromiseHandler` {

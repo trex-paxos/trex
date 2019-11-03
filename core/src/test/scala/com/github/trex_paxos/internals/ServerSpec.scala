@@ -4,6 +4,7 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import _root_.com.github.trex_paxos.TrexRouting
 import _root_.com.github.trex_paxos.library.{RetransmitRequest, RetransmitResponse, _}
+import org.scalatest.refspec.RefSpecLike
 import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
 
 import scala.concurrent.duration._
@@ -14,7 +15,7 @@ object ServerSpec {
 }
 
 class ServerSpec extends TestKit(ActorSystem("ServerSpec", ServerSpec.config))
-  with SpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
+  with RefSpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
 
   override def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
@@ -62,8 +63,8 @@ class ServerSpec extends TestKit(ActorSystem("ServerSpec", ServerSpec.config))
       listener.send(routing, "hello")
       // then the target gets the message and no-one else
       target.expectMsg("hello")
-      peers.values.foreach(_.expectNoMsg(50 millisecond))
-      listener.expectNoMsg(50 millisecond)
+      peers.values.foreach(_.expectNoMessage(50 millisecond))
+      listener.expectNoMessage(50 millisecond)
     }
 
     def `will broadcast outbound from target`: Unit = {
@@ -75,8 +76,8 @@ class ServerSpec extends TestKit(ActorSystem("ServerSpec", ServerSpec.config))
       target.send(routing, msg)
       // then the peers gets the message but no-one else
       peers.values.foreach(_.expectMsg(msg))
-      target.expectNoMsg(50 millisecond)
-      listener.expectNoMsg(50 millisecond)
+      target.expectNoMessage(50 millisecond)
+      listener.expectNoMessage(50 millisecond)
     }
 
     def `will route outbound AcceptResponse from target to peer 1`: Unit = {
@@ -152,10 +153,10 @@ class ServerSpec extends TestKit(ActorSystem("ServerSpec", ServerSpec.config))
         case (n, p) if n == peer =>
           p.expectMsg(msg)
         case (n, p) if n != peer =>
-          p.expectNoMsg(50 millisecond)
+          p.expectNoMessage(50 millisecond)
       }
-      target.expectNoMsg(50 millisecond)
-      listener.expectNoMsg(50 millisecond)
+      target.expectNoMessage(50 millisecond)
+      listener.expectNoMessage(50 millisecond)
     }
   }
 

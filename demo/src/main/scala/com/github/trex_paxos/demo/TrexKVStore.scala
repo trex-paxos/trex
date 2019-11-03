@@ -55,7 +55,7 @@ object TrexKVClient {
 
     println("commands:\n\n\tget key\n\tput key value\n\tput key value version\n\tremove key\n\tremove key version\n\nlooping on stdin for your commands...")
 
-    for (ln <- io.Source.stdin.getLines()) {
+    for (ln <- scala.io.Source.stdin.getLines()) {
       val args = ln.split("\\s+")
 
       args(0) match {

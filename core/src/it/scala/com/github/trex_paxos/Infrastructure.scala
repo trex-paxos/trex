@@ -105,7 +105,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
   (0 until size) foreach { i =>
     val node = new TestJournal
     journal(journal() + (i -> node))
-    val deliver: mutable.Buffer[Payload] = collection.JavaConversions.asScalaBuffer(new CopyOnWriteArrayList[Payload])
+    val deliver: mutable.Buffer[Payload] = collection.JavaConverters.asScalaBuffer(new CopyOnWriteArrayList[Payload])
     delivered(delivered() + (i -> deliver))
     val actor: ActorRef = context.actorOf(Props(classOf[TestPaxosActor], PaxosProperties(config), () => size, i, self, node, deliver, Some(recordTraceData _)))
     children(children() + (i -> actor))

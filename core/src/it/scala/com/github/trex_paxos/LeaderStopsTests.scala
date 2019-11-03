@@ -11,9 +11,10 @@ import scala.collection.mutable.{ArrayBuffer, Buffer}
 import scala.concurrent.Await
 import scala.language.postfixOps
 import akka.event.{LogSource, Logging}
+import org.scalatest.refspec.RefSpecLike
 
 class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
-  NoFailureTests.spacedTimeoutConfig)) with SpecLike with ImplicitSender with BeforeAndAfterAll with BeforeAndAfter with Matchers {
+  NoFailureTests.spacedTimeoutConfig)) with RefSpecLike with ImplicitSender with BeforeAndAfterAll with BeforeAndAfter with Matchers {
 
   implicit val myLogSourceType: LogSource[LeaderStopsTests] = new LogSource[LeaderStopsTests] {
     def genString(a: LeaderStopsTests) = "LeaderStopsTests"
