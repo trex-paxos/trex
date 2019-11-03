@@ -1,8 +1,5 @@
 
 [![Build Status](https://travis-ci.org/trex-paxos/trex.svg?branch=master)](https://travis-ci.org/trex-paxos/trex)
-[![Codacy Badge](https://www.codacy.com/project/badge/73b345d5a4c74a4d9d458596e64fe212)](https://www.codacy.com/app/simbo1905remixed/trex)
-[![Codacy Badge](https://api.codacy.com/project/badge/Coverage/73b345d5a4c74a4d9d458596e64fe212)](https://www.codacy.com/app/simbo1905remixed/trex?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=trex-paxos/trex&amp;utm_campaign=Badge_Coverage)
-[![Join the chat at https://gitter.im/trex-paxos/trex](https://badges.gitter.im/trex-paxos/trex.svg)](https://gitter.im/trex-paxos/trex?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ## Trex: An embeddable Paxos engine for the JVM
 
