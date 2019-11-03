@@ -10,7 +10,7 @@ val argonautVersion = "6.2.2"
 lazy val commonSettings = Seq(
   scalaVersion := "2.12.10",
   organization := "com.github.trex-paxos",
-  version := "0.4",
+  version := "0.3",
   scalacOptions := Seq("-feature", "-deprecation", "-Xfatal-warnings")
 )
 
