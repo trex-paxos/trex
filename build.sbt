@@ -5,6 +5,8 @@ val akkaVersion = "2.5.26"
 val logbackVersion = "1.2.3"
 val argonautVersion = "6.2.2"
 
+releaseIgnoreUntrackedFiles := true
+
 lazy val commonSettings = Seq(
   scalaVersion := "2.12.10",
   organization := "com.github.trex-paxos",
