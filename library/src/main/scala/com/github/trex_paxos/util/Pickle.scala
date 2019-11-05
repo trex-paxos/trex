@@ -45,7 +45,7 @@ class ByteChain(val bytes: Vector[Array[Byte]], val length: Int) extends Iterabl
 
 
   /**
-    * @return returns a new ByteChain with the length and CRC32 of this one prepended to message integrety checks
+    * @return returns a new ByteChain with the length and CRC32 of this one prepended to message integrity checks
     */
   def prependCrcData(): ByteChain = {
     val crc = new CRC32()
@@ -55,8 +55,9 @@ class ByteChain(val bytes: Vector[Array[Byte]], val length: Int) extends Iterabl
   }
 
   /**
+    * Will throw java.lang.IllegalArgumentException if the crc32 of the remainder does not match the crc32 in bytes 4 thru 7
     * @return drops the first 8 bytes, interprets the first 4 as the length of the remainder and the second as its crc32
-    * @throws IllegalArgumentException if the crc32 of the remainder does not match the crc32 in bytes 4 thru 7
+    *
     */
   def checkCrcData(): ByteChain = {
     val i = this.iterator

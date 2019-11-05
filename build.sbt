@@ -1,5 +1,3 @@
-//enablePlugins(ScalaNativePlugin)
-
 val mapdbVersion = "1.0.9"
 val scalatestVersion = "3.0.8"
 val scalamockVersion = "3.6.0"
@@ -25,8 +23,6 @@ lazy val library = project.settings(commonSettings: _*).
       "org.scalatest" % "scalatest_2.12" % scalatestVersion % "test",
       "org.scalamock" %% "scalamock-scalatest-support" % scalamockVersion % "test"
     )
-//    ,
-//    nativeLinkStubs := true
   )
 
 lazy val core = project.dependsOn(library).
@@ -36,7 +32,7 @@ lazy val core = project.dependsOn(library).
   settings(name := "trex-core").
   settings(
 		libraryDependencies ++= Seq(
-      "com.typesafe" % "config" % "1.2.1",
+      "com.typesafe" % "config" % "1.3.3",
 		  "com.typesafe.akka" %% "akka-actor" % akkaVersion,
 		  "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
 		  "org.mapdb" % "mapdb" % mapdbVersion,

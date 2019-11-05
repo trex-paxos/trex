@@ -1,5 +1,5 @@
 ThisBuild / organization := "com.github.trex-paxos"
-ThisBuild / organizationName := "trex"
+ThisBuild / organizationName := "com.github.trex-paxos"
 ThisBuild / organizationHomepage := Some(url("https://github.com/trex-paxos/trex"))
 
 ThisBuild / scmInfo := Some(
