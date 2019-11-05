@@ -21,6 +21,24 @@ sbt coverageReport
 
 See the `.travis.yml` for supported jdk and scala versions. 
 
+# Releasing
+
+Create a snapshot release:
+
+```shell script
+sbt> sonatypeOpen "com.github.trex-paxos" "0.3"
+sbt> publishSigned
+sbt> sonatypeReleaseAll
+```
+
+Createa release:
+
+```shell script
+sbt> release
+sbt> sonatypeReleaseAll
+```
+ 
+
 ## Status /  Work Plan
 
 0.1 - library (released)
@@ -38,10 +56,16 @@ See the `.travis.yml` for supported jdk and scala versions.
 
 - [x] pluggable quorum strategy in the library
 
-0.3 - practical
+0.3 - integrity
 
 - [x] crc32 message integrity 
+
+0.4 - remove akka replace with netty-reactor
+
 - [ ] Remove Akka dependence from core (keep in tests)
+
+05 - practical
+
 - [ ] dynamic cluster membership with UPaxos 
 
 0.6 - enhanced 
