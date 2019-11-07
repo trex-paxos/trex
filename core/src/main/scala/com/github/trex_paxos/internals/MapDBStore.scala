@@ -87,7 +87,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
     // TODO this needs tests
     val keysAscending = storeMap.navigableKeySet()
     if (storeMap.isEmpty())
-      PaxosActor.minJournalBounds
+      PaxosAlgorithm.minJournalBounds
     else {
       JournalBounds(keysAscending.iterator().next(), keysAscending.descendingSet().iterator().next())
     }

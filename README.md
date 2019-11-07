@@ -23,21 +23,13 @@ See the `.travis.yml` for supported jdk and scala versions.
 
 # Releasing
 
-Create a snapshot release:
+Create a release:
 
 ```shell script
-sbt> sonatypeOpen "com.github.trex-paxos" "0.3"
+sbt> sonatypeOpen "com.github.trex-paxos" "0.3.2"
 sbt> publishSigned
 sbt> sonatypeReleaseAll
 ```
-
-Createa release:
-
-```shell script
-sbt> release
-sbt> sonatypeReleaseAll
-```
- 
 
 ## Status /  Work Plan
 
@@ -60,9 +52,9 @@ sbt> sonatypeReleaseAll
 
 - [x] crc32 message integrity 
 
-0.4 - remove akka replace with netty-reactor
+0.4.0 - Remove Akka dependence from core (keep in tests) 
 
-- [ ] Remove Akka dependence from core (keep in tests)
+- [z] expose more methods for new rsocket code 
 
 05 - practical
 
