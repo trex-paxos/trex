@@ -27,7 +27,7 @@ with AkkaLoggingAdapter {
 
   def clusterSize: Int
 
-  var paxosAgent = initialAgent(nodeUniqueId, journal.loadProgress(), clusterSize _)
+  var paxosAgent = PaxosAlgorithm.initialAgent(nodeUniqueId, journal.loadProgress(), clusterSize _)
 
   val logger = this
 
@@ -74,7 +74,7 @@ with AkkaLoggingAdapter {
 
   override def receive: Receive = {
     case m: PaxosMessage =>
-      val event = new PaxosEvent(this, paxosAgent, m)
+      val event = PaxosEvent(this, paxosAgent, m)
       val agent = paxosAlgorithm(event)
       trace(event, sender().toString(), sent)
       transmit(sender())
@@ -250,17 +250,5 @@ object PaxosActor {
   case class TraceData(ts: Long, nodeUniqueId: Int, stateName: PaxosRole, statData: PaxosData, sender: String, message: Any, sent: Seq[PaxosMessage])
 
   type Tracer = TraceData => Unit
-
-  val freshAcceptResponses: SortedMap[Identifier, AcceptResponsesAndTimeout] = SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering)
-
-  val minJournalBounds = JournalBounds(0, 0)
-
-  def initialAgent(nodeUniqueId: Int, progress: Progress, clusterSize: () => Int) =
-    new PaxosAgent(nodeUniqueId, Follower, PaxosData(progress, 0, 0,
-    SortedMap.empty[Identifier, scala.collection.immutable.Map[Int, PrepareResponse]](Ordering.IdentifierLogOrdering), None,
-    SortedMap.empty[Identifier, AcceptResponsesAndTimeout](Ordering.IdentifierLogOrdering)
-    ), DefaultQuorumStrategy(clusterSize))
-
-
 }
 
