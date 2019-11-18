@@ -7,7 +7,7 @@ Checkout the [blog posts](https://simbo1905.wordpress.com/2016/01/09/trex-a-paxo
 
 ## Notable Releases
 
-[Trex 0.4.2](https://search.maven.org/search?q=a:trex-library_2.12) has 
+[Trex 0.4.2](https://search.maven.org/search?q=a:trex-library_2.12) includes unpickle byte[] for java clients 
 
 [Trex 0.2](https://github.com/trex-paxos/trex/tree/0.2) is now released which allows for pluggable a `QuroumStrategy` which would allow for a more [flexible paxos](https://ssougou.blogspot.co.uk/2016/08/a-more-flexible-paxos.html?m=1) known as [FPaxos](https://arxiv.org/pdf/1608.06696v1.pdf)
 
