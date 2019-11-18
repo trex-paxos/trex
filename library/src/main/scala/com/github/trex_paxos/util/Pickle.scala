@@ -211,6 +211,18 @@ object PicklePositiveIntegers {
 
 }
 
+class ByteIterator(bs: Array[Byte]) extends Iterator[Byte]{
+  var index = 0
+  override def hasNext: Boolean = index < bs.length
+
+  override def next(): Byte = {
+    val b = bs(index)
+    index = index + 1
+    b
+  }
+}
+
+
 /**
   * Binary pickling.
   * Note that RetransmitResponse could be big so in the future we might send am identifier handle in the message
@@ -219,6 +231,10 @@ object PicklePositiveIntegers {
 object Pickle {
 
   val UTF8 = "UTF8"
+
+  def jbytesToIteratorByte(bs: Array[Byte] ): Iterator[Byte] ={
+    new ByteIterator(bs);
+  }
 
   val config: Map[Byte, (Class[_], Iterator[Byte] => AnyRef)] = Map(
     0x0.toByte -> (classOf[Accept] -> unpickleAccept _),

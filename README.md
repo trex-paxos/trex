@@ -54,7 +54,11 @@ sbt> sonatypeReleaseAll
 
 0.4.0 - Remove Akka dependence from core (keep in tests) 
 
-- [z] expose more methods for new rsocket code 
+- [x] expose more methods for new rsocket code 
+
+0.4.1 - Remove Akka dependence from core (keep in tests) #2
+
+- [x] Unpickle byte[] for Java clients  
 
 05 - practical
 
