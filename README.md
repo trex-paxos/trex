@@ -52,13 +52,15 @@ sbt> sonatypeReleaseAll
 
 0.4.1 - Remove Akka dependence from core (keep in tests) #2
 
-- [x] Unpickle byte[] for Java clients  
+- [x] Unpickle byte[] for Java clients
 
-05 - practical
+0.5.0 - JPickle for Java Journal
+
+0.a - practical
 
 - [ ] dynamic cluster membership with UPaxos 
 
-0.6 - enhanced 
+0.b - enhanced 
 
 - [ ] learners / scale-out multicast
 - [ ] timeline reads
@@ -69,7 +71,7 @@ sbt> sonatypeReleaseAll
 - [ ] jumbo UDP packets
 - [ ] complete the TODOs
 
-0.7 - performance
+0.c - performance
 
 - [ ] strong reads
 - [ ] outdated reads
@@ -81,7 +83,7 @@ sbt> sonatypeReleaseAll
 - [ ] journal truncation by size 
 - [ ] periodically leader number boosting
 
-0.8 
+0.d 
 
 - [ ] final API
 - [ ] hand-off reads? 
