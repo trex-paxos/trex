@@ -46,15 +46,17 @@ sbt> sonatypeReleaseAll
 
 - [x] crc32 message integrity 
 
-0.4.0 - Remove Akka dependence from core (keep in tests) 
+0.4.0 - 
 
 - [x] expose more methods for new rsocket code 
 
-0.4.1 - Remove Akka dependence from core (keep in tests) #2
+0.4.1 - 
 
-- [x] Unpickle byte[] for Java clients
+- [x] Unpickle `byte[]` for Java clients
 
 0.5.0 - JPickle for Java Journal
+
+0.6.0 - MVStore as Journal with backup method
 
 0.a - practical
 
