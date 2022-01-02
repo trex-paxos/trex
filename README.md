@@ -13,8 +13,6 @@ sbt clean test it:test
 sbt coverageReport
 ```
 
-See the `.travis.yml` for supported jdk and scala versions. 
-
 # Releasing
 
 Create a release:
