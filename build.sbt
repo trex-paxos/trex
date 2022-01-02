@@ -2,7 +2,7 @@ val mapdbVersion = "1.0.9"
 val scalatestVersion = "3.0.8"
 val scalamockVersion = "3.6.0"
 val akkaVersion = "2.5.26"
-val logbackVersion = "1.2.3"
+val logbackVersion = "1.2.10"
 val argonautVersion = "6.2.2"
 
 releaseIgnoreUntrackedFiles := true
