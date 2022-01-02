@@ -2,7 +2,8 @@ package com.github.trex_paxos.library
 
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.refspec.RefSpec
-import org.scalatest.{Matchers, OptionValues}
+import org.scalatest._
+import matchers.should._
 
 /**
   * The stunning result in FPaxos is that accept quorums dont have to overlap

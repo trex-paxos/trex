@@ -4,7 +4,8 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import _root_.com.github.trex_paxos.library._
 import org.scalatest.refspec.RefSpecLike
-import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
+import org.scalatest._
+import matchers.should._
 
 import scala.collection.immutable.SortedMap
 import scala.collection.mutable.ArrayBuffer
@@ -67,7 +68,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case f => fail(f.toString)
       }
       // which will cause node zero to issue a higher prepare
-      nack.requestId.from should be(0)
+      nack.requestId.from shouldBe(0)
       // when we send it back to node zero
       actor0 ! nack
       // it issues a higher prepare
@@ -75,8 +76,8 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case hprepare: Prepare => hprepare
         case f => fail(f.toString)
       }
-      phigh.id.logIndex should be(1)
-      phigh.id.number.nodeIdentifier should be(0)
+      phigh.id.logIndex shouldBe(1)
+      phigh.id.number.nodeIdentifier shouldBe(0)
       // when we send that high prepare to node one
       actor1 ! phigh
       // it should ack
@@ -84,7 +85,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case p: PrepareAck => p
         case f => fail(f.toString)
       }
-      pack.requestId should be(phigh.id)
+      pack.requestId shouldBe(phigh.id)
       // when we send that back to node zero
       actor0 ! pack
 
@@ -94,9 +95,9 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case f => fail(f.toString)
       }
 
-      accept.id.logIndex should be(1)
+      accept.id.logIndex shouldBe(1)
       accept.value shouldBe NoOperationCommandValue
-      accept.id.number should be(phigh.id.number)
+      accept.id.number shouldBe(phigh.id.number)
       // and ack its own accept
       actor0.underlyingActor.data.acceptResponses match {
         case map if map.nonEmpty =>
@@ -118,7 +119,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case a: AcceptAck => a
         case f => fail(f.toString)
       }
-      aack.requestId should be(accept.id)
+      aack.requestId shouldBe(accept.id)
       // when we send that to node zero
       actor0 ! aack
       // it commits the noop
@@ -134,9 +135,9 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case a: Accept => a
         case f => fail(f.toString)
       }
-      accept2.id.logIndex should be(2)
-      accept2.value.asInstanceOf[ClientCommandValue].bytes.length should be(1)
-      accept2.id.number should be(phigh.id.number)
+      accept2.id.logIndex shouldBe(2)
+      accept2.value.asInstanceOf[ClientCommandValue].bytes.length shouldBe(1)
+      accept2.id.number shouldBe(phigh.id.number)
       // when we send that to node one
       actor1 ! accept2
       // it will ack
@@ -144,7 +145,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case a: AcceptAck => a
         case f => fail(f.toString)
       }
-      aack2.requestId should be(accept2.id)
+      aack2.requestId shouldBe(accept2.id)
       // when we send that back to node zero
       actor0 ! aack2
       // then it responds with the committed work
@@ -160,7 +161,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       // when we send that to node one
       actor1 ! commit
       // and both nodes will have delivered the value
-      Seq(node0, node1).map(_._map().get(2).getOrElse(fail).value) should be(Seq(hw, hw))
+      Seq(node0, node1).map(_._map().get(2).getOrElse(fail).value) shouldBe(Seq(hw, hw))
     }
 
     def `should return a response to the correct client` {
@@ -182,7 +183,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
           case a: Accept => a
           case f => fail(f.toString)
         }
-        accept.value.asInstanceOf[ClientCommandValue].bytes.length should be(1)
+        accept.value.asInstanceOf[ClientCommandValue].bytes.length shouldBe(1)
         // when we send that to node one
         follower ! accept
         // it will ack
@@ -190,7 +191,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
           case a: AcceptAck => a
           case f => fail(f.toString)
         }
-        aack.requestId should be(accept.id)
+        aack.requestId shouldBe(accept.id)
         // when we send that back to node zero
         leader ! aack
         // it will commit
@@ -203,7 +204,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         // and response went back to the probe
         client.expectMsgPF(50 millis) {
           case bytes: Array[Byte] =>
-            bytes(0) should be(-1 * msg)
+            bytes(0) shouldBe(-1 * msg)
           case f => fail(f.toString)
         }
       }
@@ -237,7 +238,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case a: Accept => a
         case f => fail(f.toString)
       }
-      accept.id.number.nodeIdentifier should be(0)
+      accept.id.number.nodeIdentifier shouldBe(0)
 
       // when we send that to node1
       actor1 ! accept
@@ -247,7 +248,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case a: AcceptNack => a
         case f => fail(f.toString)
       }
-      nack1.requestId should be(accept.id)
+      nack1.requestId shouldBe(accept.id)
 
       // we send that to the leader
       actor0 ! nack1
@@ -260,7 +261,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case a: AcceptNack => a
         case f => fail(f.toString)
       }
-      nack2.requestId should be(accept.id)
+      nack2.requestId shouldBe(accept.id)
 
       // we send that to the leader
       actor0 ! nack2
@@ -324,7 +325,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case p: PrepareAck => p
         case f => fail(f.toString)
       }
-      pack1.requestId should be(phigh1.id)
+      pack1.requestId shouldBe(phigh1.id)
       pack1.highestAcceptedIndex shouldBe 3L
 
       // when we respond back to node zero
@@ -351,7 +352,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       }
       accept1.id.logIndex shouldBe 1
       accept1.value shouldBe v1
-      accept1.id.number should be(phigh1.id.number)
+      accept1.id.number shouldBe(phigh1.id.number)
       // and ack its own accept
       actor0.underlyingActor.data.acceptResponses match {
         case map if map.nonEmpty =>
@@ -433,7 +434,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
         case a: AcceptAck => a
         case f => fail(f.toString)
       }
-      aack1.requestId should be(accept1.id)
+      aack1.requestId shouldBe(accept1.id)
       // when we send that to node zero
       actor0 ! aack1
       // it commits

@@ -1,11 +1,12 @@
 package com.github.trex_paxos.library
 
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{Matchers, OptionValues, WordSpecLike}
+import org.scalatest._
+import matchers.should._
 
 import scala.collection.mutable.ArrayBuffer
 
-class AcceptResponseTests extends WordSpecLike with Matchers with MockFactory with OptionValues {
+class AcceptResponseTests extends wordspec.AnyWordSpec with Matchers with MockFactory with OptionValues {
 
   import TestHelpers._
 

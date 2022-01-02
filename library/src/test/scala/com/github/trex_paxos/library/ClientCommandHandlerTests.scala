@@ -1,10 +1,11 @@
 package com.github.trex_paxos.library
 
-import org.scalatest.{OptionValues, Matchers, WordSpecLike}
+import org.scalatest._
+import matchers.should._
 
 import scala.collection.mutable.ArrayBuffer
 
-class ClientCommandHandlerTests extends WordSpecLike
+class ClientCommandHandlerTests extends wordspec.AnyWordSpec
 with Matchers
 with OptionValues
 with PaxosLenses {

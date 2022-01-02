@@ -1,5 +1,5 @@
 val mapdbVersion = "1.0.9"
-val scalatestVersion = "3.0.8"
+val scalatestVersion = "3.2.10"
 val scalamockVersion = "3.6.0"
 val akkaVersion = "2.5.26"
 val logbackVersion = "1.2.10"
@@ -34,21 +34,21 @@ lazy val core = project.dependsOn(library).
   settings(name := "trex-core").
   settings(
     parallelExecution in Test := false,
-		libraryDependencies ++= Seq(
+    libraryDependencies ++= Seq(
       "com.typesafe" % "config" % "1.3.3",
-		  "com.typesafe.akka" %% "akka-actor" % akkaVersion,
-		  "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
-		  "org.mapdb" % "mapdb" % mapdbVersion,
+      "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+      "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
+      "org.mapdb" % "mapdb" % mapdbVersion,
       "io.argonaut" %% "argonaut" % argonautVersion,
       "org.scalatest" % "scalatest_2.12" % scalatestVersion % "test,it",
-		  "org.scalamock" %% "scalamock-scalatest-support" % scalamockVersion % "test,it",
+      "org.scalamock" %% "scalamock-scalatest-support" % scalamockVersion % "test,it",
       "com.typesafe.akka" %% "akka-remote" % akkaVersion
-		  )
+    )
   )
-  
+
 lazy val demo = project.dependsOn(core).
-	settings(commonSettings: _*).
-	settings( name := "trex-demo").
+  settings(commonSettings: _*).
+  settings( name := "trex-demo").
   settings(
     libraryDependencies ++= Seq(
       "org.scala-lang" % "scala-compiler" % scalaVersion.value,

@@ -1,6 +1,7 @@
 package com.github.trex_paxos.library
 
-import org.scalatest.{Matchers, OptionValues, WordSpecLike}
+import org.scalatest._
+import matchers.should._
 
 import scala.collection.immutable.SortedMap
 import scala.collection.mutable.ArrayBuffer
@@ -12,7 +13,7 @@ class TestPrepareResponseHandlerNoRetransmission extends PrepareResponseHandler 
   override def requestRetransmissionIfBehind(io: PaxosIO, agent: PaxosAgent, from: Int, highestCommitted: Identifier): Unit = {}
 }
 
-class PrepareResponseHandlerTests extends WordSpecLike with Matchers with OptionValues {
+class PrepareResponseHandlerTests extends wordspec.AnyWordSpec with Matchers with OptionValues {
 
   import TestHelpers._
 

@@ -1,11 +1,12 @@
 package com.github.trex_paxos.library
 
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest._
+import matchers.should._
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 import scala.collection.mutable.ArrayBuffer
 
-class CoreTests extends WordSpecLike with Matchers with PaxosLenses {
+class CoreTests extends wordspec.AnyWordSpec with Matchers with PaxosLenses {
   "Paxos Numbers" should {
     "have working equalities" in {
       assert(BallotNumber(2, 2) > BallotNumber(1, 2))

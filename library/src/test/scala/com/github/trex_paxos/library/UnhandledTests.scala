@@ -1,10 +1,9 @@
 package com.github.trex_paxos.library
 
-import java.util.concurrent.atomic.AtomicReference
+import org.scalatest._
+import matchers.should._
 
-import org.scalatest.WordSpecLike
-
-class UnhandledTests extends WordSpecLike {
+class UnhandledTests extends wordspec.AnyWordSpec {
 
   import TestHelpers._
 

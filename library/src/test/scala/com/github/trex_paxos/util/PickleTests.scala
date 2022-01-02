@@ -3,11 +3,13 @@ package com.github.trex_paxos.util
 import java.util.Arrays.{equals => bequals}
 
 import com.github.trex_paxos.library._
-import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.util.{Failure, Success, Try}
 
-class PickleTests extends WordSpecLike with Matchers {
+import org.scalatest._
+import matchers.should._
+
+class PickleTests extends wordspec.AnyWordSpec with Matchers {
 
   "Pickling rich objects" should {
 

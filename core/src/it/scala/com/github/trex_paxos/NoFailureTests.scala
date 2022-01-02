@@ -2,13 +2,14 @@ package com.github.trex_paxos
 
 import akka.actor._
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
-import com.github.trex_paxos.library.{ClientCommandValue, CommandValue, LostLeadershipException, Payload}
+import com.github.trex_paxos.library.{ClientCommandValue, LostLeadershipException, Payload}
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.refspec.RefSpecLike
-import org.scalatest.{BeforeAndAfterAll, _}
+import org.scalatest._
+import matchers.should._
 
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
+
 import scala.language.postfixOps
 
 object NoFailureTests {

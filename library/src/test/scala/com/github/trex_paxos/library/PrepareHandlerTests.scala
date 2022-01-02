@@ -5,7 +5,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.{OptionValues}
 
 import scala.collection.immutable.TreeMap
-import scala.compat.Platform
 import Ordering._
 import org.scalatest.refspec.RefSpec
 

@@ -8,7 +8,9 @@ import akka.actor._
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import akka.util.Timeout
 import org.scalatest.refspec.RefSpecLike
-import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
+
+import org.scalatest._
+import matchers.should._
 
 import scala.compat.Platform
 import scala.concurrent.duration._

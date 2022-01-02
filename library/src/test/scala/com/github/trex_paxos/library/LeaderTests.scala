@@ -1,6 +1,6 @@
 package com.github.trex_paxos.library
 
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong, AtomicReference}
+import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
 
 import TestHelpers._
 

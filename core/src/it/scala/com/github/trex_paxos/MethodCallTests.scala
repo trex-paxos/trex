@@ -4,9 +4,9 @@ import akka.actor.TypedActor.MethodCall
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props, TypedActor, TypedProps}
 import akka.serialization.SerializationExtension
 import akka.testkit.{ImplicitSender, TestKit}
-import com.typesafe.config.ConfigFactory
 import org.scalatest.refspec.RefSpecLike
-import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
+import org.scalatest._
+import matchers.should._
 
 import scala.util.{Failure, Success, Try}
 

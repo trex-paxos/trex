@@ -5,7 +5,10 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import _root_.com.github.trex_paxos.TrexRouting
 import _root_.com.github.trex_paxos.library.{RetransmitRequest, RetransmitResponse, _}
 import org.scalatest.refspec.RefSpecLike
-import org.scalatest.{BeforeAndAfterAll, Matchers, SpecLike}
+
+import org.scalatest._
+import matchers.should._
+
 
 import scala.concurrent.duration._
 import scala.language.postfixOps

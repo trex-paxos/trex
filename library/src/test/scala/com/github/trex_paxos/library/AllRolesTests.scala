@@ -4,7 +4,8 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong, AtomicReference}
 
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.refspec.RefSpec
-import org.scalatest.{Matchers, OptionValues}
+import org.scalatest._
+import matchers.should._
 
 import scala.collection.mutable.ArrayBuffer
 

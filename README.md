@@ -4,7 +4,7 @@
 ## Trex: An embeddable Paxos engine for the JVM
 
 Checkout the [blog posts](https://simbo1905.wordpress.com/2016/01/09/trex-a-paxos-replication-engine/) for a description of this implementation of [Paxos Made Simple](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/12/paxos-simple-Copy). 
-s
+
 ## Building
 
 ```

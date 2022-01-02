@@ -4,13 +4,15 @@ import java.util.concurrent.atomic.AtomicLong
 
 import RetransmitHandler.{AcceptState, CommitState, ResponseState}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{OptionValues, Matchers, WordSpecLike}
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.scalatest._
+import matchers.should._
+
 class TestRetransmitHandler extends RetransmitHandler
 
-class RetransmitTests extends WordSpecLike
+class RetransmitTests extends wordspec.AnyWordSpec
 with Matchers
 with MockFactory
 with OptionValues {

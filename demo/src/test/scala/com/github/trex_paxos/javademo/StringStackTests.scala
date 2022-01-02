@@ -3,7 +3,8 @@ package com.github.trex_paxos.javademo
 import java.io.File
 
 import org.scalatest.refspec.RefSpec
-import org.scalatest.{Matchers}
+import org.scalatest._
+import matchers.should._
 
 class StringStackTests extends RefSpec with Matchers {
 

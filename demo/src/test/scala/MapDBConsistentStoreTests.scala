@@ -7,6 +7,8 @@ import com.github.trex_paxos.library.{Accept, Journal, JournalBounds, Progress}
 import com.typesafe.config.ConfigFactory
 import org.mapdb.{DB, DBMaker}
 import org.scalatest._
+import matchers.should._
+
 import org.scalatest.refspec.RefSpecLike
 
 import scala.collection.immutable.{SortedMap, TreeMap}
@@ -61,23 +63,23 @@ with DefaultTimeout with ImplicitSender with RefSpecLike with Matchers with Befo
 
       store.get("hello") match {
         case Some((value, version)) =>
-          value should be("world")
-          version should be(1L)
+          value shouldBe("world")
+          version shouldBe(1L)
         case x => fail(x.toString)
       }
       store.remove("hello")
-      store.get("hello") should be(None)
+      store.get("hello") shouldBe(None)
     }
 
     object `has oplock semantics` {
       val store: ConsistentKVStore = new MapDBConsistentKVStore(db)
-      store.put("hello", "world", 10) should be(false)
-      store.get("hello") should be(None)
-      store.put("hello", "world", 0) should be(true)
-      store.get("hello").value should be(("world", 1))
-      store.put("hello", "world", 0) should be(false)
-      store.put("hello", "world", 1) should be(true)
-      store.get("hello").value should be(("world", 2))
+      store.put("hello", "world", 10) shouldBe(false)
+      store.get("hello") shouldBe(None)
+      store.put("hello", "world", 0) shouldBe(true)
+      store.get("hello").value shouldBe(("world", 1))
+      store.put("hello", "world", 0) shouldBe(false)
+      store.put("hello", "world", 1) shouldBe(true)
+      store.get("hello").value shouldBe(("world", 2))
     }
 
   }
@@ -93,10 +95,10 @@ with DefaultTimeout with ImplicitSender with RefSpecLike with Matchers with Befo
       store.remove("hello") // noop
       store.put("hello", "world")
       val (value, version) = store.get("hello").getOrElse(fail())
-      value should be("world")
-      version should be(1L)
+      value shouldBe("world")
+      version shouldBe(1L)
       store.remove("hello")
-      store.get("hello") should be(None)
+      store.get("hello") shouldBe(None)
     }
 
     object `has oplock semantics` {
@@ -104,13 +106,13 @@ with DefaultTimeout with ImplicitSender with RefSpecLike with Matchers with Befo
         TypedActor(system).typedActorOf(TypedProps(classOf[ConsistentKVStore],
           new MapDBConsistentKVStore(db)))
 
-      store.put("hello", "world", 10) should be(false)
-      store.get("hello") should be(None)
-      store.put("hello", "world", 0) should be(true)
-      store.get("hello").value should be (("world", 1))
-      store.put("hello", "world", 0) should be(false)
-      store.put("hello", "world", 1) should be(true)
-      store.get("hello").value should be (("world", 2))
+      store.put("hello", "world", 10) shouldBe(false)
+      store.get("hello") shouldBe(None)
+      store.put("hello", "world", 0) shouldBe(true)
+      store.get("hello").value shouldBe (("world", 1))
+      store.put("hello", "world", 0) shouldBe(false)
+      store.put("hello", "world", 1) shouldBe(true)
+      store.get("hello").value shouldBe (("world", 2))
     }
 
   }

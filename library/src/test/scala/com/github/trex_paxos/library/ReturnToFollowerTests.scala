@@ -1,14 +1,15 @@
 package com.github.trex_paxos.library
 
-import org.scalatest.{Matchers, OptionValues, WordSpecLike}
-
 import scala.language.postfixOps
+
+import org.scalatest._
+import matchers.should._
 
 class TestReturnToFollowerHandler extends ReturnToFollowerHandler {
   def commit(io: PaxosIO, agent: PaxosAgent, identifier: Identifier): (Progress, Seq[(Identifier, Any)]) = (agent.data.progress, Seq.empty)
 }
 
-class ReturnToFollowerTests extends WordSpecLike with Matchers with OptionValues {
+class ReturnToFollowerTests extends wordspec.AnyWordSpec with Matchers with OptionValues {
 
   import TestHelpers._
 

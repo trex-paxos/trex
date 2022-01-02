@@ -3,9 +3,11 @@ package com.github.trex_paxos
 import java.util.Arrays.{equals => bequals}
 
 import com.github.trex_paxos.library._
-import org.scalatest.{Matchers, WordSpecLike}
 
-class JPickleTests extends WordSpecLike with Matchers {
+import org.scalatest._
+import matchers.should._
+
+class JPickleTests extends wordspec.AnyWordSpec with Matchers {
   "Java Pickle" should {
 
     "round-trip Progress" in {

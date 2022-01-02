@@ -5,8 +5,8 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import akka.util.Timeout
 import com.github.trex_paxos.library.{LostLeadershipException, _}
 import org.scalatest._
+import matchers.should._
 
-import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, Buffer}
 import scala.concurrent.Await
 import scala.language.postfixOps

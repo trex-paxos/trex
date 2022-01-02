@@ -5,7 +5,8 @@ import java.util.concurrent.atomic.AtomicLong
 import com.github.trex_paxos.library.Ordering._
 import com.github.trex_paxos.library.TestHelpers._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{Matchers, OptionValues}
+import org.scalatest._
+import matchers.should._
 
 import scala.collection.immutable.TreeMap
 import scala.collection.mutable.ArrayBuffer

@@ -1,6 +1,7 @@
 package com.github.trex_paxos.library
 
-import org.scalatest.{Matchers, OptionValues, WordSpecLike}
+import org.scalatest._
+import matchers.should._
 
 import scala.collection.immutable.TreeMap
 import TestHelpers._
@@ -22,7 +23,7 @@ class TestFollowerHandler extends FollowerHandler with BackdownAgent {
   override def highestAcceptedIndex(io: PaxosIO): Long = 0L
 }
 
-class FollowerTimeoutHandlerTests extends WordSpecLike with Matchers with OptionValues {
+class FollowerTimeoutHandlerTests extends wordspec.AnyWordSpec with Matchers with OptionValues {
 
   import TestFollowerHandler._
 

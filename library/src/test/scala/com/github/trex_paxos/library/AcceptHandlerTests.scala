@@ -4,7 +4,9 @@ import java.util.concurrent.atomic.AtomicLong
 
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.refspec.RefSpec
-import org.scalatest.{Matchers, OptionValues}
+
+import org.scalatest._
+import matchers.should._
 
 class TestAcceptHandler extends AcceptHandler
 

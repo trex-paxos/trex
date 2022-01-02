@@ -1,8 +1,9 @@
 package com.github.trex_paxos.util
 
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest._
+import matchers.should._
 
-class PicklePositiveIntegersTests extends WordSpecLike with Matchers {
+class PicklePositiveIntegersTests extends wordspec.AnyWordSpec with Matchers {
 
   import com.github.trex_paxos.util.PicklePositiveIntegers._
 

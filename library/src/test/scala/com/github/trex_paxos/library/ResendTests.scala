@@ -1,7 +1,8 @@
 package com.github.trex_paxos.library
 
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest._
+import matchers.should._
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 import scala.collection.mutable.ArrayBuffer
@@ -10,7 +11,7 @@ class TestResendHandler extends ResendHandler {
   override def highestNumberProgressed(data: PaxosData): BallotNumber = throw new AssertionError("deliberately not implemented")
 }
 
-class ResendAcceptsTests extends WordSpecLike with Matchers with MockFactory {
+class ResendAcceptsTests extends wordspec.AnyWordSpec with Matchers with MockFactory {
 
   import TestHelpers._
 

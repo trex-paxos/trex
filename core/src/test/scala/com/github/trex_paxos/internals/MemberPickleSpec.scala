@@ -1,8 +1,8 @@
 package com.github.trex_paxos.internals
+import org.scalatest._
+import matchers.should._
 
-import org.scalatest.{Matchers, WordSpecLike}
-
-class MemberPickleSpec extends WordSpecLike with Matchers {
+class MemberPickleSpec extends wordspec.AnyWordSpec with Matchers {
 
   "Pickling simple objects " should {
     "roundtrip empty CommittedMembership" in {
