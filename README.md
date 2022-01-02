@@ -1,5 +1,5 @@
 
-[![Build Status](https://travis-ci.org/trex-paxos/trex.svg?branch=master)](https://travis-ci.org/trex-paxos/trex)
+![Build Status](https://github.com/trex-paxos/trex/actions/workflows/scala.yml/badge.svg)
 
 ## Trex: An embeddable Paxos engine for the JVM
 
