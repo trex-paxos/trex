@@ -16,3 +16,7 @@ library/project/
 library/target/
 project/target/
 project/project/
+demo/.idea/
+demo/trex-demo.iml
+library/.idea/
+library/library/
