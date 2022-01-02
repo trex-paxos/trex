@@ -9,7 +9,7 @@ releaseIgnoreUntrackedFiles := true
 releasePublishArtifactsAction := PgpKeys.publishSigned.value
 
 lazy val commonSettings = Seq(
-  scalaVersion := "2.12.10",
+  scalaVersion := "2.12.15",
   organization := "com.github.trex-paxos",
   scalacOptions := Seq("-feature", "-deprecation", "-Xfatal-warnings")
 )
@@ -33,6 +33,7 @@ lazy val core = project.dependsOn(library).
   settings(Defaults.itSettings: _*).
   settings(name := "trex-core").
   settings(
+    parallelExecution in Test := false,
 		libraryDependencies ++= Seq(
       "com.typesafe" % "config" % "1.3.3",
 		  "com.typesafe.akka" %% "akka-actor" % akkaVersion,
