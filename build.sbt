@@ -6,7 +6,7 @@ val logbackVersion = "1.2.10"
 val argonautVersion = "6.2.2"
 
 releaseIgnoreUntrackedFiles := true
-releasePublishArtifactsAction := PgpKeys.publishSigned.value
+//releasePublishArtifactsAction := PgpKeys.publishSigned.value
 
 lazy val commonSettings = Seq(
   scalaVersion := "2.12.15",
