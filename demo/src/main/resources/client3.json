@@ -1,0 +1,7 @@
+include "common"
+include "cluster3.conf"
+
+akka {
+  remote.netty.tcp.port = 2551
+  loglevel = "DEBUG"
+}

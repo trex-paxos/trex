@@ -1,8 +1,8 @@
 package com.github.trex_paxos
 
-import akka.actor.ActorSystem
-import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
-import akka.util.Timeout
+import _root_.akka.actor.ActorSystem
+import _root_.akka.testkit.{ImplicitSender, TestActorRef, TestKit}
+import _root_.akka.util.Timeout
 import com.github.trex_paxos.library.{LostLeadershipException, _}
 import org.scalatest._
 import matchers.should._
@@ -10,7 +10,7 @@ import matchers.should._
 import scala.collection.mutable.{ArrayBuffer, Buffer}
 import scala.concurrent.Await
 import scala.language.postfixOps
-import akka.event.{LogSource, Logging}
+import _root_.akka.event.{LogSource, Logging}
 import org.scalatest.refspec.RefSpecLike
 
 class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
@@ -94,7 +94,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
 
     logger.info(s"responses: ${responses}")
 
-    import akka.pattern.ask
+    import _root_.akka.pattern.ask
     implicit val timeout = Timeout(2 seconds)
 
     // shutdown the actor and have it tell us what was committed

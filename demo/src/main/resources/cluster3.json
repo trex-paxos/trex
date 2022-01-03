@@ -1,0 +1,27 @@
+{
+  "cluster":{
+    "name":"PaxosCluster",
+    "folder":"/tmp",
+    "retained":1048576,
+    "nodes":[
+      {
+        "nodeUniqueId":2552,
+        "host":"127.0.0.1",
+        "nodePort":2552,
+        "clientPort":2553
+      },
+      {
+        "nodeUniqueId":2562,
+        "host":"127.0.0.1",
+        "nodePort":2562,
+        "clientPort":2563
+      },
+      {
+        "nodeUniqueId":2572,
+        "host":"127.0.0.1",
+        "nodePort":2572,
+        "clientPort":2573
+      }
+    ]
+  }
+}

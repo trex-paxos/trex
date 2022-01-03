@@ -1,9 +1,9 @@
 package com.github.trex_paxos
 
-import akka.actor.TypedActor.MethodCall
-import akka.actor.{Actor, ActorLogging, ActorSystem, Props, TypedActor, TypedProps}
-import akka.serialization.SerializationExtension
-import akka.testkit.{ImplicitSender, TestKit}
+import _root_.akka.actor.TypedActor.MethodCall
+import _root_.akka.actor.{Actor, ActorLogging, ActorSystem, Props, TypedActor, TypedProps}
+import _root_.akka.serialization.SerializationExtension
+import _root_.akka.testkit.{ImplicitSender, TestKit}
 import org.scalatest.refspec.RefSpecLike
 import org.scalatest._
 import matchers.should._

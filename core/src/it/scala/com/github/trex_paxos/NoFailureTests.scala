@@ -1,7 +1,7 @@
 package com.github.trex_paxos
 
-import akka.actor._
-import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
+import _root_.akka.actor._
+import _root_.akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import com.github.trex_paxos.library.{ClientCommandValue, LostLeadershipException, Payload}
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.refspec.RefSpecLike
