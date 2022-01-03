@@ -13,7 +13,52 @@ sbt clean test it:test
 sbt coverageReport
 ```
 
-# Releasing
+## Java Demo
+
+Make some state folders with: 
+
+```shell
+mkdir -p /private/tmp/2552
+mkdir -p /private/tmp/2562
+mkdir -p /private/tmp/2572
+```
+
+Note that those won't automatically be cleaned up so that you can experiment with crashes.
+
+Then run three versions of `com.github.trex_paxos.javademo.StackClusterNode` assigning them node
+numbers `2552`, `2562` and `2572`. In IntelliJ simply run the main method then add the following 
+args `server3.conf xxxx` replacing the xxxx with the node numbers. 
+
+Once the cluster is up run the client main method with:
+
+```shell
+com.github.trex_paxos.javademo.StackClient clustered client3.conf 127.0.0.1
+```
+
+This will appear to do nothing after logging a lot of debug as it is awaiting user input. You can
+`push`, `pop` and `peek` some integers such as `push 99`. The values will be replicated across the 
+nodes. An example session might look like: 
+
+```
+push 1
+peek
+1
+push 2
+push 3
+pop
+3
+peek
+2
+pop
+2
+pop
+1
+```
+
+You can experiment with killing nodes and restarting them to see what happens. As long as two our of 
+three nodes are running the client should get responses. 
+
+# Releases
 
 Create a release first edit version.sbt, commit, tag, push and then:
 

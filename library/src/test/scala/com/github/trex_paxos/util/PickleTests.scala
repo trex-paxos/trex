@@ -38,16 +38,16 @@ class PickleTests extends wordspec.AnyWordSpec with Matchers {
 
     "roundtrip Accept" in {
       {
-        val a = Accept(Identifier(1, BallotNumber(2, 3), 4L), ClientCommandValue("0", bytes1))
+        val a = Accept(Identifier(2552, BallotNumber(2, 2552), 4L), ClientCommandValue("0", bytes1))
         val b = Pickle.pack(a).iterator
         Pickle.unpack(b) match {
-          case Accept(Identifier(1, BallotNumber(2, 3), 4L), ClientCommandValue("0", bout)) =>
+          case Accept(Identifier(2552, BallotNumber(2, 2552), 4L), ClientCommandValue("0", bout)) =>
             assert(bequals(Array[Byte](5, 6), bout))
           case f => fail(f.toString)
         }
       }
       {
-        val a = Accept(Identifier(1, BallotNumber(2, 3), 4L), NoOperationCommandValue)
+        val a = Accept(Identifier(2552, BallotNumber(2, 2552), 4L), NoOperationCommandValue)
         Pickle.unpack(Pickle.pack(a).iterator) match {
           case `a` =>
           case f => fail(f.toString)
@@ -106,19 +106,19 @@ class PickleTests extends wordspec.AnyWordSpec with Matchers {
       }
     }
     "roundtrip simple RetransmitResponse" in {
-      val a1 = Accept(Identifier(1, BallotNumber(2, 3), 4L), ClientCommandValue("0", bytes1))
-      val a2 = Accept(Identifier(5, BallotNumber(6, 7), 8L), ClientCommandValue("0", bytes2))
+      val a1 = Accept(Identifier(2552, BallotNumber(2, 2552), 4L), NoOperationCommandValue)
+      val a2 = Accept(Identifier(2562, BallotNumber(6, 2562), 8L), ClientCommandValue("0", bytes2))
       val r = RetransmitResponse(10, 11, Seq(a1), Seq(a2))
       val b = Pickle.pack(r).iterator
       Pickle.unpack(b) match {
         case RetransmitResponse(10, 11, Seq(a1), Seq(a2)) => {
           a1 match {
-            case Accept(Identifier(1, BallotNumber(2, 3), 4L), ClientCommandValue("0", bout)) =>
-              assert(bequals(Array[Byte](5, 6), bout))
+            case Accept(Identifier(2552, BallotNumber(2, 2552), 4L), NoOperationCommandValue) =>
+              // good
             case f => fail(f.toString)
           }
           a2 match {
-            case Accept(Identifier(5, BallotNumber(6, 7), 8L), ClientCommandValue("0", bout)) =>
+            case Accept(Identifier(2562, BallotNumber(6, 2562), 8L), ClientCommandValue("0", bout)) =>
               assert(bequals(Array[Byte](7, 8), bout))
             case f => fail(f.toString)
           }
@@ -138,6 +138,8 @@ class PickleTests extends wordspec.AnyWordSpec with Matchers {
                   bequals(b1, b2)
                 case f => fail(f.toString)
               }
+            case NoOperationCommandValue if a2.value == NoOperationCommandValue =>
+              true
             case f => fail(f.toString)
           }
         } else false
@@ -145,7 +147,7 @@ class PickleTests extends wordspec.AnyWordSpec with Matchers {
 
     }
 
-    "roundtrip empty RetransmitResponse" in {
+    "roundtrip empty vectors in RetransmitResponse" in {
       val a = Accept(Identifier(1, BallotNumber(2, 3), 4L), ClientCommandValue("0", bytes1))
 
       {
@@ -175,8 +177,8 @@ class PickleTests extends wordspec.AnyWordSpec with Matchers {
         }
       }
     }
-    "roundtrip multiple values" in {
-      val a1 = Accept(Identifier(1, BallotNumber(1, 1), 1L), ClientCommandValue("0", Array[Byte](1, 1)))
+    "roundtrip complex RetransmitResponse" in {
+      val a1 = Accept(Identifier(1, BallotNumber(1, 1), 1L), NoOperationCommandValue)
       val a2 = Accept(Identifier(2, BallotNumber(2, 2), 2L), ClientCommandValue("0", Array[Byte](2, 2)))
       val a3 = Accept(Identifier(3, BallotNumber(3, 3), 3L), ClientCommandValue("0", Array[Byte](3, 3)))
       val a4 = Accept(Identifier(4, BallotNumber(4, 4), 4L), ClientCommandValue("0", Array[Byte](4, 4)))
@@ -213,7 +215,6 @@ class PickleTests extends wordspec.AnyWordSpec with Matchers {
         case f => fail(f.toString)
       }
     }
-
   }
   "Pickling with crc32" should {
     "should not fail CRC if not modified data" in {

@@ -1,7 +1,5 @@
 package com.github.trex_paxos.library
 
-import scala.compat.Platform
-
 /**
  * We perform consensus over instances of CommandValue.
  */
@@ -18,21 +16,21 @@ trait CommandValue extends PaxosMessage {
   * @param msgUuid The client message id used to correlate sent commands back to server responses.
   * @param bytes The serialized client command read to log to a journal or transit on the wire.
   */
-case class ClientCommandValue(msgUuid: String, val bytes: Array[Byte]) extends CommandValue
+case class ClientCommandValue(msgUuid: String, bytes: Array[Byte]) extends CommandValue
 
 /**
   * Client request command has an id to correlate to the server response. Does not need to be made durable and can be lost during crashes.
   * @param msgUuid The client message id used to correlate sent commands back to server responses.
   * @param bytes The serialized client command read to log to a journal or transit on the wire.
   */
-case class ReadOnlyClientCommandValue(msgUuid: String, val bytes: Array[Byte]) extends CommandValue
+case class ReadOnlyClientCommandValue(msgUuid: String, bytes: Array[Byte]) extends CommandValue
 
 /**
   * Cluster administration command which has an id to correlate to the server response.
   * @param msgUuid The message id used to correlate sent commands back to server responses.
   * @param bytes The serialized client command read to log to a journal or transit on the wire.
   */
-case class ClusterCommandValue(msgUuid: String, val bytes: Array[Byte]) extends CommandValue
+case class ClusterCommandValue(msgUuid: String, bytes: Array[Byte]) extends CommandValue
 
 
 case object NoOperationCommandValue extends CommandValue {

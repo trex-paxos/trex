@@ -254,12 +254,12 @@ object Pickle {
     0xe.toByte -> (classOf[ClusterCommandValue] -> unpickleClusterValue _),
     0xf.toByte -> (classOf[ServerResponse] -> unpickleServerResponse _)
   )
-  val toMap: Map[Class[_], Byte] = (config.map {
-    case (b, (c, f)) => c -> b
-  }).toMap
+  val toMap: Map[Class[_], Byte] = config.map {
+    case (b, (c, _)) => c -> b
+  }
 
   val fromMap: Map[Byte, Iterator[Byte] => AnyRef] = config.map {
-    case (b, (c, f)) => b -> f
+    case (b, (_, f)) => b -> f
   }
 
   import PicklePositiveIntegers._
@@ -293,13 +293,16 @@ object Pickle {
   }
 
   def pickleValue(v: CommandValue) = v match {
-    case n@NoOperationCommandValue => pickleNoOpValue
+    case NoOperationCommandValue => pickleNoOpValue
     case c: CommandValue => pickleCommandValue(c)
   }
 
-  def pickleNoOpValue = ByteChain.empty
+  def pickleNoOpValue = ByteChain(Array(zeroByte))
 
-  def unpickleNoOpValue(b: Iterator[Byte]): CommandValue = NoOperationCommandValue
+  def unpickleNoOpValue(b: Iterator[Byte]): CommandValue = {
+    b.next()
+    NoOperationCommandValue
+  }
 
   def pickleCommandValue(c: CommandValue): ByteChain = pickleStringUtf8(c.msgUuid) ++ pickleInt(c.bytes.length) ++ ByteChain(c.bytes)
 
