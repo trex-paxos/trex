@@ -184,7 +184,7 @@ class FollowerTimeoutHandlerTests extends wordspec.AnyWordSpec with Matchers wit
               case Some(r: PrepareAck) if r.requestId == prepare.id => // good
               case x => fail(x.toString)
             }
-            case _ => fail // unreachable
+            case _ => fail() // unreachable
           }
         case x => fail(x.toString)
       }

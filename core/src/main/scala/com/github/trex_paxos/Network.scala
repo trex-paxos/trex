@@ -18,7 +18,7 @@ class UdpSender(remote: InetSocketAddress) extends Actor with ActorLogging {
 
   def receive = {
     case "status" =>
-      sender ! false // not yet ready
+      sender() ! false // not yet ready
     case Udp.SimpleSenderReady =>
       log.info("ready to send to {}", remote)
       context.become(ready(sender()))
@@ -28,7 +28,7 @@ class UdpSender(remote: InetSocketAddress) extends Actor with ActorLogging {
 
   def ready(connection: ActorRef): Receive = {
     case "status" =>
-      sender ! true // ready
+      sender() ! true // ready
     case msg: AnyRef =>
       log.debug("sending to {} msg {}", remote, msg)
       val packed = Pickle.pack(msg).prependCrcData()
@@ -49,7 +49,7 @@ class UdpListener(socket: InetSocketAddress, nextActor: ActorRef) extends Actor 
 
   def receive = {
     case "status" =>
-      sender ! false // not yet ready
+      sender() ! false // not yet ready
     case Udp.Bound(local) =>
       log.info("Bound UdpListener to {}", socket)
       context.become(ready(sender()))
@@ -63,7 +63,7 @@ class UdpListener(socket: InetSocketAddress, nextActor: ActorRef) extends Actor 
   def ready(s: ActorRef): Receive = {
     case "status" =>
       log.info("successfully bound to {}", socket)
-      sender ! true // ready
+      sender() ! true // ready
     case Udp.Received(data, remote) =>
       val checked = ByteChain(data.toArray).checkCrcData()
       val msg = Pickle.unpack(checked.iterator)

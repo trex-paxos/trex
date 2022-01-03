@@ -6,13 +6,13 @@ trait PrepareHandler extends PaxosLenses with BackdownAgent {
     prepare match {
       case Prepare(id) if id.number < agent.data.progress.highestPromised =>
         // nack a low prepare
-        io.send(PrepareNack(id, agent.nodeUniqueId, agent.data.progress, io.journal.bounds.max, agent.data.leaderHeartbeat))
+        io.send(PrepareNack(id, agent.nodeUniqueId, agent.data.progress, io.journal.bounds().max, agent.data.leaderHeartbeat))
         agent
       case p@Prepare(id) if id.number > agent.data.progress.highestPromised =>
         // ack a higher prepare
         handleHighPrepare(io, agent, p)
       case Prepare(id) if id.number == agent.data.progress.highestPromised =>
-        io.send(PrepareAck(id, agent.nodeUniqueId, agent.data.progress, io.journal.bounds.max, agent.data.leaderHeartbeat, io.journal.accepted(id.logIndex)))
+        io.send(PrepareAck(id, agent.nodeUniqueId, agent.data.progress, io.journal.bounds().max, agent.data.leaderHeartbeat, io.journal.accepted(id.logIndex)))
         agent
       case f => throw new IllegalArgumentException(s"${f.getClass.getCanonicalName}:${f.toString}")
     }
@@ -36,7 +36,7 @@ trait PrepareHandler extends PaxosLenses with BackdownAgent {
     // journal promise
     io.journal.saveProgress(data.progress)
     // ack the prepare
-    io.send(PrepareAck(prepare.id, a.nodeUniqueId, data.progress, io.journal.bounds.max, data.leaderHeartbeat, io.journal.accepted(prepare.id.logIndex)))
+    io.send(PrepareAck(prepare.id, a.nodeUniqueId, data.progress, io.journal.bounds().max, data.leaderHeartbeat, io.journal.accepted(prepare.id.logIndex)))
     // retain the promise in-memory
     a.copy(data = data)
   }

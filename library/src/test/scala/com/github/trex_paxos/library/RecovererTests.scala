@@ -13,49 +13,49 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
   val initialDataAgent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
 
   object `The Recoverer Function` {
-    def `should be defined for a recoverer and a client command message` {
+    def `should be defined for a recoverer and a client command message`(): Unit = {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue("99"))))
     }
 
-    def `should be defined for a recoverer and RetransmitRequest` {
+    def `should be defined for a recoverer and RetransmitRequest`(): Unit = {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, RetransmitRequest(0, 1, 0L))))
     }
 
-    def `should be defined for a recoverer and RetransmitResponse` {
+    def `should be defined for a recoverer and RetransmitResponse`(): Unit = {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, RetransmitResponse(0, 1, Seq(), Seq()))))
     }
 
-    def `should be defined for a recoverer and a Prepare if the prepare is less than the promise` {
+    def `should be defined for a recoverer and a Prepare if the prepare is less than the promise`(): Unit = {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(0, 0), 0)))))
     }
 
-    def `should be defined for a recoverer and a Prepare if the prepare is higher than the promise` {
+    def `should be defined for a recoverer and a Prepare if the prepare is higher than the promise`(): Unit = {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(Int.MaxValue, Int.MaxValue), 0)))))
     }
 
-    def `should be defined for a recoverer and a Prepare if the prepare is equal to the promise` {
+    def `should be defined for a recoverer and a Prepare if the prepare is equal to the promise`(): Unit = {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, initialDataAgent.data.progress.highestPromised, 0)))))
     }
 
-    def `should be defined for a recoverer and an Accept with a lower number` {
+    def `should be defined for a recoverer and an Accept with a lower number`(): Unit = {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Accept(Identifier(0, BallotNumber(0, 0), 0), NoOperationCommandValue))))
     }
 
-    def `should be defined for a recoverer and an Accept with a higher number for a committed slot` {
+    def `should be defined for a recoverer and an Accept with a higher number for a committed slot`(): Unit = {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = TestHelpers.highestPromisedHighestCommittedLens.set(TestHelpers.initialData, (promise, Identifier(from = 0, number = promise, logIndex = 99L)))
       val higherCommittedAgent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, higherCommittedAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
-    def `should be defined for an Accept equal to promise` {
+    def `should be defined for an Accept equal to promise`(): Unit = {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = highestPromisedLens.set(TestHelpers.initialData, promise)
       val equalPromiseAgent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, equalPromiseAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
-    def `should be defined for an Accept greater than promise` {
+    def `should be defined for an Accept greater than promise`(): Unit = {
       val higherAcceptId = BallotNumber(Int.MaxValue, Int.MaxValue)
       val lowerPromise = BallotNumber(Int.MaxValue - 1, Int.MaxValue - 1)
       val initialData = highestPromisedLens.set(TestHelpers.initialData, lowerPromise)
@@ -73,22 +73,22 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, CheckTimeout)))
     }
 
-    def `should be defined for a PrepareResponse` {
+    def `should be defined for a PrepareResponse`(): Unit = {
       val agent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, new UndefinedPrepareResponse)))
     }
 
-    def `should be defined for a CheckTimeout when prepares are timed out` {
+    def `should be defined for a CheckTimeout when prepares are timed out`(): Unit = {
       val agent = PaxosAgent(0, Recoverer, initialData.copy(prepareResponses = prepareSelfVotes), initialQuorumStrategy)
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, CheckTimeout)))
     }
 
-    def `should be defined for a CheckTimeout when accepts are timed out` {
+    def `should be defined for a CheckTimeout when accepts are timed out`(): Unit = {
       val agent = PaxosAgent(0, Recoverer, initialData.copy(acceptResponses = emptyAcceptResponses), initialQuorumStrategy)
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, CheckTimeout)))
     }
 
-    def `should deal with timed-out prepares before timed-out accepts` {
+    def `should deal with timed-out prepares before timed-out accepts`(): Unit = {
       val handleResendAcceptsInvoked =Box(false)
       val handleResendPreparesInvoked = Box(false)
       val paxosAlgorithm = new PaxosAlgorithm {
@@ -107,60 +107,60 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       assert(handleResendPreparesInvoked() == true && handleResendAcceptsInvoked() == false)
     }
 
-    def `should be defined for a commit at a higher log index` {
+    def `should be defined for a commit at a higher log index`(): Unit = {
       val agent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, initialData.progress.highestPromised, Int.MaxValue))
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
-    def `should be defined for a commit at a same log index with a higher number` {
+    def `should be defined for a commit at a same log index with a higher number`(): Unit = {
       val agent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, BallotNumber(Int.MaxValue, Int.MaxValue), initialData.progress.highestCommitted.logIndex))
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
-    def `should be defined for a low commit` {
+    def `should be defined for a low commit`(): Unit = {
       val agent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, BallotNumber(0, 0), Long.MinValue))
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
-    def `should be defined for a client command message` {
+    def `should be defined for a client command message`(): Unit = {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue("1"))))
     }
 
-    def `should be defined for a RetransmitRequest` {
+    def `should be defined for a RetransmitRequest`(): Unit = {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, RetransmitRequest(0, 1, 0L))))
     }
 
-    def `should be defined for a RetransmitResponse` {
+    def `should be defined for a RetransmitResponse`(): Unit = {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, RetransmitResponse(0, 1, Seq(), Seq()))))
     }
 
-    def `should be defined for a Prepare if the prepare is less than the promise` {
+    def `should be defined for a Prepare if the prepare is less than the promise`(): Unit = {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(0, 0), 0)))))
     }
 
-    def `should be defined for a Prepare if the prepare is higher than the promise` {
+    def `should be defined for a Prepare if the prepare is higher than the promise`(): Unit = {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(Int.MaxValue, Int.MaxValue), 0)))))
     }
 
-    def `should be defined for a Prepare if the prepare is equal to the promise` {
+    def `should be defined for a Prepare if the prepare is equal to the promise`(): Unit = {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, initialDataAgent.data.progress.highestPromised, 0)))))
     }
 
-    def `should be defined for an Accept with a lower number` {
+    def `should be defined for an Accept with a lower number`(): Unit = {
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Accept(Identifier(0, BallotNumber(0, 0), 0), NoOperationCommandValue))))
     }
 
-    def `should be defined for an Accept with a higher number for a committed slot` {
+    def `should be defined for an Accept with a higher number for a committed slot`(): Unit = {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = TestHelpers.highestPromisedHighestCommittedLens.set(TestHelpers.initialData, (promise, Identifier(from = 0, number = promise, logIndex = 99L)))
       val higherCommittedAgent = PaxosAgent(0, Recoverer, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(undefinedIO, higherCommittedAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
-    def `should be defined for a CheckTimeout when not timedout` {
+    def `should be defined for a CheckTimeout when not timedout`(): Unit = {
       val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.recovererFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, CheckTimeout)))
     }
@@ -181,37 +181,37 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
   }
 
   object `A Recoverer` {
-    def `responds is not leader` {
+    def `responds is not leader`(): Unit = {
       respondsIsNotLeader(Recoverer)
     }
-    def `should ignore a lower commit` {
+    def `should ignore a lower commit`(): Unit = {
       shouldIngoreLowerCommit(Recoverer)
     }
-    def `should ignore a late prepare response` {
+    def `should ignore a late prepare response`(): Unit = {
       shouldIngoreLatePrepareResponse(Leader)
     }
-    def `should ingore a commit for same slot from lower numbered node` {
+    def `should ingore a commit for same slot from lower numbered node`(): Unit = {
       shouldIngoreCommitMessageSameSlotLowerNodeId(Recoverer)
     }
-    def `should backdown on commit same slot higher node number` {
+    def `should backdown on commit same slot higher node number`(): Unit = {
       shouldBackdownOnCommitSameSlotHigherNodeId(Recoverer)
     }
-    def `should backdown on higher slot commit` {
+    def `should backdown on higher slot commit`(): Unit = {
       shouldBackdownOnHigherSlotCommit(Recoverer)
     }
-    def `should backdown and commit on higher slot commit` {
+    def `should backdown and commit on higher slot commit`(): Unit = {
       shouldBackdownAndCommitOnHigherSlotCommit(Recoverer)
     }
-    def `reissue same accept messages it gets a timeout and no challenge` {
+    def `reissue same accept messages it gets a timeout and no challenge`(): Unit = {
       shouldReissueSameAcceptMessageIfTimeoutNoChallenge(Recoverer)
     }
-    def `reissue higher accept messages upon learning of another nodes higher promise in a nack` {
+    def `reissue higher accept messages upon learning of another nodes higher promise in a nack`(): Unit = {
       sendHigherAcceptOnLearningOtherNodeHigherPromise(Recoverer)
     }
-    def `reissues higher accept message upon having made a higher promise itself by the timeout` {
+    def `reissues higher accept message upon having made a higher promise itself by the timeout`(): Unit = {
       sendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(Recoverer)
     }
-    def `backs down if it has to make a higher promise` {
+    def `backs down if it has to make a higher promise`(): Unit = {
       val (agent, _) = recovererNoResponsesInClusterOfSize(3)
       val inMemoryJournal = new InMemoryJournal
       val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
@@ -219,7 +219,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
-        override def clock: Long = Platform.currentTime
+        override def clock(): Long = System.currentTimeMillis()
 
         override def randomTimeout: Long = 1234L
 
@@ -246,7 +246,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       // and backs down to a follower as it cannot accept client values under its own epoch it cannot journal them so cannot commit so cannot lead
       newRole shouldBe Follower
     }
-    def `backs down with a majority negative prepare response` {
+    def `backs down with a majority negative prepare response`(): Unit = {
       // given a recoverer with no responses
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
       val inMemoryJournal = new InMemoryJournal
@@ -255,7 +255,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
-        override def clock: Long = Platform.currentTime
+        override def clock(): Long = System.currentTimeMillis()
 
         override def randomTimeout: Long = 1234L
 
@@ -276,7 +276,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       data.prepareResponses.isEmpty shouldBe true
       data.epoch shouldBe None
     }
-    def `reboardcast prepares if it gets a timeout with no majority response` {
+    def `reboardcast prepares if it gets a timeout with no majority response`(): Unit = {
       // given a recoverer with no responses
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(5)
       val inMemoryJournal = new InMemoryJournal
@@ -285,7 +285,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
-        override def clock: Long = Long.MaxValue
+        override def clock(): Long = Long.MaxValue
 
         override def randomTimeout: Long = 1234L
 
@@ -308,7 +308,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       // then it reboardcasts the accept message
       sent.headOption.value shouldBe recoverHighPrepare
     }
-    def `requests retransmission if is behind when gets a majority showing others have higher commit watermark` {
+    def `requests retransmission if is behind when gets a majority showing others have higher commit watermark`(): Unit = {
       // given a recoverer with self vote
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
       val inMemoryJournal = new InMemoryJournal
@@ -317,7 +317,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
-        override def clock: Long = Long.MaxValue
+        override def clock(): Long = Long.MaxValue
 
         override def randomTimeout: Long = 1234L
 
@@ -341,7 +341,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
         case f => fail(f.toString)
       }
     }
-    def `issue new prepares if it learns from the majority that other nodes have higher accepted values` {
+    def `issue new prepares if it learns from the majority that other nodes have higher accepted values`(): Unit = {
       // given a recoverer with self vote
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
       // and verifiable io
@@ -351,7 +351,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
-        override def clock: Long = Long.MaxValue
+        override def clock(): Long = Long.MaxValue
 
         override def randomTimeout: Long = 1234L
 
@@ -399,7 +399,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val saveTime = inMemoryJournal.lastSaveTime.get()
       assert(saveTime > 0L && sentTime() > 0L && saveTime < sentTime())
     }
-    def `promote to Leader and ack its own accept if it has not made a higher promise` {
+    def `promote to Leader and ack its own accept if it has not made a higher promise`(): Unit = {
       // given a recoverer with self vote
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
       // and verifiable io
@@ -409,7 +409,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
-        override def clock: Long = Long.MaxValue
+        override def clock(): Long = Long.MaxValue
 
         override def randomTimeout: Long = 1234L
 
@@ -456,7 +456,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
    * The following are more like integration tests that pass through recover into leader
    */
   object `Full recovery with commit` {
-    def `fix a no-op and promote to Leader then commits if in a three node cluster gets a majority with one ack with no values to fix` {
+    def `fix a no-op and promote to Leader then commits if in a three node cluster gets a majority with one ack with no values to fix`(): Unit = {
       // given a recoverer with self vote
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
       // and verifiable io
@@ -466,7 +466,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
-        override def clock: Long = Long.MaxValue
+        override def clock(): Long = Long.MaxValue
 
         override def randomTimeout: Long = 1234L
 
@@ -512,7 +512,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val saveTime = inMemoryJournal.lastSaveTime.get()
       assert(saveTime > 0L && sentTime() > 0L && saveTime < sentTime())
     }
-    def `fix a no-op and promote to Leader then commits if in a three node cluster gets a majority with one ack` {
+    def `fix a no-op and promote to Leader then commits if in a three node cluster gets a majority with one ack`(): Unit = {
       // given a recoverer with self vote
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(3)
       // and verifiable io
@@ -524,7 +524,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
-        override def clock: Long = Long.MaxValue
+        override def clock(): Long = Long.MaxValue
 
         override def randomTimeout: Long = 1234L
 
@@ -580,7 +580,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val saveTime = inMemoryJournal.lastSaveTime.get()
       assert(saveTime > 0L && sentTime() > 0L && saveTime < sentTime())
     }
-    def `fix a no-op promote to Leader and commits if in a five node cluster gets a majority with two acks with no values to fix` {
+    def `fix a no-op promote to Leader and commits if in a five node cluster gets a majority with two acks with no values to fix`(): Unit = {
       // given a recoverer with self vote
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(5)
       // and verifiable io
@@ -590,7 +590,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
-        override def clock: Long = Long.MaxValue
+        override def clock(): Long = Long.MaxValue
 
         override def randomTimeout: Long = 1234L
 
@@ -642,7 +642,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val saveTime = inMemoryJournal.lastSaveTime.get()
       assert(saveTime > 0L && sentTime() > 0L && saveTime < sentTime())
     }
-    def `fix a no-op and promote to Leader then commits if in a five node cluster gets a majority with two acks` {
+    def `fix a no-op and promote to Leader then commits if in a five node cluster gets a majority with two acks`(): Unit = {
       // given a recoverer with self vote
       val (agent, prepareId) = recovererNoResponsesInClusterOfSize(5)
       // and verifiable io
@@ -653,7 +653,7 @@ class RecovererTests extends AllRolesTests with LeaderLikeTests {
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
-        override def clock: Long = Long.MaxValue
+        override def clock(): Long = Long.MaxValue
 
         override def randomTimeout: Long = 1234L
 

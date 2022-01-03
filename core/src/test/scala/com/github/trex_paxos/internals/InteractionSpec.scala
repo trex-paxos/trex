@@ -35,7 +35,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
 
     def accepted(logIndex: Long): Option[Accept] = _map().get(logIndex)
 
-    def bounds: JournalBounds = {
+    def bounds(): JournalBounds = {
       val keys = _map().keys
       if (keys.isEmpty) JournalBounds(0L, 0L) else JournalBounds(keys.head, keys.last)
     }
@@ -49,7 +49,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
 
   object `A three node cluster` {
 
-    def `should work when two nodes are up` {
+    def `should work when two nodes are up`: Unit = {
       expectNoMessage(25 millisecond)
       // given node zero
       val node0 = new TestJournal
@@ -161,10 +161,10 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       // when we send that to node one
       actor1 ! commit
       // and both nodes will have delivered the value
-      Seq(node0, node1).map(_._map().get(2).getOrElse(fail).value) shouldBe(Seq(hw, hw))
+      Seq(node0, node1).map(_._map().get(2).getOrElse(fail()).value) shouldBe(Seq(hw, hw))
     }
 
-    def `should return a response to the correct client` {
+    def `should return a response to the correct client`: Unit = {
       // given node zero leader
       val node0 = new TestJournal
       val actor0 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 0, self, node0, ArrayBuffer.empty, None))
@@ -210,7 +210,7 @@ class InteractionSpec extends TestKit(ActorSystem("InteractionSpec",
       }
     }
 
-    def `should return NoLongerLeader during a failover` {
+    def `should return NoLongerLeader during a failover`: Unit = {
       // given node0 leader
       val node0 = new TestJournal
       val actor0 = TestActorRef(new TestPaxosActorNoTimeout(PaxosProperties(InteractionSpec.config), () => 3, 0, self, node0, ArrayBuffer.empty, None))

@@ -19,7 +19,7 @@ class InMemoryJournal extends Journal {
     p((n, progress))
   }
 
-  override def bounds: JournalBounds = if( a.isEmpty ) {
+  override def bounds(): JournalBounds = if( a.isEmpty ) {
     JournalBounds(0, 0)
   } else {
     val slots = a.keySet
@@ -58,7 +58,7 @@ class TestAcceptMapJournal extends Journal {
     accept().get(logIndex)
   }
 
-  def bounds: JournalBounds = {
+  def bounds(): JournalBounds = {
     val keys = accept().keys
     if (keys.isEmpty) JournalBounds(0L, 0L) else JournalBounds(keys.head, keys.last)
   }
@@ -74,7 +74,7 @@ class AllRolesTests extends RefSpec with PaxosLenses with Matchers with OptionVa
 
   import TestHelpers._
 
-  def respondsIsNotLeader(role: PaxosRole) {
+  def respondsIsNotLeader(role: PaxosRole): Unit = {
     require(role != Leader)
     val agent = PaxosAgent(0, role, initialData, initialQuorumStrategy)
     val sent = ArrayBuffer[PaxosMessage]()
@@ -96,7 +96,7 @@ class AllRolesTests extends RefSpec with PaxosLenses with Matchers with OptionVa
     }
   }
 
-  def shouldIngoreLatePrepareResponse(role: PaxosRole) {
+  def shouldIngoreLatePrepareResponse(role: PaxosRole): Unit = {
     val paxosAlgorithm = new PaxosAlgorithm
     val agent1 = PaxosAgent(0, role, initialDataCommittedSlotOne, initialQuorumStrategy)
     val event1 = PaxosEvent(undefinedIO, agent1, PrepareNack(minPrepare.id, 2, initialData.progress, initialData.progress.highestCommitted.logIndex, Long.MaxValue))

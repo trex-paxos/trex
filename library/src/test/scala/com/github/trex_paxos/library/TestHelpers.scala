@@ -21,7 +21,7 @@ class UndefinedIO extends PaxosIO{
 
   override def randomTimeout: Long = throw new AssertionError("deliberately not implemented")
 
-  override def clock: Long = throw new AssertionError("deliberately not implemented")
+  override def clock(): Long = throw new AssertionError("deliberately not implemented")
 
   override def send(msg: PaxosMessage): Unit = throw new AssertionError("deliberately not implemented")
 
@@ -54,7 +54,7 @@ class UndefinedPrepareResponse extends PrepareResponse {
 class UndefinedJournal extends Journal {
   override def saveProgress(progress: Progress): Unit = throw new AssertionError("deliberately not implemented")
 
-  override def bounds: JournalBounds = throw new AssertionError("deliberately not implemented")
+  override def bounds(): JournalBounds = throw new AssertionError("deliberately not implemented")
 
   override def loadProgress(): Progress = throw new AssertionError("deliberately not implemented")
 
@@ -108,7 +108,7 @@ object TestHelpers extends PaxosLenses{
   val noopJournal = new Journal {
     override def saveProgress(progress: Progress): Unit = {}
 
-    override def bounds: JournalBounds = JournalBounds(0L, 0L)
+    override def bounds(): JournalBounds = JournalBounds(0L, 0L)
 
     override def loadProgress(): Progress = TestHelpers.initialData.progress
 
@@ -118,11 +118,11 @@ object TestHelpers extends PaxosLenses{
   }
 
   val negativeClockIO = new UndefinedIO {
-    override def clock: Long = Long.MinValue
+    override def clock(): Long = Long.MinValue
   }
 
   val maxClockIO = new UndefinedIO {
-    override def clock: Long = Long.MaxValue
+    override def clock(): Long = Long.MaxValue
   }
 
   val lowValue = 1

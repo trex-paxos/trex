@@ -50,7 +50,7 @@ object TrexKVClient {
     val typedActor: ConsistentKVStore =
       TypedActor(system).
         typedActorOf(
-          TypedProps[ConsistentKVStore],
+          TypedProps[ConsistentKVStore](),
           driver)
 
     println("commands:\n\n\tget key\n\tput key value\n\tput key value version\n\tremove key\n\tremove key version\n\nlooping on stdin for your commands...")

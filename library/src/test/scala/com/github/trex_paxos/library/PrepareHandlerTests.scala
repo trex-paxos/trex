@@ -17,13 +17,13 @@ class PrepareHandlerTests extends RefSpec with MockFactory with OptionValues {
 
     val testPromiseHandler = new TestPrepareHandler
 
-    def `high perpare logic should require that the prepare number is higher than the current promise` {
+    def `high perpare logic should require that the prepare number is higher than the current promise`(): Unit = {
       intercept[IllegalArgumentException] {
         testPromiseHandler.handleHighPrepare(undefinedIO, agentPromise10, Prepare(Identifier(0, BallotNumber(1, 1), 10)))
       }
     }
 
-    def `should respond with an ack and journal before sending` {
+    def `should respond with an ack and journal before sending`(): Unit = {
       val prepare = Prepare(Identifier(0, BallotNumber(11, 11), 10))
       val journal = new InMemoryJournal
       val io = new TestIO(journal)
@@ -38,7 +38,7 @@ class PrepareHandlerTests extends RefSpec with MockFactory with OptionValues {
       }
     }
 
-    def `should have the new promise in the output agent data` {
+    def `should have the new promise in the output agent data`(): Unit = {
       val mockJournal = stub[Journal]
       (mockJournal.saveProgress _ ).when(*)
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
@@ -69,7 +69,7 @@ class PrepareHandlerTests extends RefSpec with MockFactory with OptionValues {
       }
     }
 
-    def `should send out NotLeader and return to follower if leader` {
+    def `should send out NotLeader and return to follower if leader`(): Unit = {
       val id = Identifier(0, BallotNumber(0, 0), 0)
       val mockJournal = stub[Journal]
       (mockJournal.saveProgress _ ).when(*)
@@ -85,7 +85,7 @@ class PrepareHandlerTests extends RefSpec with MockFactory with OptionValues {
       assert(sentNoLongerLeader())
     }
 
-    def `should nack lower number` {
+    def `should nack lower number`(): Unit = {
       val mockJournal = stub[Journal]
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
       (mockJournal.accepted _).when(*).returns(None)
@@ -97,7 +97,7 @@ class PrepareHandlerTests extends RefSpec with MockFactory with OptionValues {
       }
     }
 
-    def `should ack equal number` {
+    def `should ack equal number`(): Unit = {
       val mockJournal = stub[Journal]
       (mockJournal.bounds _).when().returns(JournalBounds(0,0))
       (mockJournal.accepted _).when(*).returns(None)

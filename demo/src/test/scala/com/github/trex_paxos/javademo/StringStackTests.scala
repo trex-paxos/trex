@@ -38,7 +38,7 @@ class StringStackTests extends RefSpec with Matchers {
       object `should retain state` {
         val file = File.createTempFile("stack", "data")
 
-        def one() {
+        def one(): Unit = {
           val stack = new StringStackImpl(file)
           stack.empty() shouldBe true
           stack.push("hello2")
@@ -47,7 +47,7 @@ class StringStackTests extends RefSpec with Matchers {
 
         one()
 
-        def two() {
+        def two(): Unit = {
           val other = new StringStackImpl(file)
           other.empty() shouldBe false
           val w = other.pop()
@@ -65,7 +65,7 @@ class StringStackTests extends RefSpec with Matchers {
       object `pop should only pop one` {
         val file = File.createTempFile("stack", "data")
 
-        def one() {
+        def one(): Unit = {
           val stack = new StringStackImpl(file)
           stack.empty() shouldBe true
           stack.push("helloA")
@@ -74,7 +74,7 @@ class StringStackTests extends RefSpec with Matchers {
 
         one()
 
-        def two() {
+        def two(): Unit = {
           val other = new StringStackImpl(file)
           other.empty() shouldBe false
           val w = other.pop()
@@ -83,7 +83,7 @@ class StringStackTests extends RefSpec with Matchers {
 
         two()
 
-        def three() {
+        def three(): Unit = {
           val other = new StringStackImpl(file)
           other.empty() shouldBe false
           val w = other.pop()

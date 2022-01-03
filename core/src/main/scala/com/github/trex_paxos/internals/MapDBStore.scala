@@ -47,7 +47,8 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
     db.commit() // eager commit
     // lazy gc of some old values as dont commit until next update
     val Progress(_, Identifier(_, _, logIndex)) = progress
-    JavaConverters.asScalaSet(storeMap.navigableKeySet).takeWhile(_ < logIndex - retained).foreach { i =>
+    import scala.jdk.CollectionConverters._
+    storeMap.navigableKeySet.asScala.takeWhile(_ < logIndex - retained).foreach { i =>
       if (storeMap.containsKey(i))
         storeMap.remove(i)
     }
@@ -83,7 +84,7 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
     db.close
   }
 
-  def bounds: JournalBounds = {
+  def bounds(): JournalBounds = {
     // TODO this needs tests
     if (storeMap.isEmpty())
       PaxosAlgorithm.minJournalBounds
@@ -101,8 +102,8 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
 
   override def loadMembership(): Option[CommittedMembership] =
   {
-    import scala.collection.JavaConverters._
-    val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
+    import scala.jdk.CollectionConverters._
+    val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.to(LazyList).headOption
     lastSlotOption map { (s: Long) =>
       val jsonBytesUtf8 = memberMap.get(s)
       MemberPickle.fromJson(new String(jsonBytesUtf8, UTF8)).get
@@ -111,8 +112,8 @@ class MapDBStore(journalFile: File, retained: Int) extends Journal with TrexMemb
 
   override def saveMembership(cm: CommittedMembership): Unit =
   {
-    import scala.collection.JavaConverters._
-    val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.toStream.headOption
+    import scala.jdk.CollectionConverters._
+    val lastSlotOption =  memberMap.descendingKeySet().iterator().asScala.to(LazyList).headOption
     lastSlotOption foreach {
       case last if last < cm.slot => // good
       case last => throw new IllegalArgumentException(s"slot ${cm.slot} is not higher than last ${last}")

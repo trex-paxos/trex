@@ -44,11 +44,11 @@ class MethodCallInvokingActor(target: Any) extends Actor with ActorLogging {
         Option(method.invoke(target, parameters: _*))
       } match {
         case Success(response) => response foreach {
-          sender ! _
+          sender() ! _
         }
         case Failure(ex) =>
           log.error(ex, s"call to $method with ${parameters} got exception $ex")
-          sender ! ex
+          sender() ! ex
         case f => throw new IllegalArgumentException(f.toString)
       }
     case f => throw new IllegalArgumentException(f.toString)
@@ -67,7 +67,7 @@ with RefSpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
     val typedActor: MethodCallTestTrait =
       TypedActor(system).
         typedActorOf(
-          TypedProps[MethodCallTestTrait],
+          TypedProps[MethodCallTestTrait](),
           invokingActor)
 
     val result = typedActor.testMethod("hello")
@@ -75,7 +75,7 @@ with RefSpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
     result should be("out:hello")
   }
 
-  override def afterAll {
+  override def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
   }
 }

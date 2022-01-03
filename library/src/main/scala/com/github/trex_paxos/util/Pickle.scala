@@ -461,7 +461,7 @@ object Pickle {
       ByteChain.empty
   }
 
-  def unpack(b: Iterator[Byte]): AnyRef = fromMap(b.next)(b)
+  def unpack(b: Iterator[Byte]): AnyRef = fromMap(b.next())(b)
 
   def pack(a: AnyRef): ByteChain = ByteChain(Array(toMap(a.getClass))) ++ pickle(a)
 }

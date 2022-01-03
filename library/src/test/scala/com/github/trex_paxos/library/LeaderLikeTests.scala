@@ -15,7 +15,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
 
   val paxosAlgorithm = new PaxosAlgorithm
 
-  def shouldIngoreLowerCommit(role: PaxosRole) {
+  def shouldIngoreLowerCommit(role: PaxosRole) : Unit = {
     require(role == Leader || role == Recoverer)
     val agent = PaxosAgent(0, role, initialDataCommittedSlotOne, initialQuorumStrategy)
     val event = PaxosEvent(undefinedIO, agent, Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0L), Long.MinValue))
@@ -23,7 +23,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     newRole shouldBe role
     data shouldBe agent.data
   }
-  def shouldIngoreCommitMessageSameSlotLowerNodeId(role: PaxosRole) {
+  def shouldIngoreCommitMessageSameSlotLowerNodeId(role: PaxosRole): Unit = {
     require(role == Leader || role == Recoverer)
     val node2slot1Identifier = Identifier(2, BallotNumber(lowValue + 1, 2), 1L)
     val agent = PaxosAgent(0, role, initialData.copy(epoch = Some(node2slot1Identifier.number),
@@ -36,7 +36,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     newRole shouldBe role
     data shouldBe agent.data
   }
-  def shouldBackdownOnCommitSameSlotHigherNodeId(role: PaxosRole) {
+  def shouldBackdownOnCommitSameSlotHigherNodeId(role: PaxosRole): Unit = {
     require(role == Leader || role == Recoverer)
     val node2slot1Identifier = Identifier(2, BallotNumber(lowValue + 1, 2), 1L)
     val node3slot1Identifier = Identifier(0, BallotNumber(lowValue + 1, 3), 1L)
@@ -58,7 +58,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     data.timeout shouldBe 12345L
     data.leaderHeartbeat should not be(initialData.leaderHeartbeat)
   }
-  def shouldBackdownOnHigherSlotCommit(role: PaxosRole) {
+  def shouldBackdownOnHigherSlotCommit(role: PaxosRole): Unit = {
     require(role == Leader || role == Recoverer)
     val identifier = Identifier(1, BallotNumber(lowValue + 1, 0), 1L)
     val greaterThan = Identifier(1, BallotNumber(lowValue + 2, 2), 2L)
@@ -93,7 +93,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
       case f => fail(f.toString)
     }
   }
-  def shouldBackdownAndCommitOnHigherSlotCommit(role: PaxosRole) {
+  def shouldBackdownAndCommitOnHigherSlotCommit(role: PaxosRole): Unit = {
     require(role == Leader || role == Recoverer)
     // given slot 1 has been accepted under the same number as previously committed slot 0 shown in initialData
     val identifier = Identifier(1, BallotNumber(lowValue, lowValue), 1L)
@@ -126,7 +126,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
       case f => fail(f.toString)
     }
   }
-  def shouldReissueSameAcceptMessageIfTimeoutNoChallenge(role: PaxosRole) {
+  def shouldReissueSameAcceptMessageIfTimeoutNoChallenge(role: PaxosRole): Unit = {
     require(role == Leader || role == Recoverer)
     // self voted on accept id99
     val lastCommitted = Identifier(0, BallotNumber(1, 0), 98L)
@@ -141,7 +141,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     val sent: ArrayBuffer[PaxosMessage] = ArrayBuffer()
     val io = new UndefinedIO with SilentLogging {
 
-      override def clock: Long = timeNow
+      override def clock(): Long = timeNow
 
       override def randomTimeout: Long = 12345L
 
@@ -166,7 +166,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     }
     data.timeout shouldBe 12345L
   }
-  def sendHigherAcceptOnLearningOtherNodeHigherPromise(role: PaxosRole){
+  def sendHigherAcceptOnLearningOtherNodeHigherPromise(role: PaxosRole): Unit = {
     require(role == Leader || role == Recoverer)
     // given a leader who has boardcast slot 99 and seen a nack with higher promise
     val tempJournal = new InMemoryJournal()
@@ -191,7 +191,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
         sent += msg
       }
 
-      override def clock: Long = 0
+      override def clock(): Long = 0
 
       override def journal: Journal = tempJournal
     }
@@ -217,7 +217,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     }
     assert(saveTime != 0 && sentTime.get() != 0 && saveTime < sentTime.get())
   }
-  def sendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(role: PaxosRole) {
+  def sendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(role: PaxosRole): Unit = {
     // given a leader who has boardcast slot 99 and seen no other responses
     // but has issued a higher promise to some other node
     val tempJournal = new InMemoryJournal()
@@ -236,7 +236,7 @@ trait LeaderLikeTests { this: Matchers with MockFactory with OptionValues =>
     val sentTime = new AtomicLong()
     val io = new UndefinedIO with SilentLogging {
 
-      override def clock: Long = timeNow
+      override def clock(): Long = timeNow
 
       override def randomTimeout: Long = 12345L
 

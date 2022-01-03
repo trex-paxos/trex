@@ -55,10 +55,11 @@ with OptionValues {
     }
     "sends a response with both committed and uncommitted values" in {
       // given a journal with a value
-      val stubJournal = stub[Journal]
-      (stubJournal.bounds _) when() returns (JournalBounds(0, 2))
-      (stubJournal.accepted _) when (1L) returns Option(a98)
-      (stubJournal.accepted _) when (2L) returns Option(a99)
+      val mockJournal = mock[Journal]
+      (mockJournal.bounds _).expects().returning(JournalBounds(0, 2))
+      (mockJournal.accepted _).expects(1L).returning(Option(a98))
+      (mockJournal.accepted _).expects(2L).returning(Option(a99))
+
       // and a retransmit handler which records what it sent
       val handler = new TestRetransmitHandler
       // when we send it a request and we have only uncommitted values
@@ -67,7 +68,7 @@ with OptionValues {
           sent(sent() :+ MessageAndTimestamp(msg, 0L))
         }
 
-        override def journal: Journal = stubJournal
+        override def journal: Journal = mockJournal
       }
       handler.handleRetransmitRequest(testIO, PaxosAgent(99, Leader, initialDataCommittedSlotOne, initialQuorumStrategy), RetransmitRequest(2, 0, 0L))
       // then

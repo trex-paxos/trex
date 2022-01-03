@@ -32,7 +32,7 @@ object Cluster {
       val nport = config.getString(s"trex.cluster.node-$nodeId.node-port")
       Node(nodeId.toInt, host, cport.toInt, nport.toInt)
     }
-    Cluster(name, folder, retained, collection.immutable.Seq(nodes: _*))
+    Cluster(name, folder, retained, nodes.toIndexedSeq)
   }
 
 }

@@ -22,7 +22,7 @@ object DriverSpec {
 class DriverSpec extends TestKit(ActorSystem("DriverSpec",
   DriverSpec.conf)) with RefSpecLike with ImplicitSender with BeforeAndAfterAll with Matchers {
 
-  override def afterAll {
+  override def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
   }
 
@@ -35,13 +35,13 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
 
     override def receive: Actor.Receive = {
       case msg =>
-        log.debug("forwarding {} from {} to probe {}", msg, sender, other)
+        log.debug("forwarding {} from {} to probe {}", msg, sender(), other)
         other ! msg
     }
   }
 
   def clusterOf(a0: ActorRef, a1: ActorRef, a2: ActorRef)(implicit system: ActorSystem): Map[Int, ActorSelection] = {
-    val now = Platform.currentTime
+    val now = System.currentTimeMillis()
     system.actorOf(Props(new ForwardingActor(a0)), "a0-" + now)
     system.actorOf(Props(new ForwardingActor(a1)), "a1-" + now)
     system.actorOf(Props(new ForwardingActor(a2)), "a2-" + now)
@@ -224,7 +224,8 @@ class DriverSpec extends TestKit(ActorSystem("DriverSpec",
       clientProbe.expectMsgPF(1 seconds) {
         case ex: TimeoutException =>
           ex.getMessage.indexOf(s"Exceeded maxAttempts 6") should be(0)
-        case f => fail(f.toString)
+        case f =>
+          fail(f.toString)
       }
 
       Seq(testProbe1, testProbe2, testProbe3).foreach(_.receiveN(2).map({

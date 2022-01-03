@@ -103,7 +103,7 @@ object PrepareResponseHandler {
               }
               val selfVote = Map(agent.nodeUniqueId -> ackOrNack)
               (prepare.id -> selfVote)
-            })(scala.collection.breakOut)
+            }).to(SortedMap)
           agent.data.prepareResponses ++ newPrepareSelfVotes
         } else {
           // no additional slots learnt about from the responses

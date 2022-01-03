@@ -13,45 +13,45 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
 
   object `The Leader Function` {
     val initialDataAgent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
-    def `should be defined for a leader and RetransmitRequest` {
+    def `should be defined for a leader and RetransmitRequest`(): Unit = {
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, RetransmitRequest(0, 1, 0L))))
     }
 
-    def `should be defined for a leader and RetransmitResponse` {
+    def `should be defined for a leader and RetransmitResponse`(): Unit = {
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, RetransmitResponse(0, 1, Seq(), Seq()))))
     }
 
-    def `should be defined for a leader and a Prepare if the prepare is less than the promise` {
+    def `should be defined for a leader and a Prepare if the prepare is less than the promise`(): Unit = {
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(0, 0), 0)))))
     }
 
-    def `should be defined for a leader and a Prepare if the prepare is higher than the promise` {
+    def `should be defined for a leader and a Prepare if the prepare is higher than the promise`(): Unit = {
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(Int.MaxValue, Int.MaxValue), 0)))))
     }
 
-    def `should be defined for a leader and a Prepare if the prepare is equal to the promise` {
+    def `should be defined for a leader and a Prepare if the prepare is equal to the promise`(): Unit = {
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, initialDataAgent.data.progress.highestPromised, 0)))))
     }
 
-    def `should be defined for a leader and an Accept with a lower number` {
+    def `should be defined for a leader and an Accept with a lower number`(): Unit = {
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Accept(Identifier(0, BallotNumber(0, 0), 0), NoOperationCommandValue))))
     }
 
-    def `should be defined for a leader and an Accept with a higher number for a committed slot` {
+    def `should be defined for a leader and an Accept with a higher number for a committed slot`(): Unit = {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = TestHelpers.highestPromisedHighestCommittedLens.set(TestHelpers.initialData, (promise, Identifier(from = 0, number = promise, logIndex = 99L)))
       val higherCommittedAgent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, higherCommittedAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
-    def `should be defined for an Accept equal to promise` {
+    def `should be defined for an Accept equal to promise`(): Unit = {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = highestPromisedLens.set(TestHelpers.initialData, promise)
       val equalPromiseAgent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, equalPromiseAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
-    def `should be defined for an Accept greater than promise` {
+    def `should be defined for an Accept greater than promise`(): Unit = {
       val higherAcceptId = BallotNumber(Int.MaxValue, Int.MaxValue)
       val lowerPromise = BallotNumber(Int.MaxValue -1 , Int.MaxValue - 1)
       val initialData = highestPromisedLens.set(TestHelpers.initialData, lowerPromise)
@@ -69,12 +69,12 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, CheckTimeout)))
     }
 
-    def `should be defined for a CheckTimeout when accepts are timed out` {
+    def `should be defined for a CheckTimeout when accepts are timed out`(): Unit = {
       val agent = PaxosAgent(0, Leader, initialData.copy(acceptResponses = emptyAcceptResponses), initialQuorumStrategy)
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, CheckTimeout)))
     }
 
-    def `should deal with timed-out prepares before timed-out accepts` {
+    def `should deal with timed-out prepares before timed-out accepts`(): Unit = {
       val handleResendAcceptsInvoked = Box(false)
       val handleResendPreparesInvoked = Box(false)
       val paxosAlgorithm = new PaxosAlgorithm {
@@ -92,34 +92,34 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       assert(handleResendPreparesInvoked() == true && handleResendAcceptsInvoked() == false)
     }
 
-    def `should be defined for a commit at a higher log index` {
+    def `should be defined for a commit at a higher log index`(): Unit = {
       val agent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, initialData.progress.highestPromised, Int.MaxValue))
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
-    def `should be defined for a commit at a same log index with a higher number` {
+    def `should be defined for a commit at a same log index with a higher number`(): Unit = {
       val agent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, BallotNumber(Int.MaxValue, Int.MaxValue), initialData.progress.highestCommitted.logIndex))
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
-    def `should be defined for a low commit` {
+    def `should be defined for a low commit`(): Unit = {
       val agent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       val commit = Commit(Identifier(1, BallotNumber(0, 0), Long.MinValue))
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, commit)))
     }
 
-    def `should be defined for Heatbeat`{
+    def `should be defined for Heatbeat`(): Unit = {
       val agent = PaxosAgent(0, Leader, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(maxClockIO, agent, HeartBeat)))
     }
 
-    def `should be defined for a client command message` {
+    def `should be defined for a client command message`(): Unit = {
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue("0"))))
     }
 
-    def `should be defined for a late PrepareResponse`  {
+    def `should be defined for a late PrepareResponse`(): Unit = {
       val dataPrepareResponses = initialDataAgent.data.copy(prepareResponses = TreeMap(Identifier(0, BallotNumber(0, 0), 0) -> Map.empty))
       assert(paxosAlgorithm.leaderFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent.copy(data = dataPrepareResponses), undefinedPrepareResponse)))
     }
@@ -140,31 +140,31 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
   }
 
   object `A Leader` {
-    def `should ignore a lower commit` {
+    def `should ignore a lower commit`(): Unit = {
       shouldIngoreLowerCommit(Leader)
     }
-    def `should ignore a late prepare response` {
+    def `should ignore a late prepare response`(): Unit = {
       shouldIngoreLatePrepareResponse(Leader)
     }
-    def `should ingore a commit for same slot from lower numbered node` {
+    def `should ingore a commit for same slot from lower numbered node`(): Unit = {
       shouldIngoreCommitMessageSameSlotLowerNodeId(Leader)
     }
-    def `should backdown on commit same slot higher node number` {
+    def `should backdown on commit same slot higher node number`(): Unit = {
       shouldBackdownOnCommitSameSlotHigherNodeId(Leader)
     }
-    def `should backdown on higher slot commit` {
+    def `should backdown on higher slot commit`(): Unit = {
       shouldBackdownOnHigherSlotCommit(Leader)
     }
-    def `should backdown and commit on higher slot commit` {
+    def `should backdown and commit on higher slot commit`(): Unit = {
       shouldBackdownAndCommitOnHigherSlotCommit(Leader)
     }
-    def `reissue same accept messages it gets a timeout and no challenge` {
+    def `reissue same accept messages it gets a timeout and no challenge`(): Unit = {
       shouldReissueSameAcceptMessageIfTimeoutNoChallenge(Leader)
     }
-    def `reissue higher accept messages upon learning of another nodes higher promise in a nack` {
+    def `reissue higher accept messages upon learning of another nodes higher promise in a nack`(): Unit = {
       sendHigherAcceptOnLearningOtherNodeHigherPromise(Leader)
     }
-    def `reissues higher accept message upon having made a higher promise itself by the timeout` {
+    def `reissues higher accept message upon having made a higher promise itself by the timeout`(): Unit = {
       sendsHigherAcceptOnHavingMadeAHigherPromiseAtTimeout(Leader)
     }
     val epoch = BallotNumber(1, 1)
@@ -175,7 +175,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
     val expectedString2 = "Paxos"
     val expectedBytes2 = expectedString2.getBytes
 
-    def `broadcast client values` {
+    def `broadcast client values`(): Unit = {
       // given some client commands
       val c1 = DummyCommandValue("1")
       val c2 = DummyCommandValue("2")
@@ -236,7 +236,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       associated(1) shouldBe (2 -> c2)
       associated(2) shouldBe (3 -> c3)
     }
-    def `commits when it receives a majority of accept acks` {
+    def `commits when it receives a majority of accept acks`(): Unit = {
       // given a verifiable io
       val lastDelivered = new AtomicReference[CommandValue]()
       val inMemoryJournal = new InMemoryJournal
@@ -245,7 +245,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
-        override def clock: Long = Long.MaxValue
+        override def clock(): Long = Long.MaxValue
 
         override def randomTimeout: Long = 1234L
 
@@ -297,7 +297,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       val saveTime = inMemoryJournal.lastSaveTime.get()
       assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
     }
-    def `commits in order when it receives responses out of order` {
+    def `commits in order when it receives responses out of order`(): Unit = {
       // given a verifiable io
       val delivered = ArrayBuffer[CommandValue]()
       val inMemoryJournal = new InMemoryJournal
@@ -306,7 +306,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
-        override def clock: Long = Long.MaxValue
+        override def clock(): Long = Long.MaxValue
 
         override def randomTimeout: Long = 1234L
 
@@ -375,12 +375,12 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       val saveTime = inMemoryJournal.lastSaveTime.get()
       assert(saveTime > 0L && sentTime.get() > 0L && saveTime < sentTime.get())
     }
-    def `rebroadcasts its commit with a fresh heartbeat when it gets prompted` {
+    def `rebroadcasts its commit with a fresh heartbeat when it gets prompted`(): Unit = {
       val sent = ArrayBuffer[Commit]()
       val io = new UndefinedIO with SilentLogging {
         override def randomTimeout: Long = 0L
 
-        override def clock: Long = 0L
+        override def clock(): Long = 0L
 
         override def send(msg: PaxosMessage): Unit = {
           msg match {
@@ -418,7 +418,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       val io = new UndefinedIO with SilentLogging {
         override def journal: Journal = inMemoryJournal
 
-        override def clock: Long = Long.MaxValue
+        override def clock(): Long = Long.MaxValue
 
         override def randomTimeout: Long = 1234L
 
@@ -452,7 +452,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       follower.data.prepareResponses.isEmpty shouldBe true
       sentNoLongerLeader() shouldBe true
     }
-    def `returns to follower when it receives a majority of accept nacks`{
+    def `returns to follower when it receives a majority of accept nacks`(): Unit = {
       val sent = ArrayBuffer[PaxosMessage]()
       val messages = ArrayBuffer[PaxosMessage]()
       val id99 = Identifier(0, epoch, 99L)
@@ -463,7 +463,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       returnsToFollowerTest(messages, sent)
       sent shouldBe empty
     }
-    def `returns to follower when it sees a higher commit watermark in a response` {
+    def `returns to follower when it sees a higher commit watermark in a response`(): Unit = {
       val sent = ArrayBuffer[PaxosMessage]()
       val messages = ArrayBuffer[PaxosMessage]()
       val id99 = Identifier(0, epoch, 99L)
@@ -473,7 +473,7 @@ class LeaderTests extends AllRolesTests with LeaderLikeTests {
       // it sends nothing
       sent.isEmpty shouldBe true
     }
-    def `returns to follower when it makes a higher promise to another node` {
+    def `returns to follower when it makes a higher promise to another node`(): Unit = {
       val sent = ArrayBuffer[PaxosMessage]()
       val messages = ArrayBuffer[PaxosMessage]()
       val highIdentifier = Identifier(2, BallotNumber(Int.MaxValue, Int.MaxValue), 99L)

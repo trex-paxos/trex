@@ -69,7 +69,7 @@ class TypedActorPaxosEndpoint(
       import Member.pattern
       val pattern(host, port) = n.location
       n.nodeUniqueId -> context.system.actorOf(Props(classOf[UdpSender],
-        new java.net.InetSocketAddress(host, port.toInt)), s"UdpSender${n.nodeUniqueId}-${Platform.currentTime}")
+        new java.net.InetSocketAddress(host, port.toInt)), s"UdpSender${n.nodeUniqueId}-${System.currentTimeMillis()}")
     }.toMap
   }
 

@@ -142,7 +142,7 @@ class PrepareResponseHandlerTests extends wordspec.AnyWordSpec with Matchers wit
         case f => fail(f.toString)
       }
       // and we did not accept our own new prepare
-      data.prepareResponses.headOption.getOrElse(fail) match {
+      data.prepareResponses.headOption.getOrElse(fail()) match {
         case (id, map) if id.logIndex == 2 => map.get(0) match {
           case Some(r: PrepareNack) => // good
           case f => fail(f.toString)
@@ -187,9 +187,9 @@ class PrepareResponseHandlerTests extends wordspec.AnyWordSpec with Matchers wit
         case f => fail(f.toString)
       }
       // and we have the self vote for the accept
-      data.acceptResponses.headOption.getOrElse(fail) match {
+      data.acceptResponses.headOption.getOrElse(fail()) match {
         case (id, AcceptResponsesAndTimeout(_, a: Accept, responses)) if id == recoverHighPrepare.id && a.id == id =>
-          responses.headOption.getOrElse(fail) match {
+          responses.headOption.getOrElse(fail()) match {
             case (0, r: AcceptAck) => // good
             case f => fail(f.toString)
           }
@@ -238,9 +238,9 @@ class PrepareResponseHandlerTests extends wordspec.AnyWordSpec with Matchers wit
         case f => fail(f.toString)
       }
       // and we have the self vote for the accept
-      data.acceptResponses.headOption.getOrElse(fail) match {
+      data.acceptResponses.headOption.getOrElse(fail()) match {
         case (id, AcceptResponsesAndTimeout(_, a: Accept, responses)) if id == recoverHighPrepare.id && a.id == id =>
-          responses.headOption.getOrElse(fail) match {
+          responses.headOption.getOrElse(fail()) match {
             case (0, r: AcceptNack) => // good
             case f => fail(f.toString)
           }

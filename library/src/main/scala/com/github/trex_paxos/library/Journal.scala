@@ -43,6 +43,6 @@ trait Journal {
    * The lowest and highest index currently available. 
    * @return The min and max index retrained within this journal which is subject to the retention policy of the implementation. 
    */
-  def bounds: JournalBounds
+  def bounds(): JournalBounds
 
 }

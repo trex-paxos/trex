@@ -44,14 +44,14 @@ class QuorumStrategyTests extends RefSpec with Matchers with MockFactory with Op
       cluster1.assessPromises(Seq(pAck, pNack)) shouldBe Option(SplitVote)
 
       cluster1.assessAccepts(Seq(a98ack0, a98nack1)).value match {
-        case _: Outcome =>
+        case _: com.github.trex_paxos.library.Outcome =>
           // If we are running FPaxos its an impossible result to see both an ack and a nack
           // in a two node cluster. The leader should have seen its own self accepted ack
           // as quorum and should not have waited to see what the other node said which cannot
           // have promoted to be a leader to send an nack. So whatever the QuorumStrategy says
           // in this impossible scenario is okay.
 
-        case _ => fail // impossible
+        case _ => fail() // impossible
 
       }
 

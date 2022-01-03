@@ -29,7 +29,7 @@ class TestJournal extends Journal {
 
   def accepted(logIndex: Long): Option[Accept] = _map().get(logIndex)
 
-  def bounds: JournalBounds = {
+  def bounds(): JournalBounds = {
     val keys = _map().keys
     if (keys.isEmpty) JournalBounds(0L, 0L) else JournalBounds(keys.head, keys.last)
   }
@@ -105,7 +105,8 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
   (0 until size) foreach { i =>
     val node = new TestJournal
     journal(journal() + (i -> node))
-    val deliver: mutable.Buffer[Payload] = collection.JavaConverters.asScalaBuffer(new CopyOnWriteArrayList[Payload])
+    import scala.jdk.CollectionConverters._
+    val deliver: mutable.Buffer[Payload] = (new CopyOnWriteArrayList[Payload]).asScala
     delivered(delivered() + (i -> deliver))
     val actor: ActorRef = context.actorOf(Props(classOf[TestPaxosActor], PaxosProperties(config), () => size, i, self, node, deliver, Some(recordTraceData _)))
     children(children() + (i -> actor))
@@ -138,7 +139,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       r.bytes(0) match {
         case b if b > 0 => // value greater than zero is client request send to leader
           valueByMsgId(valueByMsgId() + (r.msgUuid -> r))
-          valuesToClients(valuesToClients() + ((-b).toByte -> sender))
+          valuesToClients(valuesToClients() + ((-b).toByte -> sender()))
           val guessedLeader = next()
           log.info("ClusterHarness client rq: {} -> {} {}", bytes, invertedChildren(guessedLeader), guessedLeader)
           guessedLeader ! r
@@ -152,8 +153,8 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
     case response: Array[Byte] =>
       response(0) match {
         case b if b < 0 => // value less than zero is the committed response send back to client
-          lastRespondingLeader(sender)
-          log.info(s"ClusterHarness client rs: from {}", invertedChildren(sender))
+          lastRespondingLeader(sender())
+          log.info(s"ClusterHarness client rs: from {}", invertedChildren(sender()))
           valuesToClients()(b) ! response
           valuesToClients(valuesToClients() - b)
         case b =>
@@ -196,52 +197,52 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       */
 
     case p: Prepare =>
-      log.info(s"ClusterHarness $sender sent $p broadcasting")
+      log.info(s"ClusterHarness ${sender()} sent $p broadcasting")
       children() foreach {
         case (id, actor) if id != p.id.from =>
-          log.info(s"$id <- $p : $actor <- $sender")
+          log.info(s"$id <- $p : $actor <- ${sender()}")
           actor ! p
         case _ =>
       }
     case p: PrepareResponse =>
       children() foreach {
         case (id, actor) if id == p.to =>
-          log.info(s"ClusterHarness $id <- $p : $actor <- $sender")
+          log.info(s"ClusterHarness $id <- $p : $actor <- ${sender()}")
           actor ! p
         case _ =>
       }
     case a: Accept =>
       children() foreach {
         case (id, actor) if id != a.id.from =>
-          log.info(s"ClusterHarness $id <- $a : $actor <- $sender")
+          log.info(s"ClusterHarness $id <- $a : $actor <- ${sender()}")
           actor ! a
         case _ =>
       }
     case a: AcceptResponse =>
       children() foreach {
         case (id, actor) if id == a.to =>
-          log.info(s"ClusterHarness $id <- $a : $actor <- $sender")
+          log.info(s"ClusterHarness $id <- $a : $actor <- ${sender()}")
           actor ! a
         case _ =>
       }
     case c: Commit =>
       children() foreach {
         case (id, actor) if id != c.identifier.from =>
-          log.info(s"ClusterHarness $id <- $c : $actor <- $sender")
+          log.info(s"ClusterHarness $id <- $c : $actor <- ${sender()}")
           actor ! c
         case _ =>
       }
     case r@RetransmitRequest(_, to, _) =>
       children() foreach {
         case (id, actor) if to == id =>
-          log.info(s"ClusterHarness $id <- $r : $actor <- $sender")
+          log.info(s"ClusterHarness $id <- $r : $actor <- ${sender()}")
           actor ! r
         case _ =>
       }
     case r: RetransmitResponse =>
       children() foreach {
         case (id, actor) if r.to == id =>
-          log.info(s"ClusterHarness $id <- $r : $actor <- $sender")
+          log.info(s"ClusterHarness $id <- $r : $actor <- ${sender()}")
           actor ! r
         case _ =>
       }
@@ -271,7 +272,7 @@ class ClusterHarness(val size: Int, config: Config) extends Actor with ActorLogg
       self ! PoisonPill.getInstance
 
       // output what was committed
-      sender ! delivered()
+      sender() ! delivered()
 
     case m =>
       val msg =

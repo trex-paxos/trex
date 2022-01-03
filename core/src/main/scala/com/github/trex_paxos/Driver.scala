@@ -81,19 +81,19 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
   private[this] var requestByTimeoutById: SortedMap[Long, Map[String, Request]] = SortedMap.empty
 
   def hold(request: Request): Unit = {
-    requestById = requestById + (request.command.msgUuid -> request)
+    requestById = requestById ++ SortedMap(request.command.msgUuid -> request)
     val peers = requestByTimeoutById.getOrElse(request.timeoutTime, Map.empty)
-    requestByTimeoutById = requestByTimeoutById + (request.timeoutTime -> (peers + (request.command.msgUuid -> request)))
+    requestByTimeoutById = requestByTimeoutById ++ SortedMap(request.timeoutTime -> (peers + (request.command.msgUuid -> request)))
   }
 
   def drop(request: Request): Unit = {
-    requestById = requestById - request.command.msgUuid
-    val peers = requestByTimeoutById.getOrElse(request.timeoutTime, Map.empty)
-    val updated = peers - request.command.msgUuid
+    requestById = requestById.filterNot(entry => entry._1.equals(request.command.msgUuid))
+    val requestsAtTimeout = requestByTimeoutById.getOrElse(request.timeoutTime, Map.empty)
+    val updated = requestsAtTimeout - request.command.msgUuid
     if (updated.isEmpty) {
-      requestByTimeoutById = requestByTimeoutById - request.timeoutTime
+      requestByTimeoutById = requestByTimeoutById.filterNot(entry => entry._1.equals(request.timeoutTime) )
     } else {
-      requestByTimeoutById = requestByTimeoutById + (request.timeoutTime -> updated)
+      requestByTimeoutById = requestByTimeoutById ++ SortedMap(request.timeoutTime -> updated)
     }
   }
 
@@ -116,7 +116,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
   /**
     * override for tests
     */
-  def now() = Platform.currentTime
+  def now() = System.currentTimeMillis()
 
   override def receive: Receive = {
     /**
@@ -150,9 +150,11 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
                 request
             }
         }
-        val (overAttempts, underAttempts) = overdueRequests.seq.partition {
+        val (overAttempts, underAttempts) = overdueRequests.partition {
           _.attempt >= maxAttempts
         }
+        log.debug("overAttempts is size {}", overAttempts.size)
+        log.debug("underAttempts is size {}", underAttempts.size)
         overAttempts foreach { overAttempt =>
           drop(overAttempt)
           overAttempt.client ! new TimeoutException(s"Exceeded maxAttempts $maxAttempts")
@@ -194,7 +196,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
     case work: AnyRef =>
       val bytes = serializerClient.toBinary(work)
       val commandValue = ClientCommandValue(incrementAndGetRequestId(), bytes)
-      val request = Request(Platform.currentTime + timeoutMillis, sender(), commandValue, 1)
+      val request = Request(System.currentTimeMillis() + timeoutMillis, sender(), commandValue, 1)
       transmit(leaderCounter, request)
   }
 
@@ -216,7 +218,7 @@ abstract class BaseDriver(requestTimeout: Timeout, maxAttempts: Int) extends Act
   }
 
   def resend(out: Request): Unit = {
-    val in = out.copy(attempt = out.attempt + 1, timeoutTime = now + timeoutMillis)
+    val in = out.copy(attempt = out.attempt + 1, timeoutTime = now() + timeoutMillis)
     swap(out, in)
     val target = resolveActorSelectorForIndex((leaderCounter % clusterSize).toInt)
     target match {

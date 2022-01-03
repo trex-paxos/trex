@@ -45,7 +45,7 @@ trait PaxosIO {
   /**
     * The current time (so that we can test timeout permutations and behaviours).
     */
-  def clock: Long
+  def clock(): Long
 
   /**
     * The callback to the host application which can side effect.
@@ -58,7 +58,7 @@ trait PaxosIO {
   /**
     * Send a paxos algorithm message within the cluster. May be deferred.
     */
-  def send(msg: PaxosMessage)
+  def send(msg: PaxosMessage): Unit
 
   /**
     * Associate a command value with a paxos identifier so that the result of the commit can be routed back to the sender of the command
@@ -106,7 +106,7 @@ class PaxosAlgorithm extends PaxosLenses
     // update heartbeat and attempt to commit contiguous accept messages
     case PaxosEvent(io, agent@PaxosAgent(_, Follower, _, _), c@Commit(i, heartbeat)) =>
       handleFollowerCommit(io, agent, c)
-    case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, _, _), _), CheckTimeout) if io.clock >= to =>
+    case PaxosEvent(io, agent@PaxosAgent(_, Follower, PaxosData(_, _, to, _, _, _), _), CheckTimeout) if io.clock() >= to =>
       handleFollowerTimeout(io, agent)
     case PaxosEvent(io, agent, vote: PrepareResponse) if agent.role == Follower =>
       handleFollowerPrepareResponse(io, agent, vote)
@@ -187,12 +187,12 @@ class PaxosAlgorithm extends PaxosLenses
     */
   val resendPreparesAndAcceptsFunction: PaxosFunction = {
     // if we have timed-out on prepare messages
-    case PaxosEvent(io, agent, CheckTimeout) if agent.data.prepareResponses.nonEmpty && io.clock > agent.data.timeout =>
-      handleResendPrepares(io, agent, io.clock)
+    case PaxosEvent(io, agent, CheckTimeout) if agent.data.prepareResponses.nonEmpty && io.clock() > agent.data.timeout =>
+      handleResendPrepares(io, agent, io.clock())
 
     // if we have timed-out on accept messages
-    case PaxosEvent(io, agent, CheckTimeout) if agent.data.acceptResponses.nonEmpty && io.clock >= agent.data.timeout =>
-      handleResendAccepts(io, agent, io.clock)
+    case PaxosEvent(io, agent, CheckTimeout) if agent.data.acceptResponses.nonEmpty && io.clock() >= agent.data.timeout =>
+      handleResendAccepts(io, agent, io.clock())
   }
 
   val backDownOnHigherCommit: PaxosFunction = {

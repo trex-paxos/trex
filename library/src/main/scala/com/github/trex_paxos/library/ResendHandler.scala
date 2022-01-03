@@ -4,7 +4,7 @@ import Ordering._
 
 import scala.collection.SortedMap
 
-case class AcceptsAndData(accepts: Traversable[Accept], data: PaxosData)
+case class AcceptsAndData(accepts: Iterable[Accept], data: PaxosData)
 
 trait ResendHandler extends PaxosLenses {
 
@@ -107,7 +107,7 @@ object ResendHandler {
     (Seq(ownPromise) ++ others).max
   }
 
-  def refreshAccepts(newNumber: BallotNumber, accepts: Traversable[Accept]) = {
+  def refreshAccepts(newNumber: BallotNumber, accepts: Iterable[Accept]) = {
     accepts.map(a => a.copy(a.id.copy(number = newNumber)))
   }
 }

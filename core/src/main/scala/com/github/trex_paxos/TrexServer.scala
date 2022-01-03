@@ -73,7 +73,7 @@ trait TrexRouting extends Actor with ActorLogging {
   def paxosActor: ActorRef
 
   override def receive: Receive = {
-    case outbound: AnyRef if sender == paxosActor =>
+    case outbound: AnyRef if sender() == paxosActor =>
       route(outbound) match {
         case Some(nodeId) =>
           val other = peers.get(nodeId)
@@ -81,7 +81,7 @@ trait TrexRouting extends Actor with ActorLogging {
           other.foreach(_ ! outbound)
         case _ => peers.values.foreach(_ ! outbound)
       }
-    case inbound: AnyRef if sender == networkListener =>
+    case inbound: AnyRef if sender() == networkListener =>
       paxosActor ! inbound
     case t: Terminated =>
       // FIXME handle this

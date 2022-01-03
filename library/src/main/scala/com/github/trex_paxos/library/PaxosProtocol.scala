@@ -249,7 +249,7 @@ case class Commit(identifier: Identifier, heartbeat: Long) extends PaxosMessage 
 }
 
 object Commit {
-  def apply(identifier: Identifier) = new Commit(identifier, Platform.currentTime)
+  def apply(identifier: Identifier) = new Commit(identifier, java.lang.System.currentTimeMillis())
 }
 
 /**

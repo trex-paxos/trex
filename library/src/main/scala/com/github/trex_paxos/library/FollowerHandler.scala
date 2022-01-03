@@ -7,7 +7,7 @@ import scala.collection.immutable.{SortedMap, TreeMap}
 trait FollowerHandler extends PaxosLenses with BackdownAgent {
   import FollowerHandler._
 
-  def highestAcceptedIndex(io: PaxosIO): Long = io.journal.bounds.max
+  def highestAcceptedIndex(io: PaxosIO): Long = io.journal.bounds().max
 
   def handleFollowerResendLowPrepares(io: PaxosIO, agent: PaxosAgent): PaxosAgent = {
     io.logger.debug("Node {} {} timed-out having already issued a low. rebroadcasting", agent.nodeUniqueId, agent.role)
@@ -64,7 +64,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
 
           } else {
             // need to wait until we hear from a majority
-            agent.copy(role = Follower, data = agent.data.copy(prepareResponses = TreeMap(Map(agent.minPrepare.id -> votes).toArray: _*))) // TODO lens
+            agent.copy(role = Follower, data = agent.data.copy(prepareResponses = TreeMap(Map(agent.minPrepare.id -> votes).toIndexedSeq: _*))) // TODO lens
           }
         case x =>
           io.logger.debug("Node {} {} is no longer awaiting responses to {} so ignoring {}", agent.nodeUniqueId, agent.role, vote.requestId, x)
@@ -92,7 +92,7 @@ trait FollowerHandler extends PaxosLenses with BackdownAgent {
               (prepares map { prepare =>
                 val selfVote = Map(agent.nodeUniqueId -> PrepareAck(prepare.id, agent.nodeUniqueId, agent.data.progress, highestAcceptedIndex(io), agent.data.leaderHeartbeat, io.journal.accepted(prepare.id.logIndex)))
                 prepare.id -> selfVote
-              })(scala.collection.breakOut)
+              }).to(SortedMap)
 
             // the new leader epoch is the promise it made to itself
             val epoch: Option[BallotNumber] = Some(selfPromise)

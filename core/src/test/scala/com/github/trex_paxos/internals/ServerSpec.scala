@@ -52,7 +52,8 @@ class ServerSpec extends TestKit(ActorSystem("ServerSpec", ServerSpec.config))
 
         override def paxosActor: ActorRef = target.ref
 
-        override def peers: Map[Int, ActorRef] = thePeers.mapValues(_.ref)
+        override def peers: Map[Int, ActorRef] = thePeers.view.mapValues(_.ref).toMap
+
       })
 
       (routing, listener, target, thePeers)

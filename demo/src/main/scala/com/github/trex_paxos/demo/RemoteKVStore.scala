@@ -21,7 +21,7 @@ class MethodCallInvoker(target: Any) extends Actor with ActorLogging {
       } match {
         case Failure(ex) =>
           log.error(ex, s"call to $method with $parameters got exception $ex")
-          sender ! ex
+          sender() ! ex
         case Success(response) => response.foreach {
           sender() ! _
         }
@@ -31,7 +31,7 @@ class MethodCallInvoker(target: Any) extends Actor with ActorLogging {
 
 object RemoteKVStore {
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     if (args.length < 4) {
       println("Usage: port folder")
       println("Where:\n\tport is the port to run the actor system")
@@ -57,7 +57,7 @@ object RemoteKVStore {
 }
 
 object KVStoreClient {
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     if (args.length != 2) {
       println("Args: host port")
       println("Where:\n\t host and port identify the remote actor system")
@@ -81,7 +81,7 @@ object KVStoreClient {
         val typedActor: ConsistentKVStore =
           TypedActor(system).
             typedActorOf(
-              TypedProps[ConsistentKVStore],
+              TypedProps[ConsistentKVStore](),
               actorRefToRemoteActor)
 
         for (ln <- scala.io.Source.stdin.getLines()) {

@@ -27,7 +27,7 @@ with AkkaLoggingAdapter {
 
   def clusterSize: Int
 
-  var paxosAgent = PaxosAlgorithm.initialAgent(nodeUniqueId, journal.loadProgress(), clusterSize _)
+  var paxosAgent = PaxosAlgorithm.initialAgent(nodeUniqueId, journal.loadProgress(), () => clusterSize)
 
   val logger = this
 
@@ -110,7 +110,7 @@ with AkkaLoggingAdapter {
     System.currentTimeMillis()
   }
 
-  def highestAcceptedIndex = journal.bounds.max
+  def highestAcceptedIndex = journal.bounds().max
 
   def randomInterval: Long = {
     config.leaderTimeoutMin + ((config.leaderTimeoutMax - config.leaderTimeoutMin) * random.nextDouble()).toLong

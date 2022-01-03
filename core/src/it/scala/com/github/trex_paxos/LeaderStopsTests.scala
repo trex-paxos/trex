@@ -24,7 +24,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
 
   val logger = Logging(system, this)
 
-  override def afterAll {
+  override def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
   }
 
@@ -177,7 +177,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
   object `A three node cluster` {
     val clusterSize = 3
 
-    def `should survive the leader dying` {
+    def `should survive the leader dying`(): Unit = {
       testLeaderDying(clusterSize)
     }
   }
@@ -185,7 +185,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
   object `A four node cluster` {
     val clusterSize = 4
 
-    def `should survive the leader dying` {
+    def `should survive the leader dying`(): Unit = {
       testLeaderDying(clusterSize)
     }
   }
@@ -193,7 +193,7 @@ class LeaderStopsTests extends TestKit(ActorSystem("LeaderStops",
   object `A seven node cluster` {
     val clusterSize = 7
 
-    def `should survive the leader dying` {
+    def `should survive the leader dying`(): Unit = {
       testLeaderDying(clusterSize)
     }
   }

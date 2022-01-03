@@ -10,10 +10,12 @@ import matchers.should._
 
 class TestAcceptHandler extends AcceptHandler
 
-class AcceptHandlerTests extends RefSpec with Matchers with MockFactory with OptionValues with PaxosLenses {
+class AcceptHandlerTests extends RefSpec with Matchers
+  with MockFactory
+  with OptionValues with PaxosLenses {
 
   object `A HighAcceptHandler` {
-    def `should require accept number at least as high as promise` {
+    def `should require accept number at least as high as promise`(): Unit = {
       val handler = new TestAcceptHandler
       val mockJournal = stub[Journal]
       val id = Identifier(0, BallotNumber(0, 0), 0)
@@ -26,7 +28,7 @@ class AcceptHandlerTests extends RefSpec with Matchers with MockFactory with Opt
 
   object `An AcceptHandler` {
 
-    def `should ack an Accept equal to its promise and journal message but not save progress sending last` {
+    def `should ack an Accept equal to its promise and journal message but not save progress sending last`(): Unit = {
       val id = Identifier(0, TestHelpers.initialData.progress.highestPromised, 0)
       val accept = Accept(id, NoOperationCommandValue)
       val handler = new TestAcceptHandler
@@ -44,7 +46,7 @@ class AcceptHandlerTests extends RefSpec with Matchers with MockFactory with Opt
     }
 
     // http://stackoverflow.com/q/29880949/329496
-    def `should ack an Accept higher than its promise and save new promise` {
+    def `should ack an Accept higher than its promise and save new promise`(): Unit = {
       val highNumber = BallotNumber(Int.MaxValue, Int.MaxValue)
       val id = Identifier(0, highNumber, 1)
       val accept = Accept(id, NoOperationCommandValue)
@@ -70,7 +72,7 @@ class AcceptHandlerTests extends RefSpec with Matchers with MockFactory with Opt
     val expectedString = "Knossos"
     val expectedBytes = expectedString.getBytes
 
-    def `should ack duplicated accept` {
+    def `should ack duplicated accept`(): Unit = {
       val stubJournal: Journal = stub[Journal]
       // given initial state
       val promised = BallotNumber(6, 1)
@@ -93,7 +95,7 @@ class AcceptHandlerTests extends RefSpec with Matchers with MockFactory with Opt
       newData shouldBe data
     }
 
-    def `should nack an accept below the high watermark` {
+    def `should nack an accept below the high watermark`(): Unit = {
       val stubJournal: Journal = stub[Journal]
       // given initial state
       val committedLogIndex = 1
@@ -116,7 +118,7 @@ class AcceptHandlerTests extends RefSpec with Matchers with MockFactory with Opt
       newData shouldBe initialData
     }
 
-    def `sould nack and accept below current promise` {
+    def `sould nack and accept below current promise`(): Unit = {
       val id = Identifier(0, BallotNumber(0, 0), 0)
       val accept = Accept(id, NoOperationCommandValue)
       val handler = new TestAcceptHandler

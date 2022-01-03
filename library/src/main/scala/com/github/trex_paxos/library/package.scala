@@ -3,7 +3,7 @@ package com.github.trex_paxos
 package object library {
 
   /** http://stackoverflow.com/a/5597750/329496 */
-  case class Lens[A, B](get: A => B, set: (A, B) => A) extends ((A) => B) with Immutable {
+  case class Lens[A, B](get: A => B, set: (A, B) => A) extends ((A) => B) {
     def apply(whole: A): B = get(whole)
 
     def mod(a: A, f: B => B) = set(a, f(this (a)))

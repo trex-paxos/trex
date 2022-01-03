@@ -31,7 +31,7 @@ class InMemoryJournal extends Journal {
 
   def accepted(logIndex: Long): Option[Accept] = _map.get(logIndex)
 
-  def bounds: JournalBounds = {
+  def bounds(): JournalBounds = {
     val keys = _map.keys
     if (keys.isEmpty) JournalBounds(0L, 0L) else JournalBounds(keys.head, keys.last)
   }
@@ -50,7 +50,7 @@ with DefaultTimeout with ImplicitSender with RefSpecLike with Matchers with Befo
     db = null
   }
 
-  override def afterAll() {
+  override def afterAll(): Unit = {
     shutdown()
   }
 

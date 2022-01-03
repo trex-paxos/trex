@@ -15,7 +15,8 @@ object MemberPickle {
   })
 
 
-  implicit def VectorDecodeJson[A](implicit e: DecodeJson[A]): DecodeJson[Seq[A]] = CanBuildFromDecodeJson[A, Seq]
+  implicit def VectorDecodeJson[A](implicit e: DecodeJson[A]): DecodeJson[Seq[A]] =
+    DecodeJson( cursor => DecodeJson.ListDecodeJson[A].apply(cursor).map(list => list.toSeq))
 
   implicit def VectorEncodeJson[A](implicit e: EncodeJson[List[A]]): EncodeJson[Seq[A]] =
     EncodeJson(a => e(a.toList))

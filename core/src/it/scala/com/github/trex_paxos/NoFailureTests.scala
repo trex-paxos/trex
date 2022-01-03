@@ -22,7 +22,7 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
 
   import scala.concurrent.duration._
 
-  override def afterAll() {
+  override def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
   }
 
@@ -77,11 +77,11 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
 
     val clusterSize = 3
 
-    def `should replicated values when timeouts are well spaced out` {
+    def `should replicated values when timeouts are well spaced out`(): Unit = {
       runWithConfig(NoFailureTests.spacedTimeoutConfig, "goodTimeout"+clusterSize, clusterSize)
     }
 
-    def `should replicated values when timeouts are not well spaced out` {
+    def `should replicated values when timeouts are not well spaced out`(): Unit = {
       runWithConfig(NoFailureTests.simultaneousTimeoutConfig, "poorTimeout"+clusterSize, clusterSize)
     }
   }
@@ -89,11 +89,11 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
   object `A five node cluster` {
     val clusterSize = 5
 
-    def `should replicated values when timeouts are well spaced out` {
+    def `should replicated values when timeouts are well spaced out`(): Unit = {
       runWithConfig(NoFailureTests.spacedTimeoutConfig, "goodTimeout"+clusterSize, clusterSize)
     }
 
-    def `should replicated values when timeouts are not well spaced out` {
+    def `should replicated values when timeouts are not well spaced out`(): Unit = {
       runWithConfig(NoFailureTests.simultaneousTimeoutConfig, "poorTimeout"+clusterSize, clusterSize)
     }
   }
@@ -101,11 +101,11 @@ class NoFailureTests extends TestKit(ActorSystem("NoFailure",
   object `A seven node cluster` {
     val clusterSize = 7
 
-    def `should replicated values when timeouts are well spaced out` {
+    def `should replicated values when timeouts are well spaced out`(): Unit = {
       runWithConfig(NoFailureTests.spacedTimeoutConfig, "goodTimeout"+clusterSize, clusterSize)
     }
 
-    def `should replicated values when timeouts are not well spaced out` {
+    def `should replicated values when timeouts are not well spaced out`(): Unit = {
       runWithConfig(NoFailureTests.simultaneousTimeoutConfig, "poorTimeout"+clusterSize, clusterSize)
     }
   }

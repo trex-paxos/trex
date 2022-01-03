@@ -11,7 +11,7 @@ import scala.collection.mutable.ArrayBuffer
 class FollowerTests extends AllRolesTests {
 
   class ClockPaxosIO(time: Long) extends UndefinedIO {
-    override def clock: Long = time
+    override def clock(): Long = time
   }
 
   val initialDataAgent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
@@ -22,143 +22,143 @@ class FollowerTests extends AllRolesTests {
 
     val commit = Commit(Identifier(0, BallotNumber(0, 0), 0))
 
-    def `should be defined for a follower and a commit message` {
+    def `should be defined for a follower and a commit message`(): Unit = {
       assert(paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, commit)))
     }
 
-    def `should not be defined for a recoverer and a commit message` {
+    def `should not be defined for a recoverer and a commit message`(): Unit = {
       assert(!paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent.copy(role = Recoverer), commit)))
     }
 
-    def `should not be defined for a leader and a commit message` {
+    def `should not be defined for a leader and a commit message`(): Unit = {
       assert(!paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent.copy(role = Leader), commit)))
     }
 
-    def `should be defined for a follower with an empty prepare response timed out and a CheckTimeout` {
+    def `should be defined for a follower with an empty prepare response timed out and a CheckTimeout`(): Unit = {
       val dataNoPrepareResponsesAndTimout10 = initialDataAgent.data.copy(timeout = 10L)
       assert(paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(new ClockPaxosIO(11L), initialDataAgent.copy(data = dataNoPrepareResponsesAndTimout10), CheckTimeout)))
     }
 
-    def `should not be defined for a follower with an empty prepare response not timed out and a CheckTimeout` {
+    def `should not be defined for a follower with an empty prepare response not timed out and a CheckTimeout`(): Unit = {
       val dataNoPrepareResponsesAndTimout10 = initialDataAgent.data.copy(timeout = 12L)
       assert(!paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(new ClockPaxosIO(11L), initialDataAgent.copy(data = dataNoPrepareResponsesAndTimout10), CheckTimeout)))
     }
 
-    def `should not be defined for a leader with an empty prepare response timed out and a CheckTimeout` {
+    def `should not be defined for a leader with an empty prepare response timed out and a CheckTimeout`(): Unit = {
       val dataNoPrepareResponsesAndTimout10 = initialDataAgent.data.copy(timeout = 10L)
       assert(!paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(new ClockPaxosIO(11L), initialDataAgent.copy(data = dataNoPrepareResponsesAndTimout10, role = Leader), CheckTimeout)))
     }
 
-    def `should not be defined for a recoverer with an empty prepare response timed out and a CheckTimeout` {
+    def `should not be defined for a recoverer with an empty prepare response timed out and a CheckTimeout`(): Unit = {
       val dataNoPrepareResponsesAndTimout10 = initialDataAgent.data.copy(timeout = 10L)
       assert(!paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(new ClockPaxosIO(11L), initialDataAgent.copy(data = dataNoPrepareResponsesAndTimout10, role = Recoverer), CheckTimeout)))
     }
 
-    def `should be defined for a follower with a non empty prepare response timed out and a CheckTimeout` {
+    def `should be defined for a follower with a non empty prepare response timed out and a CheckTimeout`(): Unit = {
       val dataNoPrepareResponsesAndTimout10 = initialDataAgent.data.copy(timeout = 10L, prepareResponses = TreeMap(Identifier(0, BallotNumber(0, 0), 0) -> Map.empty))
       assert(paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(new ClockPaxosIO(11L), initialDataAgent.copy(data = dataNoPrepareResponsesAndTimout10), CheckTimeout)))
     }
 
-    def `should not be defined for a follower with a non empty prepare response not timed out and a CheckTimeout` {
+    def `should not be defined for a follower with a non empty prepare response not timed out and a CheckTimeout`(): Unit = {
       val dataNoPrepareResponsesAndTimout10 = initialDataAgent.data.copy(timeout = 12L, prepareResponses = TreeMap(Identifier(0, BallotNumber(0, 0), 0) -> Map.empty))
       assert(!paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(new ClockPaxosIO(11L), initialDataAgent.copy(data = dataNoPrepareResponsesAndTimout10), CheckTimeout)))
     }
 
-    def `should not be defined for a recoverer with a non empty prepare response timed out and a CheckTimeout` {
+    def `should not be defined for a recoverer with a non empty prepare response timed out and a CheckTimeout`(): Unit = {
       val dataNoPrepareResponsesAndTimout10 = initialDataAgent.data.copy(timeout = 10L, prepareResponses = TreeMap(Identifier(0, BallotNumber(0, 0), 0) -> Map.empty))
       assert(!paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(new ClockPaxosIO(11L), initialDataAgent.copy(data = dataNoPrepareResponsesAndTimout10, role = Recoverer), CheckTimeout)))
     }
 
-    def `should not be defined for a leader with a non empty prepare response timed out and a CheckTimeout` {
+    def `should not be defined for a leader with a non empty prepare response timed out and a CheckTimeout`(): Unit = {
       val dataNoPrepareResponsesAndTimout10 = initialDataAgent.data.copy(timeout = 10L, prepareResponses = TreeMap(Identifier(0, BallotNumber(0, 0), 0) -> Map.empty))
       assert(!paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(new ClockPaxosIO(11L), initialDataAgent.copy(data = dataNoPrepareResponsesAndTimout10, role = Leader), CheckTimeout)))
     }
 
-    def `should be defined for a follower with a non empty prepare responses and a PrepareResponse` {
+    def `should be defined for a follower with a non empty prepare responses and a PrepareResponse`(): Unit = {
       val dataPrepareResponses = initialDataAgent.data.copy(prepareResponses = TreeMap(Identifier(0, BallotNumber(0, 0), 0) -> Map.empty))
       assert(paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent.copy(data = dataPrepareResponses), undefinedPrepareResponse)))
     }
 
-    def `should not be defined for a recoverer with a non empty prepare responses and a PrepareResponse` {
+    def `should not be defined for a recoverer with a non empty prepare responses and a PrepareResponse`(): Unit = {
       val dataPrepareResponses = initialDataAgent.data.copy(prepareResponses = TreeMap(Identifier(0, BallotNumber(0, 0), 0) -> Map.empty))
       assert(!paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent.copy(data = dataPrepareResponses, role = Recoverer), undefinedPrepareResponse)))
     }
 
-    def `should not be defined for a leader with a non empty prepare responses and a PrepareResponse` {
+    def `should not be defined for a leader with a non empty prepare responses and a PrepareResponse`(): Unit = {
       val dataPrepareResponses = initialDataAgent.data.copy(prepareResponses = TreeMap(Identifier(0, BallotNumber(0, 0), 0) -> Map.empty))
       assert(!paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent.copy(data = dataPrepareResponses, role = Leader), undefinedPrepareResponse)))
     }
 
-    def `should be defined for a follower with an empty prepare responses and a PrepareResponse` {
+    def `should be defined for a follower with an empty prepare responses and a PrepareResponse`(): Unit = {
       assert(paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, undefinedPrepareResponse)))
     }
 
-    def `should not be defined for a recoverer with an empty prepare responses and a PrepareResponse` {
+    def `should not be defined for a recoverer with an empty prepare responses and a PrepareResponse`(): Unit = {
       assert(!paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent.copy(role = Recoverer), undefinedPrepareResponse)))
     }
 
-    def `should not be defined for a leader with an empty prepare responses and a PrepareResponse` {
+    def `should not be defined for a leader with an empty prepare responses and a PrepareResponse`(): Unit = {
       assert(!paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent.copy(role = Leader), undefinedPrepareResponse)))
     }
 
-    def `should be defined for a follower and an AcceptResponse` {
+    def `should be defined for a follower and an AcceptResponse`(): Unit = {
       assert(paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, undefinedAcceptResponse)))
     }
 
-    def `should not be defined for a recoverer and an AcceptResponse` {
+    def `should not be defined for a recoverer and an AcceptResponse`(): Unit = {
       assert(!paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent.copy(role = Recoverer), undefinedAcceptResponse)))
     }
 
-    def `should not be defined for a leader and an AcceptResponse` {
+    def `should not be defined for a leader and an AcceptResponse`(): Unit = {
       assert(!paxosAlgorithm.followingFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent.copy(role = Leader), undefinedAcceptResponse)))
     }
   }
 
-  object `The Follower Function` {
+  object `The Follower Function`  {
     val paxosAlgorithm = new PaxosAlgorithm
-    def `should be defined for a client command message` {
+    def `should be defined for a client command message`(): Unit = {
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, DummyCommandValue("0"))))
     }
 
-    def `should be defined for RetransmitRequest` {
+    def `should be defined for RetransmitRequest`(): Unit = {
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, RetransmitRequest(0, 1, 0L))))
     }
 
-    def `should be defined for a RetransmitResponse` {
+    def `should be defined for a RetransmitResponse`(): Unit = {
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, RetransmitResponse(0, 1, Seq(), Seq()))))
     }
 
-    def `should be defined for a Prepare if the prepare is less than the promise` {
+    def `should be defined for a Prepare if the prepare is less than the promise`(): Unit = {
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(0, 0), 0)))))
     }
 
-    def `should be defined for a Prepare if the prepare is higher than the promise` {
+    def `should be defined for a Prepare if the prepare is higher than the promise`(): Unit = {
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, BallotNumber(Int.MaxValue, Int.MaxValue), 0)))))
     }
 
-    def `should be defined for a Prepare if the prepare is equal to the promise` {
+    def `should be defined for a Prepare if the prepare is equal to the promise`(): Unit = {
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Prepare(Identifier(0, initialDataAgent.data.progress.highestPromised, 0)))))
     }
 
-    def `should be defined for an Accept with a lower number` {
+    def `should be defined for an Accept with a lower number`(): Unit = {
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, initialDataAgent, Accept(Identifier(0, BallotNumber(0, 0), 0), NoOperationCommandValue))))
     }
 
-    def `should be defined for an Accept with a higher number for a committed slot` {
+    def `should be defined for an Accept with a higher number for a committed slot`(): Unit = {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = TestHelpers.highestPromisedHighestCommittedLens.set(TestHelpers.initialData, (promise, Identifier(from = 0, number = promise, logIndex = 99L)))
       val higherCommittedAgent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, higherCommittedAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
-    def `should be defined for an Accept equal to promise` {
+    def `should be defined for an Accept equal to promise`(): Unit = {
       val promise = BallotNumber(Int.MaxValue, Int.MaxValue)
       val initialData = highestPromisedLens.set(TestHelpers.initialData, promise)
       val equalPromiseAgent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, equalPromiseAgent, Accept(Identifier(0, promise, 0), NoOperationCommandValue))))
     }
 
-    def `should be defined for an Accept greater than promise` {
+    def `should be defined for an Accept greater than promise`(): Unit = {
       val higherAcceptId = BallotNumber(Int.MaxValue, Int.MaxValue)
       val lowerPromise = BallotNumber(Int.MaxValue -1 , Int.MaxValue - 1)
       val initialData = highestPromisedLens.set(TestHelpers.initialData, lowerPromise)
@@ -171,7 +171,7 @@ class FollowerTests extends AllRolesTests {
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(undefinedIO, agent, HeartBeat)))
     }
 
-    def `should be defined for a CheckTimeout when not timedout` {
+    def `should be defined for a CheckTimeout when not timedout`(): Unit = {
       val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       assert(paxosAlgorithm.followerFunction.isDefinedAt(PaxosEvent(negativeClockIO, agent, CheckTimeout)))
     }
@@ -179,10 +179,10 @@ class FollowerTests extends AllRolesTests {
 
   object `A Follower` {
     val paxosAlgorithm = new PaxosAlgorithm
-    def `responds is not leader` {
+    def `responds is not leader`(): Unit = {
       respondsIsNotLeader(Follower)
     }
-    def `should use follower commit handler` {
+    def `should use follower commit handler`(): Unit = {
       import CommitHandlerTests.a14
       // given
       val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
@@ -199,13 +199,13 @@ class FollowerTests extends AllRolesTests {
       // then
       invoked.get() shouldBe true
     }
-    def `should not change state if not timed out` {
+    def `should not change state if not timed out`(): Unit = {
       val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       val notTimedOutEvent = PaxosEvent(negativeClockIO, agent, CheckTimeout)
       val PaxosAgent(_, role, data, _) = paxosAlgorithm(notTimedOutEvent)
       assert( role == agent.role && data == agent.data)
     }
-    def `should update its timeout and observed heartbeat when it sees a commit` {
+    def `should update its timeout and observed heartbeat when it sees a commit`(): Unit = {
 
       val timeout = 123L
       val heartbeat = 9999L
@@ -219,17 +219,17 @@ class FollowerTests extends AllRolesTests {
       val PaxosAgent(_, role, data, _) = paxosAlgorithm(event)
       assert( role == Follower && data == agent.data.copy(timeout = timeout, leaderHeartbeat = heartbeat))
     }
-    def `should ignore a lower commit` {
+    def `should ignore a lower commit`(): Unit = {
       val agent = PaxosAgent(0, Follower, initialDataCommittedSlotOne, initialQuorumStrategy)
       val event = PaxosEvent(undefinedSilentIO, agent, Commit(Identifier(0, BallotNumber(lowValue, lowValue), 0L), Long.MinValue))
       val PaxosAgent(_, role, data, _) = paxosAlgorithm(event)
       role shouldBe Follower
       data shouldBe agent.data
     }
-    def `should ignore a late prepare response` {
+    def `should ignore a late prepare response`(): Unit = {
       shouldIngoreLatePrepareResponse(Leader)
     }
-    def `should ignore an accept response`  {
+    def `should ignore an accept response`(): Unit = {
       // given
       val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       val message = AcceptAck(initialData.progress.highestCommitted, 0, initialData.progress)
@@ -241,7 +241,7 @@ class FollowerTests extends AllRolesTests {
       newRole shouldBe Follower
       newData shouldBe initialData
     }
-    def `should update timeout and hearbeat up repeated commit` {
+    def `should update timeout and hearbeat up repeated commit`(): Unit = {
       // given
       val agent = PaxosAgent(0, Follower, initialData, initialQuorumStrategy)
       val message = Commit(initialData.progress.highestCommitted, Long.MaxValue)
@@ -256,16 +256,16 @@ class FollowerTests extends AllRolesTests {
       newRole shouldBe Follower
       newData shouldBe initialData.copy(timeout = 12345L, leaderHeartbeat = Long.MaxValue)
     }
-    def `should time-out and send a low prepare` {
+    def `should time-out and send a low prepare`(): Unit = {
       val paxosAlgorithm = new PaxosAlgorithm
       // given an empty journal
-      val stubJournal: Journal = stub[Journal]
+      val stubJournal: Journal = mock[Journal]
       val bounds = JournalBounds(0L, 0L)
-      (stubJournal.bounds _) when() returns (bounds)
+      ( stubJournal.bounds _ ).expects().returning(bounds)
       // and an io which has a high clock and checks the sent messages
       val messages: ArrayBuffer[PaxosMessage] = ArrayBuffer.empty
       val io = new UndefinedIO with SilentLogging {
-        override def clock: Long = Long.MaxValue
+        override def clock(): Long = Long.MaxValue
 
         override def send(msg: PaxosMessage): Unit = messages += msg
 
@@ -291,7 +291,7 @@ class FollowerTests extends AllRolesTests {
         case x => fail(x.toString)
       }
     }
-    def `should backdown and issue retransmit response if another node has committed a higher slot` {
+    def `should backdown and issue retransmit response if another node has committed a higher slot`(): Unit = {
       val paxosAlgorithm = new PaxosAlgorithm
       // given a follower that has issued a min prepare
       val selfAck = PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None)
@@ -315,7 +315,7 @@ class FollowerTests extends AllRolesTests {
       newData.prepareResponses.isEmpty shouldBe true
       newData.timeout shouldBe 987654L
     }
-    def `should backdown if another node has seen a higher leader heartbeat where leader has majority` {
+    def `should backdown if another node has seen a higher leader heartbeat where leader has majority`(): Unit = {
       val paxosAlgorithm = new PaxosAlgorithm
       // given a follower in a cluster sized 3 that has issued a min prepare
       val selfAck = PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None)
@@ -340,7 +340,7 @@ class FollowerTests extends AllRolesTests {
       newData.timeout shouldBe 987654L
       newData.leaderHeartbeat shouldBe Long.MaxValue
     }
-    def `should backdown if sees a commit from another leader` {
+    def `should backdown if sees a commit from another leader`(): Unit = {
       val paxosAlgorithm = new PaxosAlgorithm
       // given a follower in a cluster sized 3 that has issued a min prepare
       val selfAck = PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None)
@@ -363,7 +363,7 @@ class FollowerTests extends AllRolesTests {
       newData.prepareResponses.isEmpty shouldBe true
       newData.timeout shouldBe 987654L
     }
-    def `should backdown if it sees a commit from same leader with higher heartbeat` {
+    def `should backdown if it sees a commit from same leader with higher heartbeat`(): Unit = {
       val paxosAlgorithm = new PaxosAlgorithm
       // given a follower in a cluster sized 3 that has issued a min prepare
       val selfAck = PrepareAck(minPrepare.id, 0, initialData.progress, 0, 0, None)
@@ -387,7 +387,7 @@ class FollowerTests extends AllRolesTests {
       newData.timeout shouldBe 987654L
       newData.leaderHeartbeat shouldBe Long.MaxValue
     }
-    def `should bootstrap from a retransmission response` {
+    def `should bootstrap from a retransmission response`(): Unit = {
       val paxosAlgorithm = new PaxosAlgorithm
 
       val tempJournal = new InMemoryJournal()
@@ -439,7 +439,7 @@ class FollowerTests extends AllRolesTests {
       delivered(2) should be(v3)
 
       // and journalled the values so that it can retransmit itself
-      tempJournal.bounds shouldBe JournalBounds(1, 3)
+      tempJournal.bounds() shouldBe JournalBounds(1, 3)
 
       tempJournal.accepted(1) match {
         case Some(a) if a.id == a1.id => // good
@@ -459,7 +459,7 @@ class FollowerTests extends AllRolesTests {
         case f => fail(f.toString)
       }
     }
-    def `should switch to recoverer and issue multiple prepares if there are slots to recover and no leader` {
+    def `should switch to recoverer and issue multiple prepares if there are slots to recover and no leader`(): Unit = {
       val paxosAlgorithm = new PaxosAlgorithm
 
       // given three uncommitted values in the journal
@@ -486,7 +486,7 @@ class FollowerTests extends AllRolesTests {
 
         override def randomTimeout: Long = 987654L
 
-        override def clock: Long = Int.MaxValue
+        override def clock(): Long = Int.MaxValue
 
         override def deliver(payload: Payload): Any = payload match {
           case Payload(_, c: DummyCommandValue) => delivered += c
@@ -541,7 +541,7 @@ class FollowerTests extends AllRolesTests {
       // and votes for its own prepares
       recoverer.data.prepareResponses.isEmpty shouldBe false
       val prapareIds = recoverer.data.prepareResponses map {
-        case (id, map) if map.keys.headOption == Some(0) && map.values.headOption.getOrElse(fail).requestId == id =>
+        case (id, map) if map.keys.headOption == Some(0) && map.values.headOption.getOrElse(fail()).requestId == id =>
           id
         case x => fail(x.toString)
       }

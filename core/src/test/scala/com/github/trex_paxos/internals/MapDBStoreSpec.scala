@@ -119,7 +119,7 @@ class MapDBStoreSpec extends wordspec.AnyWordSpec with Matchers with BeforeAndAf
 
       for (a <- 0 to 9) j.accept(next)
 
-      assert(j.bounds == JournalBounds(100, 109))
+      assert(j.bounds() == JournalBounds(100, 109))
 
       j.close()
     }
@@ -133,7 +133,7 @@ class MapDBStoreSpec extends wordspec.AnyWordSpec with Matchers with BeforeAndAf
       store.saveMembership(CommittedMembership(0L, m))
       try {
         store.saveMembership(CommittedMembership(0L, m))
-        fail
+        fail()
       } catch {
         case _ :Exception => // good
       }
