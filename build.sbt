@@ -4,7 +4,7 @@ val logbackVersion = "1.2.10"
 val argonautVersion = "6.3.7"
 val scalatestVersion = "3.2.10"
 val scalamockVersion = "5.2.0"
-
+val liftjsonVersion = "3.5.0"
 lazy val scala2 = "2.13.7"
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
@@ -20,6 +20,7 @@ lazy val root = (project in file(".")).aggregate(library,core,demo).settings(
   packagedArtifacts := Map.empty
 )
 
+// TODO no mocking/stubing framework seems to support scala3 yet
 lazy val library = project.settings(commonSettings: _*).
   settings( name := "trex-library").
   settings(
@@ -29,6 +30,7 @@ lazy val library = project.settings(commonSettings: _*).
     )
   )
 
+// TODO move akka to a test dependency to use its async test kit for testing
 lazy val core = project.dependsOn(library).
   configs(IntegrationTest).
   settings(commonSettings: _*).
@@ -48,6 +50,7 @@ lazy val core = project.dependsOn(library).
     )
   )
 
+// TODO replace akka with rsocket
 lazy val demo = project.dependsOn(core).
   settings(commonSettings: _*).
   settings( name := "trex-demo").
@@ -55,7 +58,7 @@ lazy val demo = project.dependsOn(core).
     libraryDependencies ++= Seq(
       "org.scala-lang" % "scala-compiler" % scalaVersion.value,
       "ch.qos.logback" % "logback-classic" % logbackVersion,
-      "net.liftweb" %% "lift-json" % "3.5.0",
+      "net.liftweb" %% "lift-json" % liftjsonVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-remote" % akkaVersion,
