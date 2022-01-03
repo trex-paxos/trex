@@ -15,13 +15,13 @@ sbt coverageReport
 
 # Releasing
 
-Create a release:
+Create a release first edit version.sbt, commit, tag, push and then:
 
 ```shell script
-sbt> sonatypeDrop comgithubtrex-paxos-1029
 sbt> publishSigned
 sbt> sonatypeReleaseAll
 ```
+
 
 ## Status /  Work Plan
 
