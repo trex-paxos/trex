@@ -8,15 +8,10 @@ import matchers.should._
 
 class MVStoreSpec extends wordspec.AnyWordSpec with Matchers with BeforeAndAfter  {
 
-  // MapDB 1.0.x logical store file creates two other files .p and .t which we delete
   val storeFile = new File("store.trex")
-  val storeFileP = new File("store.trex.p")
-  val storeFileT = new File("store.trex.t")
 
   def deleteMapDbFiles: Unit = {
     if (storeFile.exists()) storeFile.delete()
-    if (storeFileP.exists()) storeFileP.delete()
-    if (storeFileT.exists()) storeFileT.delete()
   }
 
   before {

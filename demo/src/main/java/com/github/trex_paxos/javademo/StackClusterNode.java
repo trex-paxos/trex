@@ -4,7 +4,7 @@ import akka.actor.ActorSystem;
 import com.github.trex_paxos.Cluster;
 import com.github.trex_paxos.Node;
 import com.github.trex_paxos.TrexServer$;
-import com.github.trex_paxos.internals.MapDBStore;
+import com.github.trex_paxos.internals.MVStoreJournal;
 import com.github.trex_paxos.internals.PaxosProperties;
 import com.github.trex_paxos.internals.PaxosProperties$;
 import com.typesafe.config.Config;
@@ -41,7 +41,7 @@ public class StackClusterNode {
             System.err.println(folder.getCanonicalPath() + " does not exist or do not have permission to read and write. Exiting.");
             System.exit(-1);
         }
-        MapDBStore journal = new MapDBStore(new File(folder, "journal"), cluster.retained());
+        var journal = new MVStoreJournal(new File(folder, "journal"), Integer.MAX_VALUE, 0);
         Config systemConfig = ConfigFactory.load(configName)
                 .withValue("akka.remote.netty.tcp.port", ConfigValueFactory.fromAnyRef(node.clientPort()))
                 .withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(node.host()));

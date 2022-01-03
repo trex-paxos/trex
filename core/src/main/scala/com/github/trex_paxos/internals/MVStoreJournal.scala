@@ -30,6 +30,12 @@ class MVStoreJournal(journalFile: File, retained: Int = Int.MaxValue, retainedBa
   // stores the current cluster membership at a given slot
   val memberMap: MVMap[Long, Array[Byte]] = store.openMap("MEMBERS")
 
+  protected def init(): Unit = {
+    saveProgress(Journal.minBookwork)
+  }
+
+  if (emptyStoreFile) init()
+
   /**
     * Synchronously journal progress bookwork.
     *
