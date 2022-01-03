@@ -3,6 +3,7 @@ package com.github.trex_paxos.demo
 import akka.actor.TypedActor.MethodCall
 import akka.actor._
 import com.typesafe.config.ConfigFactory
+import org.h2.mvstore.MVStore
 //import org.mapdb.{DB, DBMaker}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -45,14 +46,14 @@ object RemoteKVStore {
       System.err.println(s"$folderPath does not exist or do not have permission to read and write. Exiting.")
       System.exit(-1)
     }
-    val dataFolder = new java.io.File(folder.getCanonicalPath + "/" + port)
+    val dataFile = new java.io.File(folder.getCanonicalPath + "/" + port)
 
-    //val db: DB = DBMaker.newFileDB(dataFolder).make
+    val store = new MVStore.Builder().fileName(dataFile.getCanonicalPath()).open();
     val system =
       ActorSystem("ConsistentStore", ConfigFactory.load(s"remotestore-$port"))
-    system.actorOf(Props(classOf[MethodCallInvoker], new MapDBConsistentKVStore(null)), "store")
+    system.actorOf(Props(classOf[MethodCallInvoker], new MVStoreConsistentKVStore(store)), "store")
 
-    println(s"Started node $port with store $dataFolder")
+    println(s"Started node $port with store $dataFile")
   }
 }
 

@@ -5,6 +5,7 @@ import akka.util.Timeout
 import com.github.trex_paxos.internals._
 import com.github.trex_paxos._
 import com.typesafe.config._
+import org.h2.mvstore.MVStore
 //import org.mapdb.{DB, DBMaker}
 
 import scala.concurrent.duration._
@@ -128,8 +129,8 @@ object TrexKVStore {
         // the client app K-V store
         val dataFile = new java.io.File(folder.getCanonicalPath + "/kvstore")
         println(s"node kv data store is ${dataFile.getCanonicalPath}")
-        //val db: DB = DBMaker.newFileDB(dataFile).make
-        val target = new MapDBConsistentKVStore(null)
+        val store = new MVStore.Builder().fileName(dataFile.getCanonicalPath()).open();
+        val target = new MVStoreConsistentKVStore(store)
         val logFile = new java.io.File(folder.getCanonicalPath + "/paxos")
         println(s"paxos data log is ${logFile.getCanonicalPath}")
         val journal = new MVStoreJournal(logFile, cluster.retained)
