@@ -2,6 +2,7 @@ package com.github.trex_paxos.internals
 
 import akka.actor.ActorRef
 import _root_.com.github.trex_paxos.library._
+import com.github.trex_paxos.akka.internals.{PaxosActor, PaxosActorNoTimeout, PaxosProperties}
 
 import scala.collection.mutable.ArrayBuffer
 

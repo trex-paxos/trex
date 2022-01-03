@@ -1,18 +1,18 @@
 package com.github.trex_paxos.internals
 
-import _root_.com.github.trex_paxos._
+import _root_.com.github.trex_paxos.akka._
 import _root_.com.github.trex_paxos.library._
 import java.util.concurrent.TimeoutException
 
-import akka.actor._
-import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import akka.util.Timeout
+import _root_.akka.actor._
+import _root_.akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import _root_.akka.util.Timeout
 import org.scalatest.refspec.RefSpecLike
 
 import org.scalatest._
 import matchers.should._
 
-import scala.compat.Platform
+
 import scala.concurrent.duration._
 
 object DriverSpec {

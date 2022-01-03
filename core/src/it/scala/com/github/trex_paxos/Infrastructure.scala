@@ -2,10 +2,9 @@ package com.github.trex_paxos
 
 import java.io.FileWriter
 import java.util.concurrent.CopyOnWriteArrayList
-
-import akka.actor._
-import com.github.trex_paxos.internals.PaxosActor.TraceData
-import com.github.trex_paxos.internals.{PaxosActor, PaxosProperties}
+import _root_.akka.actor._
+import com.github.trex_paxos.akka.internals.PaxosActor.TraceData
+import com.github.trex_paxos.akka.internals.{PaxosActor, PaxosProperties}
 import com.github.trex_paxos.library._
 import com.typesafe.config.Config
 

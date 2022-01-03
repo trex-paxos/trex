@@ -1,8 +1,8 @@
 package com.github.trex_paxos.internals
 
 import java.io.File
-
 import _root_.com.github.trex_paxos.library._
+import com.github.trex_paxos.akka.internals.{CommittedMembership, MVStoreJournal, Member, MemberStatus, Membership}
 import org.scalatest._
 import matchers.should._
 

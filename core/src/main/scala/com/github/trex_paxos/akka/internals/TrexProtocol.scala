@@ -1,6 +1,6 @@
-package com.github.trex_paxos.internals
+package com.github.trex_paxos.akka.internals
 
-import com.github.trex_paxos.internals.MemberStatus.MemberStatus
+import MemberStatus.MemberStatus
 
 object MemberStatus extends Enumeration {
   type MemberStatus = Value

@@ -1,4 +1,4 @@
-package com.github.trex_paxos.internals
+package com.github.trex_paxos.akka.internals
 
 import akka.actor.ActorLogging
 import com.github.trex_paxos.library.PaxosLogging

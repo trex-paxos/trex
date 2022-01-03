@@ -1,10 +1,9 @@
-package com.github.trex_paxos
+package com.github.trex_paxos.akka
 
 import java.net.InetSocketAddress
-
 import _root_.akka.actor._
 import _root_.akka.event.Logging
-import com.github.trex_paxos.internals._
+import com.github.trex_paxos.akka.internals.{CommittedMembership, Member, MemberStatus, Membership, PaxosActorNoTimeout, PaxosProperties}
 import com.github.trex_paxos.library._
 
 object TrexServer {

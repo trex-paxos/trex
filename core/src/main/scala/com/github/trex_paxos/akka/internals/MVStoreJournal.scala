@@ -1,6 +1,6 @@
-package com.github.trex_paxos.internals
+package com.github.trex_paxos.akka.internals
 
-import com.github.trex_paxos.TrexMembership
+import com.github.trex_paxos.akka.TrexMembership
 import com.github.trex_paxos.library.{Accept, Identifier, Journal, JournalBounds, PaxosAlgorithm, Progress}
 import org.h2.mvstore._
 

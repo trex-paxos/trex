@@ -1,4 +1,4 @@
-package com.github.trex_paxos.internals
+package com.github.trex_paxos.akka.internals
 
 import java.security.SecureRandom
 

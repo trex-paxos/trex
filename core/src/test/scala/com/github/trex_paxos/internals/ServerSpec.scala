@@ -2,7 +2,7 @@ package com.github.trex_paxos.internals
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import _root_.com.github.trex_paxos.TrexRouting
+import _root_.com.github.trex_paxos.akka.TrexRouting
 import _root_.com.github.trex_paxos.library.{RetransmitRequest, RetransmitResponse, _}
 import org.scalatest.refspec.RefSpecLike
 
@@ -26,7 +26,7 @@ class ServerSpec extends TestKit(ActorSystem("ServerSpec", ServerSpec.config))
 
   object `member pattern` {
     def `will parse string`: Unit = {
-      import Member.pattern
+      import com.github.trex_paxos.akka.internals.Member.pattern
       val pattern(host, port) = "localhost:1234"
       host shouldBe "localhost"
       port shouldBe "1234"

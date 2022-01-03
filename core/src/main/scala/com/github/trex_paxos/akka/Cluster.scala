@@ -1,4 +1,4 @@
-package com.github.trex_paxos
+package com.github.trex_paxos.akka
 
 import com.typesafe.config.Config
 

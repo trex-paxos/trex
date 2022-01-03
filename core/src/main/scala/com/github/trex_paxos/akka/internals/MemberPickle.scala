@@ -1,4 +1,4 @@
-package com.github.trex_paxos.internals
+package com.github.trex_paxos.akka.internals
 
 import argonaut._
 import Argonaut._

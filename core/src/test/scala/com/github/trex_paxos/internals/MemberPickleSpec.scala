@@ -1,4 +1,5 @@
 package com.github.trex_paxos.internals
+import com.github.trex_paxos.akka.internals.{CommittedMembership, Member, MemberPickle, MemberStatus, Membership}
 import org.scalatest._
 import matchers.should._
 

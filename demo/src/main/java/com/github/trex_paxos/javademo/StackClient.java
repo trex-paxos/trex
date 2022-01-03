@@ -1,9 +1,9 @@
 package com.github.trex_paxos.javademo;
 
 import akka.actor.*;
-import com.github.trex_paxos.Cluster;
-import com.github.trex_paxos.DynamicClusterDriver;
-import com.github.trex_paxos.DynamicClusterDriver$;
+import com.github.trex_paxos.akka.Cluster;
+import com.github.trex_paxos.akka.DynamicClusterDriver;
+import com.github.trex_paxos.akka.DynamicClusterDriver$;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigValueFactory;

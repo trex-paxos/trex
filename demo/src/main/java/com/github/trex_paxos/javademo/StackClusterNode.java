@@ -1,12 +1,12 @@
 package com.github.trex_paxos.javademo;
 
 import akka.actor.ActorSystem;
-import com.github.trex_paxos.Cluster;
-import com.github.trex_paxos.Node;
-import com.github.trex_paxos.TrexServer$;
-import com.github.trex_paxos.internals.MVStoreJournal;
-import com.github.trex_paxos.internals.PaxosProperties;
-import com.github.trex_paxos.internals.PaxosProperties$;
+import com.github.trex_paxos.akka.Cluster;
+import com.github.trex_paxos.akka.Node;
+import com.github.trex_paxos.akka.TrexServer$;
+import com.github.trex_paxos.akka.internals.MVStoreJournal;
+import com.github.trex_paxos.akka.internals.PaxosProperties;
+import com.github.trex_paxos.akka.internals.PaxosProperties$;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigValueFactory;

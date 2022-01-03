@@ -1,11 +1,10 @@
-package com.github.trex_paxos
+package com.github.trex_paxos.akka
 
 import java.net.InetSocketAddress
-
 import _root_.akka.actor.{ActorRef, PoisonPill, Props, TypedActor}
 import _root_.akka.actor.TypedActor.MethodCall
 import _root_.akka.serialization.SerializationExtension
-import com.github.trex_paxos.internals._
+import com.github.trex_paxos.akka.internals.{CommittedMembership, Member, Membership, PaxosActor, PaxosProperties}
 import com.github.trex_paxos.library._
 
 import scala.compat.Platform
@@ -66,7 +65,7 @@ class TypedActorPaxosEndpoint(
     val others = members.filterNot(_.nodeUniqueId == nodeUniqueId)
     log.info("{} creating senders for nodes {}", nodeUniqueId, others)
     others.map { n =>
-      import Member.pattern
+      import com.github.trex_paxos.akka.internals.Member.pattern
       val pattern(host, port) = n.location
       n.nodeUniqueId -> context.system.actorOf(Props(classOf[UdpSender],
         new java.net.InetSocketAddress(host, port.toInt)), s"UdpSender${n.nodeUniqueId}-${System.currentTimeMillis()}")
