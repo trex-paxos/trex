@@ -62,6 +62,8 @@ sbt> sonatypeReleaseAll
 
 0.6.0 - MVStore as Journal with backup method
 
+- [ ] Replace MapDB with H2 MVStore
+
 0.a - practical
 
 - [ ] dynamic cluster membership with UPaxos 
