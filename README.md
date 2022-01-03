@@ -90,7 +90,12 @@ sbt> sonatypeReleaseAll
 
 0.6.0 - MVStore as Journal with backup method
 
-- [ ] Replace MapDB with H2 MVStore
+- [x] Replace MapDB with H2 MVStore
+
+0.7.0 - Move Akka to be testing only hand upgrade core to RSocket
+
+- [x] Replace MapDB with H2 MVStore
+
 
 0.a - practical
 

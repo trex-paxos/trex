@@ -37,11 +37,11 @@ lazy val core = project.dependsOn(library).
   settings(
     Test / parallelExecution := false,
     libraryDependencies ++= Seq(
+      "com.h2database" % "h2-mvstore" % mvstoreVersion,
+      "io.argonaut" %% "argonaut" % argonautVersion,
       "com.typesafe" % "config" % "1.3.3",
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
-      "com.h2database" % "h2-mvstore" % mvstoreVersion,
-      "io.argonaut" %% "argonaut" % argonautVersion,
       "org.scalatest" %% "scalatest" % scalatestVersion % "test,it",
       "org.scalamock" %% "scalamock" % scalamockVersion % Test,
       "com.typesafe.akka" %% "akka-remote" % akkaVersion
