@@ -68,34 +68,7 @@ sbt> sonatypeReleaseAll
 ```
 
 
-## Status /  Work Plan
-
-0.1 - library (released)
-
-- [x] replace pickling
-- [x] fix driver
-- [x] is retransmission of accepted values actually safe?
-- [x] overrideable send methods
-- [x] fix the fixmes
-- [x] extract a core functional library with no dependencies
-- [x] breakup monolithic actor and increase unit test coverage
-- [x] java demo
-
-0.2 - Flexible paxos (FPaxos) hooks
-
-- [x] pluggable quorum strategy in the library
-
-0.3 - integrity
-
-- [x] crc32 message integrity 
-
-0.4.0 - 
-
-- [x] expose more methods for new rsocket code 
-
-0.4.1 - 
-
-- [x] Unpickle `byte[]` for Java clients
+## Tentative Roadmap
 
 0.5.0 - JPickle for Java Journal (latest Scala 2.12 support)
 
@@ -104,6 +77,10 @@ sbt> sonatypeReleaseAll
 0.5.1 - Scala 2.13 support
 
 - [x] Bump to Scala 2.13 and fix all deprecation warnings in preparation for Scala 3. Unfortunately my test dependencies do not yet support Scala 3. 
+
+0.5.2 - Bug fixes
+
+- [x] Issue #33 pickle of Seq[Accept] is broken 
 
 0.6.0 - MVStore as Journal with backup method
 
