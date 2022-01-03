@@ -34,18 +34,18 @@ class MVStoreSpec extends wordspec.AnyWordSpec with Matchers with BeforeAndAfter
 
   def actualString(bytes: Array[Byte]) = new String(bytes)
 
-  "MapDBStore" should {
+  "MVStoreJournal" should {
     "make bookwork durable" in {
       val number = BallotNumber(10, 2)
       val bookwork = Progress(number.copy(counter = number.counter), Identifier(1, number, 88L))
 
       {
-        val j = new MapDBStore(storeFile, 10)
+        val j = new MVStoreJournal(storeFile, 10)
         j.saveProgress(bookwork)
         j.close()
       }
 
-      val j = new MapDBStore(storeFile, 10)
+      val j = new MVStoreJournal(storeFile, 10)
       val readBackData = j.loadProgress()
       j.close()
       assert(bookwork == readBackData)
@@ -57,12 +57,12 @@ class MVStoreSpec extends wordspec.AnyWordSpec with Matchers with BeforeAndAfter
       val accept = Accept(identifier, ClientCommandValue("0", expectedBytes))
 
       {
-        val j = new MapDBStore(storeFile, 10)
+        val j = new MVStoreJournal(storeFile, 10)
         j.accept(accept)
         j.close()
       }
 
-      val j = new MapDBStore(storeFile, 10)
+      val j = new MVStoreJournal(storeFile, 10)
       val readBackAccept = j.accepted(logIndex).getOrElse(fail("should be defined"))
       j.close()
     }
@@ -76,7 +76,7 @@ class MVStoreSpec extends wordspec.AnyWordSpec with Matchers with BeforeAndAfter
         Accept(identifier, ClientCommandValue("0", expectedBytes))
       }
 
-      val j = new MapDBStore(storeFile, 2)
+      val j = new MVStoreJournal(storeFile, 2)
 
       for (a <- 0 to 9) j.accept(next)
 
@@ -113,7 +113,7 @@ class MVStoreSpec extends wordspec.AnyWordSpec with Matchers with BeforeAndAfter
         Accept(identifier, ClientCommandValue("0", expectedBytes))
       }
 
-      val j = new MapDBStore(storeFile, 2)
+      val j = new MVStoreJournal(storeFile, 2)
 
       for (a <- 0 to 9) j.accept(next)
 
@@ -122,12 +122,12 @@ class MVStoreSpec extends wordspec.AnyWordSpec with Matchers with BeforeAndAfter
       j.close()
     }
     "load nothing when empty" in {
-      val store = new MapDBStore(storeFile, 2)
+      val store = new MVStoreJournal(storeFile, 2)
       store.loadMembership() shouldBe None
     }
     "should throw an exception for an overwrite" in {
       val m = Membership("default", Seq(Member(1, "one", "xxx", MemberStatus.Learning), Member(2, "two", "yyy", MemberStatus.Accepting)))
-      val store = new MapDBStore(storeFile, 2)
+      val store = new MVStoreJournal(storeFile, 2)
       store.saveMembership(CommittedMembership(0L, m))
       try {
         store.saveMembership(CommittedMembership(0L, m))

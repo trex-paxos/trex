@@ -1,4 +1,4 @@
-val mapdbVersion = "1.0.9"
+val mvstoreVersion = "2.0.204"
 val akkaVersion = "2.5.32"
 val logbackVersion = "1.2.10"
 val argonautVersion = "6.3.7"
@@ -40,7 +40,7 @@ lazy val core = project.dependsOn(library).
       "com.typesafe" % "config" % "1.3.3",
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
-      "org.mapdb" % "mapdb" % mapdbVersion,
+      "com.h2database" % "h2-mvstore" % mvstoreVersion,
       "io.argonaut" %% "argonaut" % argonautVersion,
       "org.scalatest" %% "scalatest" % scalatestVersion % "test,it",
       "org.scalamock" %% "scalamock" % scalamockVersion % Test,
@@ -60,7 +60,7 @@ lazy val demo = project.dependsOn(core).
       "com.typesafe.akka" %% "akka-remote" % akkaVersion,
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       "com.typesafe.akka" %% "akka-actor-typed" %akkaVersion,
-      "org.mapdb" % "mapdb" % mapdbVersion,
+      "com.h2database" % "h2-mvstore" % mvstoreVersion,
       "org.scalatest" %% "scalatest" % scalatestVersion % Test,
       "org.scalamock" %% "scalamock" % scalamockVersion % Test
     )

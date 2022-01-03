@@ -3,7 +3,7 @@ package com.github.trex_paxos.demo
 import akka.actor.TypedActor.MethodCall
 import akka.actor._
 import com.typesafe.config.ConfigFactory
-import org.mapdb.{DB, DBMaker}
+//import org.mapdb.{DB, DBMaker}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -47,10 +47,10 @@ object RemoteKVStore {
     }
     val dataFolder = new java.io.File(folder.getCanonicalPath + "/" + port)
 
-    val db: DB = DBMaker.newFileDB(dataFolder).make
+    //val db: DB = DBMaker.newFileDB(dataFolder).make
     val system =
       ActorSystem("ConsistentStore", ConfigFactory.load(s"remotestore-$port"))
-    system.actorOf(Props(classOf[MethodCallInvoker], new MapDBConsistentKVStore(db)), "store")
+    system.actorOf(Props(classOf[MethodCallInvoker], new MapDBConsistentKVStore(null)), "store")
 
     println(s"Started node $port with store $dataFolder")
   }
