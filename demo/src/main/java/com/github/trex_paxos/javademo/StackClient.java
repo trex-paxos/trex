@@ -23,7 +23,7 @@ public class StackClient {
                 akka.util.Timeout.apply(scala.concurrent.duration.FiniteDuration.apply(100, "ms")), 20));
         DynamicClusterDriver.Initialize init = DynamicClusterDriver$.MODULE$.apply(cluster);
         driver.tell(init, null);
-        StringStack stack = TypedActor.get(system).typedActorOf(new TypedProps<StringStackImpl>(StringStack.class, StringStackImpl.class), driver);
+        StringStack stack = TypedActor.get(system).typedActorOf(new TypedProps<>(StringStack.class, StringStackImpl.class), driver);
         return stack;
     }
 

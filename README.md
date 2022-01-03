@@ -9,7 +9,7 @@ Note:
 
  * `trex-library` is the core protocol that is meant for reuse. 
  * `trex-core` is a testable scaffolding that is built using Akka primarily as Akka has excellent test tooling for async messaging. If you are not using Akka in your project you would provide your own alternatives and not use these classes. 
- * `trex-demo` contains a couple of simple apps such as a distributed stack and a toy KV store. 
+ * `trex-demo` contains an example java app that implements a stack replicated across a paxos cluster. 
 
 ## Building
 
@@ -19,9 +19,35 @@ sbt clean test it:test
 sbt coverageReport
 ```
 
-## Java Demo
+## Java Clustered Stack Demo
 
-Make some state folders with: 
+This implements a stack service as a paxos cluster with the interface: 
+
+```java
+package com.github.trex_paxos.javademo;
+
+public interface StringStack {
+    String push(String item);
+    String pop();
+    String peek();
+    boolean empty();
+    int search(Object o);
+}
+```
+
+The concrete implementation class is `com.github.trex_paxos.javademo.StringStackImpl` which is a simple wrapper 
+over `java.util.Stack<String>` where operations are also serialized to disk so that the processes can be 
+killed and restarted to recover the state of the in-memory stack. 
+
+In order to run this service as a Paxos cluster the `trex-core` package is used to wrap the `StringStackImpl` as 
+create a `TrexServer` that listens on a unique TCP socket for client connections. The set of servers use UDP to 
+broadcast messages to elect a leader and run the Paxos algorithm. 
+
+The class `com.github.trex_paxos.javademo.StackClient` obtains a dynamic proxy that implements the `StringStack` 
+interface. The dynamic proxy uses `DynamicClusterDriver` that makes TCP connections to the all the `TrexServer` 
+and send command messages to current leader. 
+
+To run the demo first make some state folders with: 
 
 ```shell
 mkdir -p /private/tmp/2552
@@ -29,11 +55,14 @@ mkdir -p /private/tmp/2562
 mkdir -p /private/tmp/2572
 ```
 
-Note that those won't automatically be cleaned up so that you can experiment with crashes.
+Note the folder will not be automatically cleaned up so that you can experiment with killing 
+and restarting severs. 
 
-Then run three versions of `com.github.trex_paxos.javademo.StackClusterNode` assigning them node
-numbers `2552`, `2562` and `2572`. In IntelliJ simply run the main method then add the following 
-args `server3.conf xxxx` replacing the xxxx with the node numbers. 
+Then run three versions of `com.github.trex_paxos.javademo.StackClusterNode` passing the following arguments:
+
+ * `server3.conf 2552`
+ * `server3.conf 2562`
+ * `server3.conf 2572`
 
 Once the cluster is up run the client main method with:
 
@@ -61,7 +90,7 @@ pop
 1
 ```
 
-You can experiment with killing nodes and restarting them to see what happens. As long as two our of 
+You can experiment with killing nodes and restarting them to see what happens. As long as two out of 
 three nodes are running the client should get responses. 
 
 # Releases
