@@ -3,11 +3,10 @@ package com.github.trex_paxos.internals
 import java.io.File
 
 import _root_.com.github.trex_paxos.library._
-import org.scalamock.scalatest.MockFactory
 import org.scalatest._
 import matchers.should._
 
-class MVStoreSpec extends wordspec.AnyWordSpec with Matchers with BeforeAndAfter with MockFactory {
+class MVStoreSpec extends wordspec.AnyWordSpec with Matchers with BeforeAndAfter  {
 
   // MapDB 1.0.x logical store file creates two other files .p and .t which we delete
   val storeFile = new File("store.trex")

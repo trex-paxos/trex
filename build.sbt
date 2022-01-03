@@ -1,16 +1,19 @@
 val mapdbVersion = "1.0.9"
-val scalatestVersion = "3.2.10"
 val akkaVersion = "2.5.32"
 val logbackVersion = "1.2.10"
 val argonautVersion = "6.3.7"
+val scalatestVersion = "3.2.10"
+val scalamockVersion = "5.2.0"
+
+lazy val scala2 = "2.13.7"
 
 releaseIgnoreUntrackedFiles := true
 //releasePublishArtifactsAction := PgpKeys.publishSigned.value
 
 lazy val commonSettings = Seq(
-  scalaVersion := "2.13.7",
+  scalaVersion := scala2,
   organization := "com.github.trex-paxos",
-  scalacOptions := Seq("-feature", "-deprecation", "-Xfatal-warnings")
+  scalacOptions := Seq("-feature", "-deprecation", "-Xfatal-warnings"),
 )
 
 lazy val root = (project in file(".")).aggregate(library,core,demo).settings(
@@ -21,8 +24,8 @@ lazy val library = project.settings(commonSettings: _*).
   settings( name := "trex-library").
   settings(
     libraryDependencies ++= Seq(
-      "org.scalatest" % "scalatest_2.13" % scalatestVersion % "test",
-      "org.scalamock" %% "scalamock" % "5.2.0" % Test
+      "org.scalatest" %% "scalatest" % scalatestVersion % Test,
+      "org.scalamock" %% "scalamock" % scalamockVersion % Test
     )
   )
 
@@ -39,8 +42,8 @@ lazy val core = project.dependsOn(library).
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       "org.mapdb" % "mapdb" % mapdbVersion,
       "io.argonaut" %% "argonaut" % argonautVersion,
-      "org.scalatest" % "scalatest_2.13" % scalatestVersion % "test,it",
-      "org.scalamock" %% "scalamock" % "5.2.0" % Test,
+      "org.scalatest" %% "scalatest" % scalatestVersion % "test,it",
+      "org.scalamock" %% "scalamock" % scalamockVersion % Test,
       "com.typesafe.akka" %% "akka-remote" % akkaVersion
     )
   )
@@ -58,7 +61,7 @@ lazy val demo = project.dependsOn(core).
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
       "com.typesafe.akka" %% "akka-actor-typed" %akkaVersion,
       "org.mapdb" % "mapdb" % mapdbVersion,
-      "org.scalatest" % "scalatest_2.13" % scalatestVersion % "test",
-      "org.scalamock" %% "scalamock" % "5.2.0" % Test
+      "org.scalatest" %% "scalatest" % scalatestVersion % Test,
+      "org.scalamock" %% "scalamock" % scalamockVersion % Test
     )
   )
