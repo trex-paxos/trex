@@ -1,3 +1,8 @@
+
+publishTo := sonatypePublishToBundle.value
+
+ThisBuild / versionScheme := Some("early-semver")
+
 ThisBuild / organization := "com.github.trex-paxos"
 ThisBuild / organizationName := "com.github.trex-paxos"
 ThisBuild / organizationHomepage := Some(url("https://github.com/trex-paxos/trex"))
@@ -13,7 +18,7 @@ ThisBuild / developers := List(
     id    = "simbo1905",
     name  = "Simon Massey",
     email = "simbo1905@60hertz.com",
-    url   = url("http://simbo1905.blog")
+    url   = url("https://simbo1905.wordpress.com")
   )
 )
 

@@ -7,8 +7,8 @@ val scalamockVersion = "5.2.0"
 
 lazy val scala2 = "2.13.7"
 
-releaseIgnoreUntrackedFiles := true
-//releasePublishArtifactsAction := PgpKeys.publishSigned.value
+Global / onChangedBuildSource := ReloadOnSourceChanges
+publish / skip := true
 
 lazy val commonSettings = Seq(
   scalaVersion := scala2,
