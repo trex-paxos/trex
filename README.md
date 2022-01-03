@@ -5,6 +5,12 @@
 
 Checkout the [blog posts](https://simbo1905.wordpress.com/2016/01/09/trex-a-paxos-replication-engine/) for a description of this implementation of [Paxos Made Simple](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/12/paxos-simple-Copy). 
 
+Note: 
+
+ * `trex-library` is the core protocol that is meant for reuse. 
+ * `trex-core` is a testable scaffolding that is built using Akka primarily as Akka has excellent test tooling for async messaging. If you are not using Akka in your project you would provide your own alternatives and not use these classes. 
+ * `trex-demo` contains a couple of simple apps such as a distributed stack and a toy KV store. 
+
 ## Building
 
 ```
