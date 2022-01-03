@@ -265,7 +265,7 @@ case class RetransmitRequest(from: Int, to: Int, logIndex: Long) extends PaxosMe
  * @param committed A contiguous sequence of committed accept messages in ascending order
  * @param uncommitted A contiguous sequence of proposed but uncommitted accept messages in ascending order
  */
-case class RetransmitResponse(from: Int, to: Int, val committed: Seq[Accept], uncommitted: Seq[Accept]) extends PaxosMessage
+case class RetransmitResponse(from: Int, to: Int, committed: Seq[Accept], uncommitted: Seq[Accept]) extends PaxosMessage
 
 /**
  * Scheduled message used to trigger timeout work.
@@ -283,7 +283,7 @@ case object HeartBeat extends PaxosMessage
  * @param nodeId The node replying that it is not the leader.
  * @param msgId The client message identifier which the node is responding to.
  */
-case class NotLeader(val nodeId: Int, val msgId: String) extends PaxosMessage
+case class NotLeader(nodeId: Int, msgId: String) extends PaxosMessage
 
 /**
   * Response to a client when the nodes is not currently a follower. As the leader is write bottleneck applications that
@@ -293,7 +293,7 @@ case class NotLeader(val nodeId: Int, val msgId: String) extends PaxosMessage
   * @param nodeId The node replying that it is has become the leader.
   * @param msgId The client message which the node is responding to.
   */
-case class NotFollower(val nodeId: Int, val msgId: String) extends PaxosMessage
+case class NotFollower(nodeId: Int, msgId: String) extends PaxosMessage
 
 /**
  * Response to a client when the nodes has lost its leadership whilst servicing a request during a fail-over due to
@@ -308,7 +308,7 @@ case class NotFollower(val nodeId: Int, val msgId: String) extends PaxosMessage
  * @param nodeId The node replying that it is has lost the leader.
  * @param msgId The client message which the node is responding to.
  */
-case class LostLeadershipException(val nodeId: Int, val msgId: String) extends RuntimeException with PaxosMessage {
+case class LostLeadershipException(nodeId: Int, msgId: String) extends RuntimeException with PaxosMessage {
   override def toString() = s"LostLeadershipException($nodeId,$msgId)"
 }
 
@@ -318,7 +318,7 @@ case class LostLeadershipException(val nodeId: Int, val msgId: String) extends R
   * @param clientMsgId The id of the ClientCommandValue being responded to.
   * @param response The result of running the comand value.
   */
-case class ServerResponse(logIndex: Long, clientMsgId: String, val response: Option[Array[Byte]])
+case class ServerResponse(logIndex: Long, clientMsgId: String, response: Option[Array[Byte]])
 
 /** Paxos process roles */
 sealed trait PaxosRole
