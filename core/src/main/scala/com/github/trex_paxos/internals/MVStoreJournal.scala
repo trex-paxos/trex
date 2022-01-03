@@ -78,8 +78,8 @@ class MVStoreJournal(journalFile: File, retained: Int = Int.MaxValue, retainedBa
   }
 
   /**
-    * Synchronously save an accept message in its slot specified by the logIndex in the [[Identifier]] of the message.
-    * Callers *must* ensure that values with a low [[BallotNumber]] do not overwrite values with a higher number using
+    * Synchronously save an accept message in its slot specified by the logIndex in the Identifier of the message.
+    * Callers *must* ensure that values with a low BallotNumber do not overwrite values with a higher number using
     * the Paxos Algorithm.
     */
   override def accept(a:  Accept*): Unit = {
