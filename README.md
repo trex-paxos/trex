@@ -52,7 +52,13 @@ sbt> sonatypeReleaseAll
 
 - [x] Unpickle `byte[]` for Java clients
 
-0.5.0 - JPickle for Java Journal
+0.5.0 - JPickle for Java Journal (latest Scala 2.12 support)
+
+- [x] Wrapper that acts as sugar to make it easier to pickle Accepts and Prepares from Java 
+
+0.5.1 - Scala 2.13 support
+
+- [x] Bump to Scala 2.13 and fix all deprecation warnings in preparation for Scala 3. Unfortunately my test dependencies do not yet support Scala 3. 
 
 0.6.0 - MVStore as Journal with backup method
 
