@@ -113,7 +113,7 @@ object TrexKVStore {
     val nodeId = args(1).toInt
     val config = ConfigFactory.load(configName)
     val cluster = Cluster.parseConfig(config)
-    val node = cluster.nodeMap.getOrElse(nodeId, throw new IllegalArgumentException(s"No node $nodeId in $cluster"))
+    cluster.nodeMap.getOrElse(nodeId, throw new IllegalArgumentException(s"No node $nodeId in $cluster"))
 
     println(cluster)
     val nodeMap = cluster.nodes.map(node => (node.nodeUniqueId, node)).toMap

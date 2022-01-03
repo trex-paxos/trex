@@ -80,6 +80,8 @@ public class StackClient {
                         System.out.println(stack.peek());
                     }
 
+                } else if (input.startsWith("search ")){
+                    System.out.println(stack.search(input.substring("search ".length())));
                 }
                 else {
                     System.err.println("not implemented: " + input);
