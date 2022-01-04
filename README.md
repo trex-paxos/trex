@@ -45,7 +45,7 @@ broadcast messages to elect a leader and run the Paxos algorithm.
 
 The class `com.github.trex_paxos.javademo.StackClient` obtains a dynamic proxy that implements the `StringStack` 
 interface. The dynamic proxy uses `DynamicClusterDriver` that makes TCP connections to the all the `TrexServer` 
-and send command messages to current leader. 
+and sends `ClientCommandValue` messages to current leader. 
 
 To run the demo first make some state folders with: 
 
