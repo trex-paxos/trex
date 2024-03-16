@@ -8,9 +8,9 @@
           "scala-lang.scala@0.5.7",
           "scalameta.metals@1.26.1",
           // Git
-          "Exelord.git-commits"
+          "Exelord.git-commits",
           // Various
-          // "GitHub.copilot" // Uncomment to use GitHub Copilot
+          "GitHub.copilot" // Uncomment to use GitHub Copilot
         ]
       }
     },

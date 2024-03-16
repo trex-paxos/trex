@@ -6,7 +6,6 @@
 /project/config-classes
 /.idea
 .metals/
-.vscode/
 trex.iml
 compile
 core/target/
