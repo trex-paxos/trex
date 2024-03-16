@@ -1,0 +1,155 @@
+{
+    "version": "1.4.0",
+    "project": {
+        "name": "root-test",
+        "directory": "/workspaces/trex",
+        "workspaceDir": "/workspaces/trex",
+        "sources": [
+            "/workspaces/trex/src/test/scala",
+            "/workspaces/trex/src/test/scala-2.12",
+            "/workspaces/trex/src/test/scala-2",
+            "/workspaces/trex/src/test/java",
+            "/workspaces/trex/target/scala-2.12/src_managed/test"
+        ],
+        "dependencies": [
+            "root",
+            "library-test",
+            "core-test",
+            "demo-test"
+        ],
+        "classpath": [
+            "/workspaces/trex/.bloop/root/scala-2.12/classes",
+            "/home/codespace/.sbt/boot/scala-2.12.15/lib/scala-library.jar"
+        ],
+        "out": "/workspaces/trex/.bloop/root",
+        "classesDir": "/workspaces/trex/.bloop/root/scala-2.12/test-classes",
+        "resources": [
+            "/workspaces/trex/src/test/resources",
+            "/workspaces/trex/target/scala-2.12/resource_managed/test"
+        ],
+        "scala": {
+            "organization": "org.scala-lang",
+            "name": "scala-compiler",
+            "version": "2.12.15",
+            "options": [
+                
+            ],
+            "jars": [
+                "/home/codespace/.sbt/boot/scala-2.12.15/lib/scala-library.jar",
+                "/home/codespace/.sbt/boot/scala-2.12.15/lib/scala-xml_2.12-1.0.6.jar",
+                "/home/codespace/.sbt/boot/scala-2.12.15/lib/scala-compiler.jar",
+                "/home/codespace/.sbt/boot/scala-2.12.15/lib/scala-reflect.jar"
+            ],
+            "setup": {
+                "order": "mixed",
+                "addLibraryToBootClasspath": true,
+                "addCompilerToClasspath": false,
+                "addExtraJarsToClasspath": false,
+                "manageBootClasspath": true,
+                "filterLibraryFromClasspath": true
+            }
+        },
+        "java": {
+            "options": [
+                
+            ]
+        },
+        "test": {
+            "frameworks": [
+                {
+                    "names": [
+                        "org.scalacheck.ScalaCheckFramework"
+                    ]
+                },
+                {
+                    "names": [
+                        "org.specs2.runner.Specs2Framework",
+                        "org.specs2.runner.SpecsFramework"
+                    ]
+                },
+                {
+                    "names": [
+                        "org.specs.runner.SpecsFramework"
+                    ]
+                },
+                {
+                    "names": [
+                        "org.scalatest.tools.Framework",
+                        "org.scalatest.tools.ScalaTestFramework"
+                    ]
+                },
+                {
+                    "names": [
+                        "com.novocode.junit.JUnitFramework"
+                    ]
+                },
+                {
+                    "names": [
+                        "munit.Framework"
+                    ]
+                }
+            ],
+            "options": {
+                "excludes": [
+                    
+                ],
+                "arguments": [
+                    
+                ]
+            }
+        },
+        "platform": {
+            "name": "jvm",
+            "config": {
+                "home": "/opt/java/11.0.14",
+                "options": [
+                    "-Duser.dir=/workspaces/trex"
+                ]
+            },
+            "mainClass": [
+                
+            ]
+        },
+        "resolution": {
+            "modules": [
+                {
+                    "organization": "org.scala-lang",
+                    "name": "scala-library",
+                    "version": "2.12.15",
+                    "configurations": "default",
+                    "artifacts": [
+                        {
+                            "name": "scala-library",
+                            "path": "/home/codespace/.sbt/boot/scala-2.12.15/lib/scala-library.jar"
+                        },
+                        {
+                            "name": "scala-library",
+                            "classifier": "sources",
+                            "path": "/home/codespace/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.12.15/scala-library-2.12.15-sources.jar"
+                        }
+                    ]
+                },
+                {
+                    "organization": "org.scala-lang",
+                    "name": "scala-library",
+                    "version": "2.12.15",
+                    "configurations": "optional",
+                    "artifacts": [
+                        {
+                            "name": "scala-library",
+                            "path": "/home/codespace/.sbt/boot/scala-2.12.15/lib/scala-library.jar"
+                        },
+                        {
+                            "name": "scala-library",
+                            "classifier": "sources",
+                            "path": "/home/codespace/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.12.15/scala-library-2.12.15-sources.jar"
+                        }
+                    ]
+                }
+            ]
+        },
+        "tags": [
+            "test"
+        ]
+    }
+}
