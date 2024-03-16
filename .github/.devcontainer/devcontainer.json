@@ -1,0 +1,19 @@
+{
+    "name": "scala-sbt-codespaces-template",
+    "image": "sbtscala/scala-sbt:eclipse-temurin-jammy-17.0.8.1_1_1.9.7_3.3.1",
+    "customizations": {
+      "vscode": {
+        "extensions": [
+          // Scala
+          "scala-lang.scala@0.5.7",
+          "scalameta.metals@1.26.1",
+          // Git
+          "Exelord.git-commits"
+          // Various
+          // "GitHub.copilot" // Uncomment to use GitHub Copilot
+        ]
+      }
+    },
+    "postCreateCommand": "bash .devcontainer/post-create.sh",
+    "remoteUser": "sbtuser"
+  }
